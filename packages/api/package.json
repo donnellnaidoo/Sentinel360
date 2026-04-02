@@ -1,0 +1,27 @@
+{
+  "name": "@Sentinel360/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@Sentinel360/auth": "workspace:*",
+    "@Sentinel360/db": "workspace:*",
+    "@Sentinel360/env": "workspace:*",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@Sentinel360/config": "workspace:*",
+    "hono": "catalog:",
+    "typescript": "^5"
+  }
+}

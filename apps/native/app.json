@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "scheme": "Sentinel360",
+    "userInterfaceStyle": "automatic",
+    "orientation": "default",
+    "web": {
+      "bundler": "metro"
+    },
+    "name": "Sentinel360",
+    "slug": "Sentinel360",
+    "plugins": ["expo-font"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
