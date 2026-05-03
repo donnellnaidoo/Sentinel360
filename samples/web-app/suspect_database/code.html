@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | Suspect Database</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-surface": "#191c1d",
+                        "on-secondary-container": "#48617e",
+                        "background": "#f8f9fa",
+                        "surface-tint": "#545e76",
+                        "primary-fixed": "#d7e2ff",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#c2dcff",
+                        "on-secondary-fixed": "#001d36",
+                        "surface-container-high": "#e7e8e9",
+                        "primary-container": "#1b263b",
+                        "on-secondary-fixed-variant": "#2f4865",
+                        "tertiary-container": "#332306",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#2e3132",
+                        "on-tertiary-container": "#a28963",
+                        "tertiary": "#1a0f00",
+                        "secondary-fixed": "#d1e4ff",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e4",
+                        "on-surface-variant": "#45474d",
+                        "surface-container": "#edeeef",
+                        "secondary": "#47607e",
+                        "inverse-primary": "#bbc6e2",
+                        "on-primary-container": "#828da7",
+                        "tertiary-fixed-dim": "#dfc299",
+                        "on-background": "#191c1d",
+                        "surface": "#f8f9fa",
+                        "outline": "#75777d",
+                        "primary-fixed-dim": "#bbc6e2",
+                        "outline-variant": "#c5c6cd",
+                        "surface-dim": "#d9dadb",
+                        "tertiary-fixed": "#fcdeb3",
+                        "on-tertiary-fixed-variant": "#574423",
+                        "surface-container-highest": "#e1e3e4",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#271901",
+                        "surface-container-low": "#f3f4f5",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#101b30",
+                        "primary": "#051125",
+                        "surface-bright": "#f8f9fa",
+                        "secondary-fixed-dim": "#afc9ea",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#3c475d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .font-headline { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="text-on-surface selection:bg-secondary-container">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full w-64 bg-[#051125] text-white z-40 flex flex-col">
+<div class="p-6">
+<div class="text-xl font-bold tracking-tight font-headline">Sentinel360</div>
+<div class="text-[0.6875rem] font-medium text-slate-400 uppercase tracking-widest mt-1">Enterprise Intelligence</div>
+</div>
+<div class="px-4 py-6">
+<button class="w-full bg-gradient-to-r from-[#051125] to-[#1B263B] border border-white/10 text-white py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-headline font-bold text-sm transition-transform active:scale-95">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Investigation
+            </button>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-6 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="text-sm font-medium">Live Surveillance</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+<span class="text-sm font-medium">AI Alerts</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="search_check">search_check</span>
+<span class="text-sm font-medium">Investigations</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white border-l-4 border-white" href="#">
+<span class="material-symbols-outlined" data-icon="person_search">person_search</span>
+<span class="text-sm font-medium">Suspect Database</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="directions_car">directions_car</span>
+<span class="text-sm font-medium">Vehicles Database</span>
+</a>
+</nav>
+<div class="mt-auto p-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors text-xs" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings_input_component">settings_input_component</span>
+                System Status
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors text-xs" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+                Settings
+            </a>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 h-16 ml-64 w-[calc(100%-16rem)] z-30 bg-[#F8F9FA]/80 backdrop-blur-xl flex justify-between items-center px-8">
+<div class="flex items-center gap-8 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 placeholder:text-on-surface-variant/60" placeholder="Search suspect identities..." type="text"/>
+</div>
+<nav class="hidden lg:flex items-center gap-6">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#">Global View</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#">Analytics</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm border-b-2 border-primary py-1" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<div class="flex items-center gap-3 ml-2 border-l border-outline-variant/20 pl-4">
+<div class="text-right hidden sm:block">
+<p class="text-xs font-bold text-on-surface">Agent K. Miller</p>
+<p class="text-[10px] text-on-surface-variant">Level 4 Clearance</p>
+</div>
+<img class="w-8 h-8 rounded-full bg-surface-container-high object-cover" data-alt="professional male intelligence officer headshot with neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0gR66Q_OWZ_ZmAIEweR-8ggci8D4Y6Xse2rqFmokc9L5HY_h37pOo5GYvAwn1IrkIj8phi3l_ps4Qawx7jyV4MQEvW1fJa9BNPHtFEHwZ1lJ3s6HQrCsOmy4QC_3BJKmbiAEFL39CGA8LU8vBSuW5SpETu0sfOVa8p_74ieiRW3umdEZlB6uJdG_g9ynFYVsUK4oncYT52FX725KvsNElfChSO6oXY4bEIq6MX9oB6d4HKhNEwka12Il-BC8D9eXWoeLROP5SaZU"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-64 pt-20 p-8 min-h-screen">
+<div class="max-w-7xl mx-auto space-y-8">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="text-3xl font-extrabold font-headline tracking-tight text-primary">Suspect Database</h1>
+<p class="text-on-surface-variant mt-1 font-medium">Monitoring 2,842 active intelligence profiles across all sectors.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-on-surface-variant rounded-xl font-semibold text-sm shadow-sm hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-lg">file_download</span>
+                        Export Data
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-container text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary/10 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-lg">person_add</span>
+                        Register Suspect
+                    </button>
+</div>
+</div>
+<!-- Filters Bar -->
+<div class="bg-surface-container-low p-4 rounded-2xl flex flex-wrap items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-wider">Filters:</span>
+</div>
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border-none rounded-lg pl-4 pr-10 py-2 text-xs font-semibold text-on-surface-variant focus:ring-2 focus:ring-primary/10 cursor-pointer">
+<option>All Crime Types</option>
+<option>Cybercrime</option>
+<option>Financial Fraud</option>
+<option>Organized Crime</option>
+<option>Narcotics</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-lg">expand_more</span>
+</div>
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border-none rounded-lg pl-4 pr-10 py-2 text-xs font-semibold text-on-surface-variant focus:ring-2 focus:ring-primary/10 cursor-pointer">
+<option>All Regions</option>
+<option>North District</option>
+<option>South Sector</option>
+<option>Metropolitan</option>
+<option>International</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-lg">expand_more</span>
+</div>
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border-none rounded-lg pl-4 pr-10 py-2 text-xs font-semibold text-on-surface-variant focus:ring-2 focus:ring-primary/10 cursor-pointer">
+<option>All Statuses</option>
+<option>Wanted</option>
+<option>In Custody</option>
+<option>Under Observation</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-lg">expand_more</span>
+</div>
+<div class="ml-auto">
+<button class="text-primary text-xs font-bold hover:underline">Clear all filters</button>
+</div>
+</div>
+<!-- Data Table Container -->
+<div class="bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-6 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Suspect Identity</th>
+<th class="px-6 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Classification</th>
+<th class="px-6 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Current Status</th>
+<th class="px-6 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Geo-Coordinates</th>
+<th class="px-6 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Lead Officer</th>
+<th class="px-6 py-4 text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest text-right">Interventions</th>
+</tr>
+</thead>
+<tbody class="divide-y-8 divide-surface-container-lowest">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-high/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="w-12 h-12 rounded-xl object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="close-up mugshot of a man with serious expression and short dark hair" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqSX_zU0Vr7RCMCqlMmu4TphaAujIz1Vb2UjhX5O3MzX0tDBETaUD-HIfa-5Pf1qY63IDKq1P38hYR7jRN5Qcr2rYndgwE9C_BccpZEdW8ZJEhauX_BX2LR0G8GqCCjPOy-4OfBgzJusGHoHjMqMTsk9gL2a0RNNbpE7QUqBp_gkpaPMbertBodrCv2UGZ_0d-c8rdMRZxBtYxlW5j1iqxYZkJPt2eXZtH9rVnqEYVKi45kW7VN3CIaIYX6lE0KjknRibEBJvIb1c"/>
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-error border-2 border-surface rounded-full"></div>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Marcus Vane</p>
+<p class="text-[10px] text-on-surface-variant font-mono">ID: #SV-992-B</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">Cyber Espionage</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-xs font-bold text-error">WANTED</span>
+</div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                        Berlin, Germany
+                                    </div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+                                    Agent J. Thorne
+                                </td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 text-[10px] font-bold bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg transition-colors">Edit</button>
+<button class="px-3 py-1.5 text-[10px] font-bold bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">View Profile</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-high/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="w-12 h-12 rounded-xl object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="close-up mugshot of a woman with long dark hair and neutral expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmPPpZNp7R2wPENR-eSnshMIfwLIEFr7sEWBtOEw8neyoh4boGJ57h_VGl8wVKvfh4Cc84N6sfHnHz-YaMnONdgSM8aMpJQYi_jxdYHy3bgwuqINuT-hON8fcjvsOCJTZbuq4MDxjQYf-9hyyNaRijaqtAy_kEvGLhl6J2HL9Xa4YhbLHXusv_Jic0G__igIb1gAhUSSyqV0SZT5qm5iA9isiyZcGdo0jeVKmS24Ifot_IPQC_PefoeOJ5Q3OYd7TVogevy7PDp8w"/>
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-secondary border-2 border-surface rounded-full"></div>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Elena Petrova</p>
+<p class="text-[10px] text-on-surface-variant font-mono">ID: #SV-412-K</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-secondary/10 text-secondary border border-secondary/20">Money Laundering</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-xs font-bold text-secondary">IN CUSTODY</span>
+</div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                        Zurich, Switzerland
+                                    </div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+                                    Senior Lead Miller
+                                </td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 text-[10px] font-bold bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg transition-colors">Edit</button>
+<button class="px-3 py-1.5 text-[10px] font-bold bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">View Profile</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-high/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="w-12 h-12 rounded-xl object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="mugshot style portrait of older man with grey beard and spectacles" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBAbBpMT3XoaNTO6aBiH_CXjwcKfUGrenUVF7naFDmtC2iS8JOl8pa-Xa-Sm6IPBQBcNMWIGYDpRNN0LxQ0gw-dCJjOSAS3TkLmlAin9I_3joFmpYRWaSNfUvmx9zlAcFEza9hVuKJAj_1L5ozcgBIXI5_fQ6I6bZq-GJ1SdN3uCmmbCdLKgA-VzCjvtXOCktySy3hFuKDMXx115bRAXzMckg7nb4sYci2UzfZLT5__iiQ0lIdTRPDBQqmR1Rk93U_P7jfwY8vXDY"/>
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-error border-2 border-surface rounded-full"></div>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Julian Graves</p>
+<p class="text-[10px] text-on-surface-variant font-mono">ID: #SV-004-X</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-error/10 text-error border border-error/20">High Priority Arms</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-xs font-bold text-error">WANTED</span>
+</div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                        Marseille, France
+                                    </div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+                                    Agent D. Silas
+                                </td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 text-[10px] font-bold bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg transition-colors">Edit</button>
+<button class="px-3 py-1.5 text-[10px] font-bold bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">View Profile</button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-high/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="w-12 h-12 rounded-xl object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="professional portrait of young man with dark curly hair looking slightly away" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgCQ3tryobQnL_j_4Iewxfue4hKLbk2z2nFXLvmRVk44_ZZpvcDvRMwi9bGchTkJOjmVLC7DzamIUmKzrrQ2jAzAZ5689VqnDHSslj18v3rrBYTUTRvtCQVZy088EcsGkEoLG-EclQ0vQ4BDC30kfyBS57J1rowmb1dA18cy_ROd12lb0Oqa_9jG_hjgFPu_8grHTgBVdJk5F6lSvn9zeEUIiMN1-wQvLJqchzodh8Iz6_e4EG29HTMOfvaGhNMDQVgWwRzT4mYdE"/>
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-on-tertiary-container border-2 border-surface rounded-full"></div>
+</div>
+<div>
+<p class="font-bold text-on-surface text-sm">Li Wei</p>
+<p class="text-[10px] text-on-surface-variant font-mono">ID: #SV-551-Q</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-on-tertiary-container/10 text-on-tertiary-container border border-on-tertiary-container/20">Corporate Espionage</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-on-tertiary-container"></span>
+<span class="text-xs font-bold text-on-tertiary-container">UNDER WATCH</span>
+</div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                        Shanghai, China
+                                    </div>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface-variant">
+                                    Officer B. Taggert
+                                </td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="px-3 py-1.5 text-[10px] font-bold bg-surface-container-low text-on-surface hover:bg-surface-container-high rounded-lg transition-colors">Edit</button>
+<button class="px-3 py-1.5 text-[10px] font-bold bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">View Profile</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="p-6 border-t border-outline-variant/10 flex items-center justify-between">
+<p class="text-xs font-medium text-on-surface-variant">Showing 4 of 2,842 intelligence profiles</p>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-white bg-primary font-bold text-xs">1</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors font-bold text-xs">2</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors font-bold text-xs">3</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant bg-surface-container-low hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Dashboard Stats Bento Preview -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-low p-6 rounded-3xl flex flex-col gap-4">
+<div class="w-10 h-10 rounded-xl bg-error/10 text-error flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div>
+<h3 class="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Active Search Warrants</h3>
+<p class="text-3xl font-extrabold font-headline text-primary mt-1">114</p>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-3xl flex flex-col gap-4">
+<div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">lock</span>
+</div>
+<div>
+<h3 class="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest">Securely Detained</h3>
+<p class="text-3xl font-extrabold font-headline text-primary mt-1">682</p>
+</div>
+</div>
+<div class="bg-primary p-6 rounded-3xl flex flex-col gap-4 relative overflow-hidden">
+<div class="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center z-10">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">update</span>
+</div>
+<div class="z-10">
+<h3 class="text-[0.6875rem] font-bold text-white/60 uppercase tracking-widest">Profiles Updated (24h)</h3>
+<p class="text-3xl font-extrabold font-headline text-white mt-1">42</p>
+</div>
+<div class="absolute -right-4 -bottom-4 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

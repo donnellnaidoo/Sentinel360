@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | AI Analysis</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-surface": "#191c1d",
+                        "on-secondary-container": "#48617e",
+                        "background": "#f8f9fa",
+                        "surface-tint": "#545e76",
+                        "primary-fixed": "#d7e2ff",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#c2dcff",
+                        "on-secondary-fixed": "#001d36",
+                        "surface-container-high": "#e7e8e9",
+                        "primary-container": "#1b263b",
+                        "on-secondary-fixed-variant": "#2f4865",
+                        "tertiary-container": "#332306",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#2e3132",
+                        "on-tertiary-container": "#a28963",
+                        "tertiary": "#1a0f00",
+                        "secondary-fixed": "#d1e4ff",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e4",
+                        "on-surface-variant": "#45474d",
+                        "surface-container": "#edeeef",
+                        "secondary": "#47607e",
+                        "inverse-primary": "#bbc6e2",
+                        "on-primary-container": "#828da7",
+                        "tertiary-fixed-dim": "#dfc299",
+                        "on-background": "#191c1d",
+                        "surface": "#f8f9fa",
+                        "outline": "#75777d",
+                        "primary-fixed-dim": "#bbc6e2",
+                        "outline-variant": "#c5c6cd",
+                        "surface-dim": "#d9dadb",
+                        "tertiary-fixed": "#fcdeb3",
+                        "on-tertiary-fixed-variant": "#574423",
+                        "surface-container-highest": "#e1e3e4",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#271901",
+                        "surface-container-low": "#f3f4f5",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#101b30",
+                        "primary": "#051125",
+                        "surface-bright": "#f8f9fa",
+                        "secondary-fixed-dim": "#afc9ea",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#3c475d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface">
+<!-- SideNavBar (Execution from JSON) -->
+<aside class="fixed left-0 top-0 h-full z-40 flex flex-col bg-[#051125] dark:bg-[#051125] docked left-0 h-full w-64">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-white text-3xl">shield</span>
+<div>
+<h1 class="text-xl font-bold tracking-tight text-white leading-none">Sentinel360</h1>
+<p class="text-[0.6875rem] font-medium text-slate-400 mt-1 uppercase tracking-widest">Enterprise Intelligence</p>
+</div>
+</div>
+<nav class="space-y-1">
+<!-- Active Navigation: AI Alerts (Contextual choice for AI Analysis Screen) -->
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="text-sm font-medium">Live Surveillance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white border-l-4 border-white" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+<span class="text-sm font-medium">AI Alerts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="search_check">search_check</span>
+<span class="text-sm font-medium">Investigations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person_search">person_search</span>
+<span class="text-sm font-medium">Suspect Database</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="directions_car">directions_car</span>
+<span class="text-sm font-medium">Vehicles Database</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-6 space-y-4">
+<button class="w-full bg-gradient-to-r from-[#051125] to-[#1B263B] text-white py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-white/10 active:opacity-80 transition-transform scale-98">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Investigation
+            </button>
+<div class="pt-4 border-t border-white/5 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings_input_component">settings_input_component</span>
+<span class="text-[0.6875rem] font-medium">System Status</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+<span class="text-[0.6875rem] font-medium">Settings</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar (Execution from JSON) -->
+<header class="flex justify-between items-center h-16 px-8 ml-64 w-[calc(100%-16rem)] z-30 bg-[#F8F9FA]/80 backdrop-blur-xl fixed top-0">
+<div class="flex items-center gap-8">
+<div class="relative w-80">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">search</span>
+<input class="w-full bg-surface-container border-none focus:ring-2 focus:ring-primary rounded-xl pl-10 py-2 text-sm" placeholder="Search global surveillance nodes..." type="text"/>
+</div>
+<nav class="flex gap-6">
+<a class="text-[#45474D] font-medium hover:text-[#1B263B] cursor-pointer text-sm" href="#">Global View</a>
+<a class="text-[#051125] font-bold border-b-2 border-[#051125] text-sm h-16 flex items-center" href="#">Analytics</a>
+<a class="text-[#45474D] font-medium hover:text-[#1B263B] cursor-pointer text-sm" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" data-icon="help">help</button>
+<div class="relative">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" data-icon="notifications">notifications</button>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full"></span>
+</div>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User Profile" data-alt="professional male intelligence officer headshot with serious expression in high-key lighting studio environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLLuYRrTcSDyXZesnuc-Ws5ZwlwmVLDRwoOHB352_0PBIVwFbBit22lUzxwAxVm8UHoCMivNdd_iEr_Tbs6DJtGovdsUZ3y8bBQr4osirzRraHGxLiwB5HPDqUXy352ZXneS2HLT1nWIZztVOpyEfBmaFnDWqPJDlhVoxRM7DXqIqiNRsBPmMHC5TbjmS2mMnF_6GbMRswChutwxYf0Nn0EwXTtkCtlTdDu6aCG4Rns5cIp7tJFUM97gLly4gtB65epDDvSzfI-QA"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-64 pt-16 min-h-screen">
+<div class="p-8 max-w-[1400px] mx-auto">
+<!-- Breadcrumbs / Context -->
+<div class="mb-8 flex justify-between items-end">
+<div>
+<span class="text-label-sm text-on-surface-variant uppercase tracking-widest font-semibold text-[0.6875rem]">AI Analysis Hub</span>
+<h2 class="font-headline text-3xl font-extrabold text-primary mt-1">CCTV Forensic Analysis</h2>
+</div>
+<div class="flex gap-3">
+<div class="bg-surface-container-low px-4 py-2 rounded-lg flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-xs font-semibold text-on-surface-variant">Neural Engine: Active</span>
+</div>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="bento-grid">
+<!-- Upload Area (Column 1-8) -->
+<section class="col-span-8 bg-surface-container-low rounded-xl p-6 border-none">
+<div class="mb-6">
+<h3 class="font-headline text-lg font-bold text-primary">Media Ingestion</h3>
+<p class="text-sm text-on-surface-variant">Upload raw footage for facial recognition and object tracking.</p>
+</div>
+<div class="group relative bg-surface-container-lowest border-2 border-dashed border-outline-variant rounded-xl p-12 transition-all hover:bg-surface-container hover:border-primary/30 flex flex-col items-center justify-center cursor-pointer">
+<div class="w-16 h-16 bg-primary-container/10 rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+<span class="material-symbols-outlined text-primary text-3xl">upload_file</span>
+</div>
+<h4 class="text-lg font-semibold text-primary mb-1">Drag and drop source files</h4>
+<p class="text-sm text-on-surface-variant mb-6 text-center max-w-xs">Supported formats: MP4, AVI, MKV (Up to 2GB per segment)</p>
+<button class="bg-gradient-to-r from-primary to-primary-container text-white px-8 py-3 rounded-lg font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity">
+                            Select Local Archive
+                        </button>
+</div>
+<!-- Processing Progress Area -->
+<div class="mt-8 space-y-4">
+<div class="bg-surface-container-lowest p-4 rounded-lg flex items-center gap-4">
+<div class="w-10 h-10 bg-secondary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary-container">movie</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-xs font-bold text-primary">Cam_04_North_Entrance_1024.mp4</span>
+<span class="text-xs font-bold text-primary">72%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[72%]"></div>
+</div>
+<div class="flex gap-4 mt-2">
+<span class="text-[0.625rem] text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">settings_accessibility</span>
+                                        Facial Extraction
+                                    </span>
+<span class="text-[0.625rem] text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">directions_car</span>
+                                        Plate Recognition
+                                    </span>
+</div>
+</div>
+<button class="material-symbols-outlined text-outline hover:text-error transition-colors">close</button>
+</div>
+</div>
+</section>
+<!-- Suspect Matches Side Panel (Column 9-12) -->
+<aside class="col-span-4 bg-surface-container-low rounded-xl p-6 flex flex-col">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline text-lg font-bold text-primary">Possible Matches</h3>
+<span class="bg-primary text-white text-[0.625rem] px-2 py-1 rounded font-bold">DATABASE V4.2</span>
+</div>
+<div class="space-y-4 overflow-y-auto max-h-[600px] pr-2">
+<!-- Suspect Card 1 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border-l-4 border-error hover:bg-surface-variant/30 transition-colors cursor-pointer group">
+<div class="flex gap-4">
+<div class="relative h-16 w-16 rounded-lg overflow-hidden flex-shrink-0">
+<img alt="Suspect" data-alt="distorted security camera style close-up profile of a man with stubble and a hoodie" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZUSyHt7794I-EYdPfLbXg91ciVbwVXATRsA2UpOfZyW09Gk3fJzm1iAinSNtElhW6vgJgNxzJ0ljwXXOdcwnwUBIf76LjXCRy9AUflwkWBiOfi3brtGz-Xvn31HPj_js-GaVEy-1pZ3-Ebu1QZNotTTxPwYbNep3_Bdiw5jj_HFy8ahbhAHnsbr9npUdtXCPiwecykjmIpJFCVU4FbchqdtGwCxh85M6txVJ66htXETf7wvOc6VZqWjK2oEaDdFszLKYm2F77xnU"/>
+<div class="absolute inset-0 bg-error/10"></div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-bold text-sm text-primary">Unknown Alpha-09</h4>
+<span class="text-[0.625rem] font-bold text-error">98.4% MATCH</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Status: Wanted / Felony Warrant</p>
+<div class="flex gap-2 mt-2">
+<span class="text-[0.625rem] bg-error-container text-on-error-container px-2 py-0.5 rounded-full font-bold">HIGH RISK</span>
+<span class="text-[0.625rem] bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full font-bold">CAM_04</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Suspect Card 2 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border-l-4 border-tertiary-fixed-dim hover:bg-surface-variant/30 transition-colors cursor-pointer group">
+<div class="flex gap-4">
+<div class="relative h-16 w-16 rounded-lg overflow-hidden flex-shrink-0">
+<img alt="Suspect" data-alt="grainy black and white portrait of a person wearing glasses and a baseball cap viewed from a high angle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8Fr6x3UcLCyHDyd2rQM6omxa5ODPnHKxu06M7CPYjtAxE5Ksvltm-TPG6X5IA-Xgtfr09PYSJdTyUbF6cKxwxbfkiwB78ZD5i6O4RfRXPuvkIs0vbnRvD6C4ZutPARPJSR9vUkJF9NDS-TW4inNey1XdO2Ekt5yWE3AorRaH5Vl4rSchOo2BAb0z7C94PcagmE8vGu7lTja566QwycCXGGjoYT1psrKot4MkkH74t9Bnljks1qqb4WTws0YPGsv2ERk0ZzSs_RTU"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-bold text-sm text-primary">Subject Gamma-21</h4>
+<span class="text-[0.625rem] font-bold text-on-tertiary-container">82.1% MATCH</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Status: Person of Interest</p>
+<div class="flex gap-2 mt-2">
+<span class="text-[0.625rem] bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full font-bold">PARKING B2</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Suspect Card 3 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border-l-4 border-outline-variant hover:bg-surface-variant/30 transition-colors cursor-pointer group">
+<div class="flex gap-4">
+<div class="relative h-16 w-16 rounded-lg overflow-hidden flex-shrink-0">
+<img alt="Suspect" data-alt="low resolution digital zoom of a person walking through a doorway with face partially obscured by shadow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDu0Bl5XG_YVXeAPjYx7OBleZWAK_o37r_hpeDLG7DvunLH6EoDyBpzsa9p2MFZtXpcuTM3H2RZBpXCRcwHtCOoER8JPlxMHpO09sY4x2EVn99ZbNEOdpLFNB7TTy_thEecVwspO3f0iWOfl9V0_w3kXKY2ifuzPYYWhayabd3GC6l2i4W_rN1ugPjnN5airdcpV-sfCrkaPJiubWr3i4F2vlHNxtTjSn3s8Y5dkbTwg4JYhCmtJGeClCZ8CfVajsEg4A4ecF3_tEk"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-bold text-sm text-primary">Unidentified Male</h4>
+<span class="text-[0.625rem] font-bold text-on-surface-variant">64.0% MATCH</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Status: No Record</p>
+<div class="flex gap-2 mt-2">
+<span class="text-[0.625rem] bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full font-bold">LOBBY_WEST</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<button class="mt-auto w-full py-3 bg-surface-container text-primary font-bold text-xs rounded-lg flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors">
+                        View Full Database Matches
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</aside>
+<!-- AI Analysis Preview (Column 1-12) -->
+<section class="col-span-12 bg-surface-container-lowest rounded-xl p-8 overflow-hidden">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="font-headline text-2xl font-extrabold text-primary">AI Diagnostic Preview</h3>
+<p class="text-sm text-on-surface-variant">Frame-by-frame intelligence processing for <span class="font-mono bg-surface-container px-2 py-0.5 rounded text-primary">Cam_04_North_Entrance</span></p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex -space-x-2">
+<span class="w-8 h-8 rounded-full bg-error flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-white">AI</span>
+<span class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-white">DB</span>
+<span class="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-white">IR</span>
+</div>
+<span class="text-[0.625rem] font-bold text-on-surface-variant uppercase tracking-widest">Multi-Engine Fusion</span>
+</div>
+</div>
+<!-- Video Canvas with Overlays -->
+<div class="relative w-full rounded-2xl overflow-hidden shadow-2xl shadow-primary/5 bg-on-surface group">
+<img alt="Surveillance Preview" class="w-full h-auto opacity-80 mix-blend-screen brightness-110" data-alt="interior view of a modern bright corporate lobby with several people walking, captured from a high-angle surveillance perspective" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBGPNKq63KCW5vYcL08tLeDgV8XYpF2iIhN0ncWVhikgo3GCEnYg63gmyCVpCmhJdCJ_fTRY52X8ha_Goi0pJafl71nJd5npR2Q_MS1kMEGWH3WfwohmZsxbW5EAAogtmM1e9uUdOEfb71F1xr0g1xgm5mGctJBFBYcyTY5pAEl_ctJFtKotM8MXogIF5UH04Aq6TDYoPxaA7QxBNPJmnefX42jfkFK6dx9Spr7qujP2K505HKfks62Ibn87UQDV7IrFrKVx38gkw"/>
+<!-- AI Overlays (Faces) -->
+<div class="absolute inset-0">
+<!-- Detection Box 1 (High Priority) -->
+<div class="absolute top-[35%] left-[42%] w-[8%] h-[15%] border-2 border-error ring-1 ring-error/50">
+<div class="absolute -top-7 left-0 bg-error text-white text-[10px] font-bold px-2 py-1 whitespace-nowrap">
+                                    SUSPECT ID: ALPHA-09 (98.4%)
+                                </div>
+<div class="absolute -bottom-1 -right-1 w-2 h-2 border-r-2 border-b-2 border-error"></div>
+</div>
+<!-- Detection Box 2 -->
+<div class="absolute top-[42%] left-[65%] w-[7%] h-[14%] border-2 border-primary ring-1 ring-primary/50">
+<div class="absolute -top-7 left-0 bg-primary text-white text-[10px] font-bold px-2 py-1 whitespace-nowrap">
+                                    OBJECT: PERSON_002
+                                </div>
+</div>
+<!-- Detection Box 3 -->
+<div class="absolute top-[28%] left-[15%] w-[9%] h-[16%] border-2 border-outline-variant opacity-60">
+<div class="absolute -top-7 left-0 bg-surface-variant text-on-surface text-[10px] font-bold px-2 py-1 whitespace-nowrap">
+                                    OBJECT: PERSON_003
+                                </div>
+</div>
+<!-- Scanning Line (Pure CSS) -->
+<div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-error/40 to-transparent shadow-[0_0_15px_rgba(186,26,26,0.5)] opacity-50" style="animation: scan 4s linear infinite;"></div>
+</div>
+<!-- Video Controls Overlay -->
+<div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-primary/90 to-transparent flex items-center justify-between">
+<div class="flex items-center gap-6">
+<button class="material-symbols-outlined text-white text-3xl hover:scale-110 transition-transform" data-icon="play_arrow" data-weight="fill">play_arrow</button>
+<div class="flex items-center gap-2">
+<span class="text-xs font-mono text-white">00:42 / 12:05</span>
+<div class="w-48 h-1 bg-white/20 rounded-full overflow-hidden">
+<div class="w-[30%] h-full bg-white"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-white/70 hover:text-white transition-colors" data-icon="screenshot">screenshot</button>
+<button class="material-symbols-outlined text-white/70 hover:text-white transition-colors" data-icon="zoom_in">zoom_in</button>
+<button class="material-symbols-outlined text-white/70 hover:text-white transition-colors" data-icon="settings">settings</button>
+<button class="material-symbols-outlined text-white/70 hover:text-white transition-colors" data-icon="fullscreen">fullscreen</button>
+</div>
+</div>
+</div>
+<!-- Meta Info Chips -->
+<div class="mt-6 flex flex-wrap gap-4">
+<div class="bg-surface-container px-4 py-2 rounded-lg border-l-2 border-primary">
+<span class="text-[0.625rem] text-on-surface-variant font-bold block uppercase tracking-tighter">Resolution</span>
+<span class="text-sm font-bold text-primary">3840 x 2160 (4K)</span>
+</div>
+<div class="bg-surface-container px-4 py-2 rounded-lg border-l-2 border-primary">
+<span class="text-[0.625rem] text-on-surface-variant font-bold block uppercase tracking-tighter">Bitrate</span>
+<span class="text-sm font-bold text-primary">12.4 Mbps</span>
+</div>
+<div class="bg-surface-container px-4 py-2 rounded-lg border-l-2 border-error">
+<span class="text-[0.625rem] text-on-surface-variant font-bold block uppercase tracking-tighter">Threat Level</span>
+<span class="text-sm font-bold text-error">CRITICAL (High Match)</span>
+</div>
+<div class="bg-surface-container px-4 py-2 rounded-lg border-l-2 border-success">
+<span class="text-[0.625rem] text-on-surface-variant font-bold block uppercase tracking-tighter">AI Processing</span>
+<span class="text-sm font-bold text-success">Hardware Accelerated</span>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Contextual FAB - Restricted as per Shell Rules (Not visible here as per instructions for Details/Analysis screens, but code-wise logic) -->
+</body></html>
