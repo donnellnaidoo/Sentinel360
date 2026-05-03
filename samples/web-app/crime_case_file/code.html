@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#f3f4f5",
+                        "surface": "#f8f9fa",
+                        "on-tertiary-fixed-variant": "#574423",
+                        "secondary-container": "#c2dcff",
+                        "surface-container-high": "#e7e8e9",
+                        "surface-container-highest": "#e1e3e4",
+                        "on-tertiary-fixed": "#271901",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#dfc299",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#001d36",
+                        "on-surface-variant": "#45474d",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#2f4865",
+                        "inverse-primary": "#bbc6e2",
+                        "primary-fixed": "#d7e2ff",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e4",
+                        "on-primary-container": "#828da7",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-primary-fixed-variant": "#3c475d",
+                        "on-tertiary-container": "#a28963",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#48617e",
+                        "secondary": "#47607e",
+                        "surface-container": "#edeeef",
+                        "inverse-surface": "#2e3132",
+                        "surface-bright": "#f8f9fa",
+                        "surface-dim": "#d9dadb",
+                        "error": "#ba1a1a",
+                        "tertiary": "#1a0f00",
+                        "tertiary-container": "#332306",
+                        "primary-fixed-dim": "#bbc6e2",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#fcdeb3",
+                        "on-surface": "#191c1d",
+                        "primary-container": "#1b263b",
+                        "outline": "#75777d",
+                        "background": "#f8f9fa",
+                        "secondary-fixed": "#d1e4ff",
+                        "outline-variant": "#c5c6cd",
+                        "primary": "#051125",
+                        "surface-tint": "#545e76",
+                        "on-background": "#191c1d",
+                        "secondary-fixed-dim": "#afc9ea",
+                        "on-primary-fixed": "#101b30"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface flex h-screen overflow-hidden">
+<!-- SideNavBar (Authority: JSON & Design System) -->
+<aside class="bg-[#F3F4F5] dark:bg-[#051125] text-[#051125] dark:text-[#F3F4F5] flex flex-col h-full py-6 docked left-0 h-screen w-64 shrink-0 font-inter text-sm font-medium">
+<div class="px-6 mb-8">
+<h1 class="font-manrope font-black text-[#051125] dark:text-white text-xl tracking-tighter uppercase">Sentinel360</h1>
+<p class="text-[10px] opacity-60 tracking-widest mt-1">Level 4 Authorization</p>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<div class="mb-4">
+<p class="px-2 py-1 text-[10px] uppercase font-bold tracking-widest text-on-surface-variant opacity-50">Main Deck</p>
+</div>
+<a class="flex items-center gap-3 px-3 py-2.5 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="dashboard">dashboard</span>
+                Intelligence Hub
+            </a>
+<!-- Active State Logic: Mapping to Crime Dockets -->
+<a class="flex items-center gap-3 px-3 py-2.5 bg-white dark:bg-[#1B263B] text-[#051125] dark:text-white rounded-l-lg shadow-sm font-bold transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="folder_open">folder_open</span>
+                Crime Dockets
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="security">security</span>
+                Threat Matrix
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="location_searching">location_searching</span>
+                Asset Tracking
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="history">history</span>
+                Archives
+            </a>
+</nav>
+<div class="px-4 mt-auto space-y-1 pt-6 border-t border-outline-variant/10">
+<a class="flex items-center gap-3 px-3 py-2 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help_outline">help_outline</span>
+                Help Desk
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="logout">logout</span>
+                Logout
+            </a>
+</div>
+</aside>
+<!-- Main Viewport -->
+<main class="flex-1 flex flex-col h-full relative overflow-hidden">
+<!-- TopAppBar (Authority: JSON & Design System) -->
+<header class="bg-[#F8F9FA] dark:bg-[#051125] flex justify-between items-center h-16 px-8 w-full docked full-width top-0 z-50 text-[#051125] dark:text-[#F8F9FA]">
+<div class="flex items-center gap-4">
+<div class="relative flex items-center bg-[#F3F4F5] dark:bg-[#1B263B] px-4 py-1.5 rounded-full">
+<span class="material-symbols-outlined text-on-surface-variant text-lg mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-on-surface-variant/50" placeholder="Search Intel..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-[#EDEEEF] dark:hover:bg-[#1B263B] transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 hover:bg-[#EDEEEF] dark:hover:bg-[#1B263B] transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+<div class="flex items-center gap-3 pl-6 border-l border-outline-variant/20">
+<div class="text-right">
+<p class="text-xs font-bold leading-tight uppercase tracking-tighter">C.I.O. Archer</p>
+<p class="text-[10px] text-on-surface-variant">Active Session: DC-04</p>
+</div>
+<img alt="Chief Intelligence Officer Profile" class="w-10 h-10 rounded-lg object-cover" data-alt="high-detail portrait of a middle-aged security professional in a dark suit with a clean-cut aesthetic and serious expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-SjqXTLxjAL8bzsOXVot1hjbef7W_pQ3BoQUpDkY-pf8UR83R0P1i432dIZ48HIwxYoulOqJIGzgNy_dhMNvSkIeQrejObuJn88QvX9obqGqArJpuTvvabMzO_Gh9dpZF9jLk6l10dErWnlI8f0JwchTZTS9FzJ850yItAAqB6CSwpu-scS9JCnupO1VUJfwCmvPVM7beNQJGtQLxEIYcRCQ_mqjrWg8K9aRfp5pk1QLV6deysGcn4V-7RO39UxxOW9VGVdMPxPk"/>
+</div>
+</div>
+</header>
+<!-- Canvas Content -->
+<div class="flex-1 p-8 overflow-y-auto space-y-8">
+<!-- Case Header -->
+<div class="flex items-end justify-between border-b-2 border-primary-container pb-4">
+<div class="space-y-1">
+<div class="flex items-center gap-3 mb-1">
+<span class="text-xs font-black tracking-[0.2em] bg-primary text-on-primary px-2 py-0.5 rounded">#CR-2024-8901</span>
+<div class="flex items-center gap-1.5 text-error text-[10px] font-bold uppercase tracking-widest border border-error/20 px-2 py-0.5 rounded">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+                            Critical Priority
+                        </div>
+</div>
+<h2 class="text-4xl font-headline font-extrabold tracking-tight text-primary">Metropoli Bank Heist</h2>
+</div>
+<div class="flex items-center gap-6 pb-1">
+<div class="flex flex-col items-end">
+<span class="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Current Status</span>
+<span class="text-secondary font-headline font-bold">In Investigation</span>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg">
+<span class="material-symbols-outlined text-sm" data-icon="ios_share">ios_share</span>
+                        Dispatch Report
+                    </button>
+</div>
+</div>
+<!-- Top Row: Suspect and 3D Scene -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Suspect Card (Asymmetric Layout) -->
+<div class="col-span-12 lg:col-span-4 bg-surface-container-lowest p-6 rounded-xl relative overflow-hidden flex flex-col">
+<div class="absolute top-0 left-0 w-1 h-full bg-error"></div>
+<div class="flex items-start justify-between mb-6">
+<h3 class="font-headline font-bold text-lg uppercase tracking-tight">Primary Suspect</h3>
+<span class="bg-error/10 text-error px-2 py-1 rounded text-[10px] font-bold">WARRANT ACTIVE</span>
+</div>
+<div class="flex gap-4 mb-6">
+<div class="relative w-32 h-40 group">
+<img alt="Marcus Vane" class="w-full h-full object-cover rounded-lg" data-alt="gritty low-angle studio portrait of a man with sharp features, stubble, and intense eyes, dramatic lighting, high contrast" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtMIGcEIuFD1TguRYNfFKmC6tESOsd62yOCQWj0_at3q4I8Xi6EbtD_88gbbO-wbay3_XgeKG1CYBjyjB3kkOmoc0Ob69sR9IWNc1BcHg0VDNRp7BC3UuNRXBVBG81kFkHRq0ls7sBnUG681M71jR-SGm6PcZs-5lKZq6wz7eyunRC4KYWVY8T_1XQyikEz5GQ8gcZ9C2jmpLWfaHqgXpTnaX4ALsWwK09VavPiVY86lQtmDqMhhl7xgm2NTK_ioO4bhU76QWfj2I"/>
+<div class="absolute inset-0 border-2 border-error/50 rounded-lg pointer-events-none opacity-40"></div>
+<div class="absolute top-2 right-2 flex gap-1">
+<span class="bg-primary/80 backdrop-blur px-1 rounded text-[8px] text-white">ID: V-102</span>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div>
+<p class="text-[10px] uppercase font-bold text-on-surface-variant">Full Name</p>
+<p class="font-headline font-bold text-primary">Marcus Vane</p>
+</div>
+<div>
+<p class="text-[10px] uppercase font-bold text-on-surface-variant">Alias</p>
+<p class="font-headline font-bold text-secondary">"The Ghost"</p>
+</div>
+<div class="bg-surface-container-low p-2 rounded">
+<p class="text-[9px] uppercase font-black text-on-surface-variant mb-1">Biometric Markers</p>
+<div class="space-y-1">
+<div class="flex justify-between text-[10px]">
+<span>Face Match</span>
+<span class="font-bold text-success">98.4%</span>
+</div>
+<div class="w-full bg-white h-1 rounded-full overflow-hidden">
+<div class="bg-success w-[98%] h-full"></div>
+</div>
+<div class="flex justify-between text-[10px]">
+<span>Gait Sync</span>
+<span class="font-bold text-success">92.1%</span>
+</div>
+<div class="w-full bg-white h-1 rounded-full overflow-hidden">
+<div class="bg-success w-[92%] h-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-auto space-y-2">
+<div class="flex items-center gap-2 text-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" data-icon="fingerprint">fingerprint</span>
+                            Fingerprints: Match Found (Vault C)
+                        </div>
+<div class="flex items-center gap-2 text-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" data-icon="location_on">location_on</span>
+                            Last Seen: Warehouse District (14:32)
+                        </div>
+</div>
+</div>
+<!-- 3D Reconstruction -->
+<div class="col-span-12 lg:col-span-8 bg-primary-container rounded-xl overflow-hidden relative group h-[450px]">
+<!-- Background Map Visual -->
+<div class="absolute inset-0 opacity-40 mix-blend-overlay">
+<img alt="3D Bank Interior Reconstruction" class="w-full h-full object-cover" data-alt="top-down wireframe architectural visualization of a bank lobby with neon blue lines and red motion tracking dots" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmI-JHtEoowoSO5Q15be7ziLYxfNIzFdB_Py12j_OjNk21yXCddKpff67Cag8-chUvMEdzZ_Qk1SGPFuh0tEZyQmIDWKmBPU7vtEoojT-yrHZ4DCjpJivgG_5RBQgZdrIZjLABylnR67JBxbWaP3-CEciNkxunQuPt4IsEjMRGSaSoTj1YcBJ1Q7LZzVpzfq3CEoEWbA1hC-K9dCMahtrEJSI_YWF_dsfOje7vH0rfd8xqHLSTEZ4aBDx_t7HbqKez3jWCNSalL6s"/>
+</div>
+<!-- SVG Overlay for vectors -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" viewbox="0 0 800 400">
+<path d="M100 300 L300 250 L450 150 L600 200" fill="none" stroke="#ba1a1a" stroke-dasharray="5,5" stroke-width="2"></path>
+<circle cx="100" cy="300" fill="#ba1a1a" r="4"></circle>
+<circle cx="600" cy="200" fill="#ba1a1a" r="4"></circle>
+<path d="M50 350 L250 300 L500 200" fill="none" stroke="#47607e" stroke-dasharray="5,5" stroke-width="2"></path>
+</svg>
+<!-- HUD Interface (Glassmorphism) -->
+<div class="absolute inset-0 p-6 flex flex-col justify-between pointer-events-none">
+<div class="flex justify-between items-start">
+<div class="glass-panel p-4 rounded-lg border border-white/10 pointer-events-auto">
+<h4 class="text-white text-xs font-black uppercase tracking-widest mb-1">3D RECONSTRUCTION</h4>
+<p class="text-white/60 text-[10px]">Model: Metropoli_Interior_V4.obj</p>
+</div>
+<div class="flex flex-col gap-2 pointer-events-auto">
+<button class="glass-panel p-2 rounded text-white hover:bg-white/20"><span class="material-symbols-outlined text-lg" data-icon="zoom_in">zoom_in</span></button>
+<button class="glass-panel p-2 rounded text-white hover:bg-white/20"><span class="material-symbols-outlined text-lg" data-icon="zoom_out">zoom_out</span></button>
+<button class="glass-panel p-2 rounded text-white hover:bg-white/20"><span class="material-symbols-outlined text-lg" data-icon="3d_rotation">3d_rotation</span></button>
+</div>
+</div>
+<div class="flex justify-between items-end">
+<div class="flex gap-4 pointer-events-auto">
+<div class="glass-panel px-3 py-2 rounded text-white text-[10px] flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+                                    Suspect Movement
+                                </div>
+<div class="glass-panel px-3 py-2 rounded text-white text-[10px] flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                                    Security Patrol
+                                </div>
+</div>
+<div class="glass-panel p-2 rounded pointer-events-auto flex gap-4">
+<button class="text-white/80 hover:text-white text-[10px] font-bold uppercase tracking-tighter">View Layers</button>
+<button class="text-white/80 hover:text-white text-[10px] font-bold uppercase tracking-tighter">Export Frame</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Row: Timeline & Evidence -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Forensic Timeline -->
+<div class="col-span-12 lg:col-span-7 bg-white rounded-xl p-6">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-headline font-bold text-lg text-primary flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="history_toggle_off">history_toggle_off</span>
+                            Forensic Timeline
+                        </h3>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase">Incident Date: 12 OCT 2024</span>
+</div>
+<div class="relative space-y-8 pl-4">
+<div class="absolute left-[23px] top-0 bottom-0 w-0.5 bg-surface-container-high"></div>
+<!-- Event 1 -->
+<div class="relative flex items-start gap-6">
+<div class="w-5 h-5 rounded-full bg-primary border-4 border-surface-container-low z-10"></div>
+<div class="flex-1 -mt-1">
+<div class="flex items-center justify-between">
+<p class="font-headline font-bold text-primary">Perimeter Breach</p>
+<span class="text-[11px] font-mono bg-surface-container-low px-2 py-0.5 rounded">02:14:12</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Sensor Trip: North Entrance (SEC-04). Silhouette match detected in dark-frame capture.</p>
+<div class="mt-2 flex items-center gap-3">
+<span class="text-[9px] text-on-primary-container bg-primary-container/10 px-2 rounded">CAM-012</span>
+<button class="text-[9px] font-bold text-secondary uppercase hover:underline">Play Clip</button>
+</div>
+</div>
+</div>
+<!-- Event 2 -->
+<div class="relative flex items-start gap-6">
+<div class="w-5 h-5 rounded-full bg-error border-4 border-surface-container-low z-10"></div>
+<div class="flex-1 -mt-1">
+<div class="flex items-center justify-between">
+<p class="font-headline font-bold text-primary">Vault Access Attempt</p>
+<span class="text-[11px] font-mono bg-surface-container-low px-2 py-0.5 rounded">02:19:45</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Thermal signature detected at Main Vault door. Bypass device detected in hand of Suspect A.</p>
+<div class="mt-2 flex items-center gap-3">
+<span class="text-[9px] text-on-primary-container bg-primary-container/10 px-2 rounded">CAM-041 (Thermal)</span>
+<button class="text-[9px] font-bold text-secondary uppercase hover:underline">View Snapshot</button>
+</div>
+</div>
+</div>
+<!-- Event 3 -->
+<div class="relative flex items-start gap-6">
+<div class="w-5 h-5 rounded-full bg-secondary border-4 border-surface-container-low z-10"></div>
+<div class="flex-1 -mt-1">
+<div class="flex items-center justify-between">
+<p class="font-headline font-bold text-primary">Exit Detection</p>
+<span class="text-[11px] font-mono bg-surface-container-low px-2 py-0.5 rounded">02:26:30</span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1">Vehicle ignition detected in alleyway. License plate partially obscured by high-intensity strobe.</p>
+<div class="mt-2 flex items-center gap-3">
+<span class="text-[9px] text-on-primary-container bg-primary-container/10 px-2 rounded">ALPR-02</span>
+<button class="text-[9px] font-bold text-secondary uppercase hover:underline">Analyze Plate</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Evidence & Details -->
+<div class="col-span-12 lg:col-span-5 space-y-8">
+<!-- Crime Details -->
+<div class="bg-surface-container-low p-6 rounded-xl">
+<h3 class="font-headline font-bold text-sm uppercase tracking-widest text-primary mb-4">Crime Details</h3>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                            Organized breach of Metropoli Bank main branch. Suspects bypassed digital locks using a specialized RF-injector. Total asset loss estimated at $4.2M. Method of operation suggests high-level technical expertise and previous surveillance of guard rotation patterns.
+                        </p>
+</div>
+<!-- Key Evidence Grid -->
+<div class="space-y-4">
+<h3 class="font-headline font-bold text-sm uppercase tracking-widest text-primary">Key Evidence</h3>
+<div class="grid grid-cols-2 gap-4">
+<div class="group cursor-pointer">
+<div class="relative h-28 rounded-lg overflow-hidden bg-surface-container-high mb-2">
+<img alt="CCTV Clip" class="w-full h-full object-cover transition-transform group-hover:scale-110" data-alt="grainy black and white cctv footage showing a hooded figure in a dark corridor with digital timestamps in green" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJQhRQpDpN3fMKtJvOmzPwj5Ioo25fUsxcG3L0wpLJjgdBCqIX724nlzdaf5Jth7hnIlXGLyh0AAVpUQNUGm2qhCFgV5qulpNEEEq7xGODEzAQgah6zlC-bns1TuYMudCeNkJzKDdEEIrlZdmP2Q4xBidB33J4QzV-W8wmSgO8ZKnaB2FOZF1MFtn4eb1vgWnyVcthaikI1UxXuvJMZzeIu4hGgi4E9sLP4414jVzOOzYzzMvBJ_VrqA7Tyz7G4yqGHSWW2uVM4cU"/>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+<span class="material-symbols-outlined text-white text-3xl" data-icon="play_circle">play_circle</span>
+</div>
+<span class="absolute bottom-1 right-1 bg-black/60 text-white text-[8px] px-1 rounded">0:12</span>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-tight truncate">CCTV_ENTRY_02.mp4</p>
+</div>
+<div class="group cursor-pointer">
+<div class="relative h-28 rounded-lg overflow-hidden bg-surface-container-high mb-2">
+<img alt="Fingerprint Scan" class="w-full h-full object-cover transition-transform group-hover:scale-110" data-alt="blue backlit digital scan of a human fingerprint showing complex swirl patterns and highlighted ridge markers" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCm8VR89fV576_bbwUeQ1oN4KYN2ENCd5inaWuKZeDeRYRwSTwHlHPWr6CJJ-7t7G3jWePWCWHulEApqVuiFGAm-cmrSt9aEeybRKll_iYg0pXWJo0wG3QT460ibTDEjrtLbO50SC2On4pjXi7UAJcuBXkJDQsTxZOjuRrIShI5gGgqtDD_HP3FGuk0ZKgbyWNU1lTHIo42dNYn3zzTE6jYFiDYSG5Ee1cvherDU8F0q4cdIu3vHjRAcHKAhKZg_WmUuNhgi8q7-uQ"/>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+<span class="material-symbols-outlined text-white text-3xl" data-icon="search">search</span>
+</div>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-tight truncate">FP_SCAN_VAULT_C.png</p>
+</div>
+<div class="group cursor-pointer">
+<div class="relative h-28 rounded-lg overflow-hidden bg-surface-container-high mb-2">
+<img alt="License Plate Log" class="w-full h-full object-cover transition-transform group-hover:scale-110" data-alt="abstract digital data stream representing computer code and surveillance log entries in blue and white" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNcMmiXAgegcZsMobtH5LUKJbVlX5rs7Cz2u46n3PHsfh68mPo0prXgFaeK4mrEl-G78SKlPr933KgohKgyTpa0qSYN6FYs89nKAMLTr9KtN8uVvDMYhmqK-ExWX74LdX9Vou_Yq19rqS6xhHUUw0u1oyMldtDws7d5GKntOfrrSzHZftX3DkhijeAF3vxRUlN6Ae4J-z3PtSIcd9Jv_uMaPPpYKpvo8FJRu_Ana3l6CAY6f7jD1sieKLaLMOWHiHQ9BTaxYy8ltw"/>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-tight truncate">LOG_ALPR_12OCT.txt</p>
+</div>
+<div class="group cursor-pointer">
+<div class="relative h-28 rounded-lg border-2 border-dashed border-outline-variant/50 flex flex-col items-center justify-center bg-white group-hover:bg-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-outline-variant" data-icon="add_circle">add_circle</span>
+<span class="text-[10px] font-bold text-outline-variant mt-1 uppercase">Add Evidence</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- FAB Suppression: On Detail screens, we suppress the FAB as per instructions -->
+</body></html>

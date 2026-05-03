@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | Investigation Workspace</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-surface": "#191c1d",
+                    "on-secondary-container": "#48617e",
+                    "background": "#f8f9fa",
+                    "surface-tint": "#545e76",
+                    "primary-fixed": "#d7e2ff",
+                    "on-primary": "#ffffff",
+                    "secondary-container": "#c2dcff",
+                    "on-secondary-fixed": "#001d36",
+                    "surface-container-high": "#e7e8e9",
+                    "primary-container": "#1b263b",
+                    "on-secondary-fixed-variant": "#2f4865",
+                    "tertiary-container": "#332306",
+                    "on-error": "#ffffff",
+                    "inverse-surface": "#2e3132",
+                    "on-tertiary-container": "#a28963",
+                    "tertiary": "#1a0f00",
+                    "secondary-fixed": "#d1e4ff",
+                    "on-secondary": "#ffffff",
+                    "surface-variant": "#e1e3e4",
+                    "on-surface-variant": "#45474d",
+                    "surface-container": "#edeeef",
+                    "secondary": "#47607e",
+                    "inverse-primary": "#bbc6e2",
+                    "on-primary-container": "#828da7",
+                    "tertiary-fixed-dim": "#dfc299",
+                    "on-background": "#191c1d",
+                    "surface": "#f8f9fa",
+                    "outline": "#75777d",
+                    "primary-fixed-dim": "#bbc6e2",
+                    "outline-variant": "#c5c6cd",
+                    "surface-dim": "#d9dadb",
+                    "tertiary-fixed": "#fcdeb3",
+                    "on-tertiary-fixed-variant": "#574423",
+                    "surface-container-highest": "#e1e3e4",
+                    "error-container": "#ffdad6",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-fixed": "#271901",
+                    "surface-container-low": "#f3f4f5",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed": "#101b30",
+                    "primary": "#051125",
+                    "surface-bright": "#f8f9fa",
+                    "secondary-fixed-dim": "#afc9ea",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#3c475d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full z-40 flex flex-col bg-[#051125] dark:bg-[#051125] w-64">
+<div class="px-6 py-8">
+<div class="flex items-center gap-3 mb-10">
+<div class="w-8 h-8 bg-gradient-to-br from-white to-slate-400 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tight text-white leading-none">Sentinel360</h1>
+<p class="text-[0.625rem] font-medium text-slate-400 uppercase tracking-widest mt-1">Enterprise Intelligence</p>
+</div>
+</div>
+<button class="w-full py-3 px-4 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white rounded-lg flex items-center gap-3 mb-8 border border-white/10 hover:border-white/20 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-sm">add_circle</span>
+<span class="text-sm font-semibold">New Investigation</span>
+</button>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">videocam</span>
+<span class="text-sm font-medium">Live Surveillance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="text-sm font-medium">AI Alerts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white border-l-4 border-white transition-all" href="#">
+<span class="material-symbols-outlined">search_check</span>
+<span class="text-sm font-medium">Investigations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">person_search</span>
+<span class="text-sm font-medium">Suspect Database</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">directions_car</span>
+<span class="text-sm font-medium">Vehicles Database</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto px-6 py-8 border-t border-white/5">
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span class="text-sm font-medium text-[0.6875rem]">System Status</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-medium text-[0.6875rem]">Settings</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 h-16 ml-64 w-[calc(100%-16rem)] z-30 bg-surface/80 backdrop-blur-xl flex justify-between items-center px-8">
+<div class="flex items-center gap-8">
+<div class="relative w-80">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary-container text-on-surface" placeholder="Search case ID, evidence, suspect..." type="text"/>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#">Global View</a>
+<a class="text-on-surface font-bold border-b-2 border-primary py-5 text-sm" href="#">Analytics</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-outline-variant/30">
+<div class="text-right">
+<p class="text-sm font-semibold leading-none">Det. James Miller</p>
+<p class="text-[0.6875rem] text-on-surface-variant font-medium">Level 4 Investigator</p>
+</div>
+<img class="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-white" data-alt="professional headshot of an intelligence officer in a modern dark suit with a neutral professional expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVupiQWPiUotpTOV57PHr51M0FIz2ahja_zUJb5JPtc64mVHgPEb0krgnCcNY4Psn3yCcal2xFFDd5u-Bjd7PM3eE_GoTb-3nMEb70u71rHcCT5EgNLH3-WD6CBYPAPv_wudCJOx0OtNwRZ4MC1wWrJY7f7EcU7Y2gHNS53qspbtxcr61K1R0QX7bDT9Ku8-Hv8TfYnVTrrkSbMIXRfTk-rGGaiGShlVvk1U4nOU4uay3mUJg3rv6oNcyW0COzBoByUx526dcoGng"/>
+</div>
+</div>
+</header>
+<!-- Main Workspace Canvas -->
+<main class="ml-64 pt-16 h-screen flex flex-col overflow-hidden">
+<!-- Header Actions Section -->
+<div class="px-8 py-6 flex justify-between items-end bg-surface">
+<div>
+<nav class="flex items-center gap-2 text-[0.6875rem] font-medium text-on-surface-variant mb-2 tracking-wide uppercase">
+<span>Investigations</span>
+<span class="material-symbols-outlined text-[10px]">chevron_right</span>
+<span>Case #SR-2024-8842</span>
+</nav>
+<h2 class="text-3xl font-extrabold tracking-tight text-primary">Downtown Transit Incursion</h2>
+<div class="flex items-center gap-4 mt-2">
+<span class="flex items-center gap-1.5 px-2.5 py-1 bg-error-container text-on-error-container rounded-full text-[0.6875rem] font-bold">
+<span class="w-1.5 h-1.5 bg-error rounded-full animate-pulse"></span> PRIORITY: ALPHA
+                    </span>
+<span class="text-[0.6875rem] text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-xs align-middle mr-1">history</span> 14h 22m elapsed
+                    </span>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary border border-outline-variant/50 rounded hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm">post_add</span> Add Evidence
+                </button>
+<button class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary border border-outline-variant/50 rounded hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm">link</span> Link Suspect
+                </button>
+<button class="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-br from-primary to-primary-container rounded shadow-lg shadow-primary/10 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">analytics</span> Generate Report
+                </button>
+</div>
+</div>
+<!-- Dashboard Bento Grid -->
+<div class="flex-1 px-8 pb-8 overflow-hidden flex gap-6">
+<!-- Left: Evidence & Media Grid -->
+<div class="flex-1 flex flex-col gap-6 overflow-hidden">
+<section class="bg-surface-container-low rounded-xl p-6 flex-1 flex flex-col min-h-0">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-lg font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined">perm_media</span> Evidence Vault
+                        </h3>
+<div class="flex gap-2">
+<button class="p-1.5 hover:bg-surface-container-high rounded transition-colors text-on-surface-variant"><span class="material-symbols-outlined">grid_view</span></button>
+<button class="p-1.5 hover:bg-surface-container-high rounded transition-colors text-on-surface-variant"><span class="material-symbols-outlined">list</span></button>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-4 overflow-y-auto pr-2 custom-scrollbar">
+<!-- Evidence Item 1 -->
+<div class="bg-surface-container-lowest rounded-lg overflow-hidden group cursor-pointer border border-transparent hover:border-primary-container transition-all">
+<div class="relative aspect-video">
+<img class="w-full h-full object-cover" data-alt="security camera still showing a dark alleyway with a single flickering street lamp and industrial silhouettes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2sa98_-n_vhQUwMUGoficx8Xv_j1_H_ayrpgojZcEye0w6jG9WDD_P9qLlKw8M6DbSbLeNArs-8B6p4CFHwfkjRbtSb9gcMJmrR5THHo1_xnatzeuBMfuMMeXEK_y6MlaFNFNQ7xBidBo_IjtaB8qlsoQ0vGh5Fj5xbBp1PEAJikpAUrH11pH1kVBXPYaGPdppEefh6vASpSaETtweE9xBSDaM6XJ22ELFwweA1rgIpqlPSUJ-FqYKV1DCJtoygrBLCYjZdYpr_A"/>
+<span class="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono">CAM_04_WEST</span>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-3xl">play_circle</span>
+</div>
+</div>
+<div class="p-3">
+<p class="text-xs font-bold text-primary truncate">Corridor Motion Segment</p>
+<p class="text-[10px] text-on-surface-variant mt-1 font-medium">04:22:15 AM · 12.4 MB</p>
+</div>
+</div>
+<!-- Evidence Item 2 -->
+<div class="bg-surface-container-lowest rounded-lg overflow-hidden group cursor-pointer border border-transparent hover:border-primary-container transition-all">
+<div class="relative aspect-video">
+<img class="w-full h-full object-cover" data-alt="city street surveillance at night with motion blur of passing cars and sharp focus on a pedestrian crossing" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw52xwV5N7zG0gB4lnJYVSTzrYYo5-3QOPDU7o2k-f1VEq4cBegiwUG1xBChhOgtOLsonxpPyoccrqYEN0l7mQJRz2_BCytc96m8J3y4TlUfy5cSOp8WOHfB0ZiRyUcix_HFp9xmvmsVcsiJ9KpAfgBoGXq1uwAiVmPSXNzq8lKanadcHLaY4OK_ydU9lRTrNyDxbpjwGXj3LuYXyfnAl5OcLbcA2IvP6z9bIXFKvNiexh083UMSoKOPaQ_sAQLs1jiHFw5_fiyYc"/>
+<span class="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono">DASH_992</span>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-3xl">image</span>
+</div>
+</div>
+<div class="p-3">
+<p class="text-xs font-bold text-primary truncate">License Plate Extraction</p>
+<p class="text-[10px] text-on-surface-variant mt-1 font-medium">05:10:02 AM · High Confidence</p>
+</div>
+</div>
+<!-- Evidence Item 3 -->
+<div class="bg-surface-container-lowest rounded-lg overflow-hidden group cursor-pointer border border-transparent hover:border-primary-container transition-all">
+<div class="relative aspect-video">
+<div class="w-full h-full bg-primary-container/10 flex flex-col items-center justify-center gap-2">
+<span class="material-symbols-outlined text-primary-container">audio_file</span>
+<div class="flex gap-0.5 items-end h-6">
+<div class="w-1 bg-primary-container h-3"></div>
+<div class="w-1 bg-primary-container h-5"></div>
+<div class="w-1 bg-primary-container h-2"></div>
+<div class="w-1 bg-primary-container h-6"></div>
+<div class="w-1 bg-primary-container h-4"></div>
+</div>
+</div>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-3xl">play_circle</span>
+</div>
+</div>
+<div class="p-3">
+<p class="text-xs font-bold text-primary truncate">Encrypted Comms Intercept</p>
+<p class="text-[10px] text-on-surface-variant mt-1 font-medium">04:45:30 AM · Audio Log</p>
+</div>
+</div>
+<!-- Repeat for filler -->
+<div class="bg-surface-container-lowest rounded-lg overflow-hidden group cursor-pointer border border-transparent hover:border-primary-container transition-all">
+<div class="relative aspect-video">
+<img class="w-full h-full object-cover" data-alt="highly detailed technical dashboard with digital telemetry and data visualization charts in a dark theme" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGkxEwBH3RQtZwsF8BOGyXiKFGVza8dccPsqykpSiHLqTRw6d_5bOQfXOgp03e0-BwTL6UHnfVjfs2c3bWH96ovcXuvx1BFujtYqnAqsT7Co2x79afO8UqvxhRqYM1zQ3l5OSNc2bv11xLjTHImEzzVxHaWPifbY7Hcbl0ilj8KflwdhcgHxZFFx2SH4UqYg96zeH9fe_yztoJ-0IYCAU0vuL2gZk_V_AkIHNcFjlQhz7_JY3dfJsmAwcEokWZ9YDQ3HWVuieBn-k"/>
+<span class="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono">TELEMETRY_LOG</span>
+</div>
+<div class="p-3">
+<p class="text-xs font-bold text-primary truncate">Network Access Log #44</p>
+<p class="text-[10px] text-on-surface-variant mt-1 font-medium">03:59:00 AM · JSON Data</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Video Timeline Module -->
+<section class="bg-primary h-56 rounded-xl p-6 flex flex-col">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-4">
+<h3 class="text-white text-sm font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-white/60">timeline</span> Global Timeline
+                            </h3>
+<div class="flex bg-white/5 rounded p-0.5 text-[10px] font-bold text-white/60">
+<button class="px-2 py-1 bg-white/10 text-white rounded-sm">LIVE</button>
+<button class="px-2 py-1">ARCHIVE</button>
+</div>
+</div>
+<div class="flex items-center gap-4 text-white/60 text-[10px] font-mono">
+<span>04:00:00</span>
+<div class="flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-white">
+<span class="w-1.5 h-1.5 bg-error rounded-full"></span>
+                                04:22:15 MARKER
+                            </div>
+<span>05:00:00</span>
+</div>
+</div>
+<!-- Interactive Scrubber Area -->
+<div class="relative flex-1 bg-white/5 rounded-lg border border-white/10 flex flex-col justify-end overflow-hidden group">
+<div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-3xl">play_arrow</span>
+</button>
+</div>
+<!-- Timeline Bars -->
+<div class="flex items-end gap-1 px-4 h-24 mb-4">
+<!-- Low activity -->
+<div class="flex-1 bg-white/10 h-4 rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-6 rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-3 rounded-t-sm"></div>
+<!-- Peak 1 -->
+<div class="flex-1 bg-tertiary-container/40 h-12 rounded-t-sm"></div>
+<div class="flex-1 bg-error/60 h-20 rounded-t-sm border-t-2 border-error shadow-[0_0_15px_rgba(186,26,26,0.3)]"></div>
+<div class="flex-1 bg-tertiary-container/40 h-10 rounded-t-sm"></div>
+<!-- Mid activity -->
+<div class="flex-1 bg-white/10 h-8 rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-5 rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-7 rounded-t-sm"></div>
+<!-- Peak 2 -->
+<div class="flex-1 bg-secondary-container/30 h-14 rounded-t-sm"></div>
+<div class="flex-1 bg-secondary-container/40 h-18 rounded-t-sm border-t-2 border-secondary-fixed"></div>
+<div class="flex-1 bg-secondary-container/30 h-12 rounded-t-sm"></div>
+<!-- Low activity -->
+<div class="flex-1 bg-white/10 h-4 rounded-t-sm"></div>
+<div class="flex-1 bg-white/10 h-2 rounded-t-sm"></div>
+</div>
+<!-- Scrubber Line -->
+<div class="absolute top-0 bottom-0 left-1/3 w-[2px] bg-white z-10 shadow-[0_0_10px_white]">
+<div class="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rotate-45"></div>
+</div>
+<!-- Time labels -->
+<div class="bg-black/20 flex justify-between px-4 py-2 border-t border-white/10 text-[9px] font-mono text-white/40 tracking-widest">
+<span>04:10</span>
+<span>04:15</span>
+<span class="text-white/80">04:20</span>
+<span>04:25</span>
+<span>04:30</span>
+<span>04:35</span>
+<span>04:40</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Right: Tracking & Notes Panel -->
+<div class="w-96 flex flex-col gap-6">
+<!-- Suspect Tracking -->
+<section class="bg-surface-container-low rounded-xl p-6 flex flex-col h-[45%]">
+<h3 class="text-lg font-bold text-primary flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined">person_search</span> Subject Profiles
+                    </h3>
+<div class="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+<!-- Suspect 1 -->
+<div class="bg-surface-container-lowest p-3 rounded-lg border-l-4 border-error flex items-center gap-4 group hover:bg-surface-container-high transition-all">
+<img class="w-12 h-12 rounded bg-surface object-cover grayscale" data-alt="grainy black and white profile photo of a male suspect with sharp features and stubble taken in low light surveillance style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRIIR0D1JrOdBjjST-ZvDXYZMbt0WYg57TocrqAlJZobL-KNklDRiYXvdw6FXQ1oxQ72tX44NVe281mkG7FgdY4qgneUY2T57mok3KW-nz0dwfo4_4ZJcjWOXXSUpUxPgE5gMzgATrmmBfJz8pKMjhja8Gw-e0nzu-ldEhTtI8lTPrddm5GmIfSvzdnTM5mXcxapvMcl-4ksGb2EXaOJGjOKRl3EBlHW4QfLa4paLLyVHYHP26tS74tk_d5fDEeowj-gHxWdIwcic"/>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-bold text-primary truncate">Subject: UNKNOWN_ALPHA</p>
+<p class="text-[10px] text-error font-bold uppercase tracking-tighter mt-0.5">POI - Active Lead</p>
+<div class="flex gap-1 mt-1.5">
+<span class="w-2 h-2 rounded-full bg-error animate-ping"></span>
+<span class="text-[9px] text-on-surface-variant font-medium">Last seen: Sector 4 G-Zone</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+</div>
+<!-- Suspect 2 -->
+<div class="bg-surface-container-lowest p-3 rounded-lg border-l-4 border-outline-variant flex items-center gap-4 group hover:bg-surface-container-high transition-all">
+<img class="w-12 h-12 rounded bg-surface object-cover" data-alt="digital identification headshot of a person with neutral expression, soft lighting, and high resolution professional quality" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADEU2Jm2Oseh7VGTmC86VL4nKJi5ZAtyBnQhD2Uw9E9bK__f5MEsEUIMR401g30Vy5VYgM9FanNMXiXPxYbLkkVTcYjR_lvY-CJ2dd2SzR5xI1AyMC5VAPF3HdJcOfh5-7LYQEJECBdsV2ilXHTI7vbLiNvBnE2Drd6toddVG5y4ji1z-lFXE0wDqhDNLfAz41bytVFDKoh3qN6bAkm--nMYYRJRBhuJOtgXt-KC2UCq7bcvqYDkQ56w768aztTxH2Ny2FOWd8KI4"/>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-bold text-primary truncate">Subject: ELIAS_VANCE</p>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-tighter mt-0.5">Citizen - Witness</p>
+<div class="flex gap-1 mt-1.5">
+<span class="text-[9px] text-on-surface-variant font-medium">Verified ID: #VT-441-2</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+</div>
+</div>
+<button class="mt-4 w-full py-2 border-2 border-dashed border-outline-variant rounded-lg text-on-surface-variant text-[10px] font-bold uppercase tracking-widest hover:border-primary-container hover:text-primary transition-all">
+                        + Identification Queue
+                    </button>
+</section>
+<!-- Case Notes -->
+<section class="bg-surface-container-lowest rounded-xl p-6 flex flex-col flex-1 border border-outline-variant/20 shadow-sm shadow-primary/5">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-lg font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined">edit_note</span> Investigation Logs
+                        </h3>
+<span class="text-[10px] font-bold text-on-surface-variant bg-surface-container py-1 px-2 rounded">AUTO-SAVING</span>
+</div>
+<div class="flex-1 flex flex-col gap-4 overflow-hidden">
+<div class="flex-1 bg-surface-container-low/30 rounded-lg p-4 border-b-2 border-primary overflow-y-auto custom-scrollbar">
+<div class="space-y-6">
+<div class="relative pl-4 border-l-2 border-primary-container">
+<span class="absolute -left-1 top-0 w-2 h-2 rounded-full bg-primary-container"></span>
+<p class="text-[10px] font-bold text-on-primary-container uppercase tracking-widest">Today, 04:35 AM</p>
+<p class="text-[11px] text-on-surface mt-1 leading-relaxed">Identified matching gait pattern from CAM_04 in Suspect Database. High probability link to Subject: UNKNOWN_ALPHA.</p>
+</div>
+<div class="relative pl-4 border-l-2 border-outline-variant">
+<span class="absolute -left-1 top-0 w-2 h-2 rounded-full bg-outline-variant"></span>
+<p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Today, 04:12 AM</p>
+<p class="text-[11px] text-on-surface mt-1 leading-relaxed">Case file initiated following perimeter alarm trigger at Downtown Transit G-Zone. All local feeds requested for archival.</p>
+</div>
+</div>
+</div>
+<div class="relative">
+<textarea class="w-full h-24 bg-surface-container rounded-lg border-none text-xs p-4 focus:ring-1 focus:ring-primary-container resize-none placeholder:text-on-surface-variant/50" placeholder="Append new intelligence note..."></textarea>
+<button class="absolute bottom-3 right-3 p-1.5 bg-primary text-white rounded shadow-md">
+<span class="material-symbols-outlined text-sm">send</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d9dadb;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #bbc6e2;
+        }
+    </style>
+</body></html>
