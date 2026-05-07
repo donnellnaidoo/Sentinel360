@@ -45,7 +45,7 @@ function DrawerLayout() {
       <Drawer.Screen
         name="(tabs)"
         options={{
-          headerTitle: "Tabs",
+          headerShown: false,
           drawerLabel: ({ color, focused }) => (
             <Text style={{ color: focused ? color : themeColorForeground }}>Tabs</Text>
           ),
@@ -55,13 +55,6 @@ function DrawerLayout() {
               size={size}
               color={focused ? color : themeColorForeground}
             />
-          ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable className="mr-4">
-                <Ionicons name="add-outline" size={24} color={themeColorForeground} />
-              </Pressable>
-            </Link>
           ),
         }}
       />
