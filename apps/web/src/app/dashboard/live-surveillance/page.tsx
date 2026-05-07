@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { authClient } from "@/lib/auth-client";
-import CommandCenterDashboard from "@/components/command-center/command-center-dashboard";
+import LiveSurveillanceMonitor from "@/components/command-center/live-surveillance-monitor";
 import Loader from "@/components/loader";
+import { authClient } from "@/lib/auth-client";
 
-export default function DashboardPage() {
+export default function LiveSurveillancePage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
 
@@ -25,5 +25,5 @@ export default function DashboardPage() {
     return null;
   }
 
-  return <CommandCenterDashboard agentName={session.user.name} />;
+  return <LiveSurveillanceMonitor agentName={session.user.name} />;
 }

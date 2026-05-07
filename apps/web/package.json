@@ -12,6 +12,7 @@
     "@Sentinel360/auth": "workspace:*",
     "@Sentinel360/env": "workspace:*",
     "@Sentinel360/ui": "workspace:*",
+    "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",

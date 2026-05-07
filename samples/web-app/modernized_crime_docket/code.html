@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | Crime Dockets</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "background": "#f8f9fa",
+                      "on-surface-variant": "#45474d",
+                      "secondary-container": "#c2dcff",
+                      "tertiary-fixed": "#fcdeb3",
+                      "on-error": "#ffffff",
+                      "on-primary-container": "#828da7",
+                      "secondary": "#47607e",
+                      "on-tertiary-fixed": "#271901",
+                      "on-primary-fixed-variant": "#3c475d",
+                      "surface-tint": "#545e76",
+                      "primary-fixed-dim": "#bbc6e2",
+                      "surface-dim": "#d9dadb",
+                      "on-primary": "#ffffff",
+                      "surface-container": "#edeeef",
+                      "primary-container": "#1b263b",
+                      "tertiary-fixed-dim": "#dfc299",
+                      "on-tertiary-container": "#a28963",
+                      "on-secondary-fixed-variant": "#2f4865",
+                      "on-primary-fixed": "#101b30",
+                      "on-secondary-container": "#48617e",
+                      "inverse-on-surface": "#f0f1f2",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#bbc6e2",
+                      "secondary-fixed": "#d1e4ff",
+                      "surface-container-lowest": "#ffffff",
+                      "surface": "#f8f9fa",
+                      "surface-variant": "#e1e3e4",
+                      "on-background": "#191c1d",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-low": "#f3f4f5",
+                      "surface-container-high": "#e7e8e9",
+                      "secondary-fixed-dim": "#afc9ea",
+                      "outline-variant": "#c5c6cd",
+                      "on-tertiary-fixed-variant": "#574423",
+                      "error-container": "#ffdad6",
+                      "on-error-container": "#93000a",
+                      "outline": "#75777d",
+                      "inverse-surface": "#2e3132",
+                      "error": "#ba1a1a",
+                      "on-surface": "#191c1d",
+                      "on-secondary-fixed": "#001d36",
+                      "primary-fixed": "#d7e2ff",
+                      "tertiary-container": "#332306",
+                      "surface-container-highest": "#e1e3e4",
+                      "primary": "#051125",
+                      "tertiary": "#1a0f00",
+                      "surface-bright": "#f8f9fa"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "fontFamily": {
+                      "headline": ["Manrope"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .headline { font-family: 'Manrope', sans-serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .tonal-surface {
+            background-color: #f3f4f5;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface flex min-h-screen overflow-hidden">
+<!-- SideNavBar Component -->
+<aside class="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-[#F3F4F5] dark:bg-[#051125] z-50 border-r border-outline-variant/10">
+<div class="p-6">
+<h1 class="font-manrope font-black text-[#051125] dark:text-white text-xl">Command Center</h1>
+<p class="text-xs uppercase tracking-widest opacity-60 font-semibold mt-1">Level 4 Authorization</p>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 dark:hover:bg-[#1B263B]/50 transition-all duration-200 rounded-l-lg font-medium text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Intelligence Hub
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#1B263B] text-[#051125] dark:text-white rounded-l-lg shadow-sm font-bold text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+                Crime Dockets
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 dark:hover:bg-[#1B263B]/50 transition-all duration-200 rounded-l-lg font-medium text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+                Threat Matrix
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 dark:hover:bg-[#1B263B]/50 transition-all duration-200 rounded-l-lg font-medium text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="location_searching">location_searching</span>
+                Asset Tracking
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 hover:bg-white/50 dark:hover:bg-[#1B263B]/50 transition-all duration-200 rounded-l-lg font-medium text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+                Archives
+            </a>
+</nav>
+<div class="p-4 mt-auto">
+<button class="w-full py-3 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95 text-sm">
+                New Investigation
+            </button>
+</div>
+<div class="px-4 py-6 border-t border-[#EDEEEF] dark:border-[#1B263B] space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-[#45474D] dark:text-[#EDEEEF] opacity-70 hover:opacity-100 text-sm" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help_outline">help_outline</span>
+                Help Desk
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-error opacity-70 hover:opacity-100 text-sm font-semibold" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="logout">logout</span>
+                Logout
+            </a>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 md:ml-64 flex flex-col h-screen bg-[#F0F1F2]">
+<!-- TopAppBar Component -->
+<header class="bg-white/80 backdrop-blur-md flex justify-between items-center h-16 px-8 w-full sticky top-0 z-40 border-b border-outline-variant/10">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#051125] dark:text-white tracking-widest uppercase">Sentinel360</span>
+<div class="relative group">
+<span class="absolute inset-y-0 left-3 flex items-center text-on-primary-container">
+<span class="material-symbols-outlined text-sm" data-icon="search">search</span>
+</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border-none rounded-full text-sm w-64 focus:ring-2 focus:ring-primary-container transition-all" placeholder="Search case numbers..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex gap-2">
+<button class="p-2 text-[#45474D] dark:text-[#EDEEEF] hover:bg-surface-container transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-[#45474D] dark:text-[#EDEEEF] hover:bg-surface-container transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+<div class="flex items-center gap-3 pl-6 border-l border-outline-variant/30">
+<div class="text-right">
+<p class="text-xs font-bold text-[#051125] dark:text-white leading-none">James Thorne</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Chief Intelligence Officer</p>
+</div>
+<img alt="Chief Intelligence Officer Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary-container" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxhUzsOWJUnOSd_WW3U_nM3AHkOvuV9j7vWIBezpDe5C-hZRshXYBVQ8lcmw9jjeoZQngbkT01iQiVaC3zTbooEad0CuVz-sofZZVgfFYJarevFDmLi9NdvXMHx99hlcRM2_JfqKHiuJWqveP6byDAucDeoXoEk0DrrrsB7aZeJjl1ZJCQWLN5PDvgi8lmF5X5_usYdk0b1eqFBvmLRGvgZ5A7r7YR0WmsaVY_OTif8jmaFCP_0ktpgyrjRUbO7NiQWi1ngXepK04"/>
+</div>
+</div>
+</header>
+<!-- New Layout Density - reference IMAGE_6 -->
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<!-- Top Section: Stats Cards (Inspired by IMAGE_6 top-left) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Case Resolution Rate</h3>
+<span class="material-symbols-outlined text-on-primary-container text-sm" data-icon="download">download</span>
+</div>
+<!-- Distribution Visual -->
+<div class="space-y-4">
+<div class="flex gap-[2px]">
+<!-- Visual bars representing score -->
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00]"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00] opacity-40"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00] opacity-40"></div>
+<div class="h-4 w-2 rounded-full bg-[#FF9F00] opacity-40"></div>
+</div>
+<div class="text-[10px] font-bold text-center py-1 bg-[#FFF8E1] text-[#A67C00] rounded">82% Positive Resolution</div>
+<div class="flex gap-[2px]">
+<div class="h-4 w-2 rounded-full bg-[#4CAF50]"></div>
+<div class="h-4 w-2 rounded-full bg-[#4CAF50]"></div>
+<div class="h-4 w-2 rounded-full bg-[#4CAF50] opacity-40"></div>
+<div class="h-4 w-2 rounded-full bg-[#4CAF50] opacity-40"></div>
+<div class="h-4 w-2 rounded-full bg-[#4CAF50] opacity-40"></div>
+<div class="h-4 w-2 rounded-full bg-[#4CAF50] opacity-40"></div>
+</div>
+<div class="text-[10px] font-bold text-center py-1 bg-[#E8F5E9] text-[#2E7D32] rounded">25% Investigation Overhead</div>
+</div>
+<div class="mt-4 text-center">
+<span class="px-3 py-1 bg-surface-container-low text-[10px] font-bold rounded-full">EFFICIENCY: HIGH</span>
+</div>
+</div>
+<div class="md:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-outline-variant/10 flex justify-between items-center">
+<div>
+<h2 class="text-3xl font-extrabold text-primary headline tracking-tight">Crime Docket Analysis</h2>
+<p class="text-on-surface-variant text-sm mt-1">842 Total Active Cases under surveillance</p>
+</div>
+<div class="flex gap-2">
+<button class="p-3 bg-surface-container-low text-primary rounded-xl hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="file_download">file_download</span>
+</button>
+<button class="px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-md hover:bg-primary-container transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                            NEW LOG
+                        </button>
+</div>
+</div>
+</div>
+<!-- Central Content Grid (3 Columns like IMAGE_6) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Left Sidebar: Recent Filing Sources & Updates (1/4 width) -->
+<div class="lg:col-span-3 space-y-6">
+<!-- Recent Filing Sources (Origin Report style) -->
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Recent Filing Sources</h3>
+<span class="material-symbols-outlined text-on-primary-container text-sm" data-icon="download">download</span>
+</div>
+<div class="flex gap-2 mb-6">
+<img alt="Bureau source" class="w-14 h-14 rounded-lg object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcvfONnbCCsQfwM55wY5lgBxmgghVSRHYNqMyoXMfPNXQ5FAofg63rIw2QNj7aa7ZzR_MUPULL0ioJhpbeHdBxFLcl5z6bYQvjBBPIB9jPC-U2yENb7kd-yjQue_-aZE0uFPCsjyeODCIAcc1IxCwfyz8veXDT8Z8KmT12qM6Er9Far5Y3FuXZASnt5caHS0YM0d1FFVZjtqai0m9reMmI85I7-EaSDJvesIQWzpXPKxrmJVp3yzL7BjzXEMF60pEIO6uXFwzM_M0"/>
+<img alt="Intelligence source" class="w-14 h-14 rounded-lg object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUDuGv2129vLOCLHz_wIEAGQQT6oTVZJFp7GWb4fadmXUAaj9poG_rpEafY9amCaz_G95JEx8yFge7KAobZg7ebnufhdHXD6ymyF9VwWnXJGN9IZ-RD2e9JnI4Nd493o_N9179ozOYIYaDt_onQmaqAAXpIn7eBJufgkmTqCmxL-QUGdXWaGiW8oPR9RO0833BA0F4Yy4fEnV5aY0tZVY-s1rFZS9Lb7hLICpwMc0jPasHA0HYU65PgUB2GMgRRgbjPs7IpJwnzCM"/>
+<img alt="Cyber source" class="w-14 h-14 rounded-lg object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOjIw6V1GYiTfjd-QEddqhLV66X4Ux2YsFWeGA2NYD3a6aA_Y_bAlmJlkWiYJQCEBumXGsaRLMAOJjBz9Ik_qClD-qDodhIjFSRPULWD4wJU4iNb-nHloQ-tJjuWgdSSppmvqM_X6px_l4PeW5WbnLqM-SC5gAgBxCPKVYx2eugcfwpjk8KTNJ62GWnUFrE4nBgtKTPNtPQ0-M-rLo_-QPyhDpJ8yhlRk5bFjJxz8QBvuFwVJlp9CI1Ut3YuTUllGxtgsly1RH-oc"/>
+</div>
+<div class="space-y-2">
+<div class="flex items-center gap-3 p-2 bg-surface-container-low rounded-lg">
+<span class="material-symbols-outlined text-sm text-success" data-icon="check_circle">check_circle</span>
+<span class="text-[11px] font-semibold text-primary flex-1">Verifiable Evidence Chain</span>
+<span class="material-symbols-outlined text-[12px] text-on-surface-variant" data-icon="info">info</span>
+</div>
+<div class="flex items-center gap-3 p-2 bg-surface-container-low rounded-lg">
+<span class="material-symbols-outlined text-sm text-success" data-icon="check_circle">check_circle</span>
+<span class="text-[11px] font-semibold text-primary flex-1">Inter-departmental Cross-ref</span>
+<span class="material-symbols-outlined text-[12px] text-on-surface-variant" data-icon="info">info</span>
+</div>
+<div class="flex items-center gap-3 p-2 bg-error/5 rounded-lg border border-error/10">
+<span class="material-symbols-outlined text-sm text-error" data-icon="close">close</span>
+<span class="text-[11px] font-semibold text-error flex-1">Missing Biometric Link</span>
+<span class="material-symbols-outlined text-[12px] text-on-surface-variant" data-icon="info">info</span>
+</div>
+</div>
+</div>
+<!-- Recent Docket Updates (Forensic Log style) -->
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Recent Docket Updates</h3>
+<span class="material-symbols-outlined text-on-primary-container text-sm" data-icon="download">download</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<span class="text-[9px] font-bold text-on-surface-variant opacity-60">09:12s</span>
+<span class="text-[10px] font-bold text-primary flex-1">Case #8901 Update</span>
+<span class="text-[10px] text-on-surface-variant">Trial set</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="flex items-center gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<span class="text-[9px] font-bold text-on-surface-variant opacity-60">10:45s</span>
+<span class="text-[10px] font-bold text-primary flex-1">Suspect Ghost-7</span>
+<span class="text-[10px] text-on-surface-variant">Trace lost</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="flex items-center gap-3 p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<span class="text-[9px] font-bold text-on-surface-variant opacity-60">11:30s</span>
+<span class="text-[10px] font-bold text-primary flex-1">Warrant Issued</span>
+<span class="text-[10px] text-on-surface-variant">Zhao, M.</span>
+<span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Central Area: Priority Case Analysis (Large Center View) -->
+<div class="lg:col-span-6 space-y-6">
+<div class="relative bg-white rounded-3xl overflow-hidden shadow-xl border border-outline-variant/10 group">
+<!-- Priority Suspect Visual -->
+<div class="aspect-[4/5] md:aspect-video relative overflow-hidden">
+<img alt="Priority Case Subject" class="w-full h-full object-cover grayscale brightness-75 group-hover:grayscale-0 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBYZzKsLCpzg-otqCyvNT2pDqLd3Lzh8IUDqLvZb8J8BIIOevqJsYmL4EVcWNNqYu3m0OadbOnn2bLuEYtcLBcXl4HNeeIlwEc364zRAcBovTkE1IhWHm87SzV-SQDvBqvllgsGMg-d4BZgbCRd59fSOUX34mBw26lJKNr2tuvN1Smt14XZpSeqGcRMRVRCkC2ESdwBtT6sMHesNBPuBzpw5C3rGzhGAduS22KJylUUwKIypE84Dx9XTewvjWiNGC4IDAkhWYHoMk"/>
+<!-- HUD Overlays -->
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="w-[80%] h-[80%] border border-white/20 rounded-full flex items-center justify-center">
+<div class="w-[70%] h-[70%] border-t border-b border-white/40 rounded-full animate-[spin_10s_linear_infinite]"></div>
+</div>
+</div>
+<div class="absolute top-6 left-6">
+<span class="px-3 py-1 bg-error text-white text-[10px] font-black uppercase tracking-widest rounded shadow-lg">Priority Case #CR-2024-8901</span>
+</div>
+<!-- Bottom Control Card -->
+<div class="absolute bottom-6 left-6 right-6">
+<div class="glass-card rounded-2xl p-6 shadow-2xl">
+<h4 class="text-sm font-bold text-primary mb-2">Subject: Sterling, Elias V.</h4>
+<p class="text-xs text-on-surface-variant leading-relaxed mb-4">
+                                        Primary suspect in multi-jurisdictional corporate fraud. Last tracked near district 7. 
+                                        High probability of exit attempt within 24 hours. Verification required.
+                                    </p>
+<div class="flex items-center justify-between">
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+</button>
+<button class="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-lg shadow-md flex items-center gap-2">
+<span class="material-symbols-outlined text-xs" data-icon="visibility">visibility</span>
+                                                ANALYZE DATA
+                                            </button>
+</div>
+<div class="flex items-center gap-2 bg-white/50 px-3 py-2 rounded-lg">
+<span class="material-symbols-outlined text-sm" data-icon="mic">mic</span>
+<div class="w-px h-4 bg-outline-variant/30"></div>
+<span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Sidebar: Dashboard & Actions (1/4 width) -->
+<div class="lg:col-span-3 space-y-6">
+<!-- Dashboard Card -->
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Immediate Actions</h3>
+<span class="material-symbols-outlined text-on-primary-container text-sm" data-icon="settings">settings</span>
+</div>
+<div class="p-6 border-2 border-dashed border-outline-variant/30 rounded-xl bg-surface-container-low flex flex-col items-center text-center">
+<div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+<span class="material-symbols-outlined text-secondary" data-icon="upload_file">upload_file</span>
+</div>
+<p class="text-[11px] font-bold text-primary mb-1">Verify Evidence</p>
+<p class="text-[9px] text-on-surface-variant mb-4">Drop files to link to current docket</p>
+<button class="px-4 py-2 bg-[#FFEB3B] text-primary text-[10px] font-bold rounded shadow-sm hover:brightness-95 transition-all">BROWSE FILES</button>
+</div>
+</div>
+<!-- Pending Verifications (Image Details style) -->
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Case Metrics</h3>
+<span class="material-symbols-outlined text-on-primary-container text-sm" data-icon="share">share</span>
+</div>
+<div class="flex gap-4">
+<div class="flex-1 space-y-4">
+<div>
+<p class="text-[9px] text-on-surface-variant font-bold uppercase opacity-60">Avg Duration</p>
+<p class="text-xs font-bold text-primary">14.2 Days</p>
+</div>
+<div>
+<p class="text-[9px] text-on-surface-variant font-bold uppercase opacity-60">Active Agents</p>
+<p class="text-xs font-bold text-primary">54 Personnel</p>
+</div>
+<div>
+<p class="text-[9px] text-on-surface-variant font-bold uppercase opacity-60">Success Rate</p>
+<p class="text-xs font-bold text-primary">94.8% Year</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 items-end">
+<div class="w-20 h-12 rounded bg-surface-container-high overflow-hidden">
+<img alt="Small metric thumb" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdt9OO9b_DXVuTmyKCjL6ZPvH1_eT6o0btPrIpx6wSCyZWwgrV65_yrgTr1x1VuvQIlV4mYZuzKHF7uL1Xk4R3FEWd_GlGvW6qau1BiKjuJJiQn2DlY5bwRgJEJ4L1B2DYtr3RiKkhj2DW8XTSHxOQbbMdcUgoQntxYgVkX8aghXQHQkePx2qnrExPQFdzDV6hNWiqKz5V1LHkwpulboeVNaAx5n5uR_pPYc406KXmdC_QGLLW5-U4hku4XtsKva0TvsCLSQMDm2A"/>
+</div>
+<div class="w-20 h-12 rounded bg-surface-container-high overflow-hidden">
+<img alt="Small metric thumb" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtcRBWMxibn-m4VPmRK0CoNbqhulDo2QpHoNYx7n2PmM7CaQgNZm90njuEBGyG9dgTiCfckhFX1959EN_aO8PTawc08qSn369_o23g7NUz97HwuBQukWV7DomijIm3cg7SSnN9KtBvF7Xe9v--oROGPCnu5OiSu3vZBwsyWUm5tPqpSYpn5tSS1yNP7M4x9rHaP37H7bEfGZX8coIqSF9-qOiJTSnvi2m1nDQazsAwpdCSbc2nimwpZhSRUi6gzlxZ9nwmfppv8PY"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Mobile Bottom Navigation -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-white flex justify-around py-3 px-2 z-50 border-t border-outline-variant/10 shadow-lg">
+<button class="flex flex-col items-center gap-1 text-[#45474D]">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-[10px] font-bold">Hub</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-[#051125]">
+<span class="material-symbols-outlined" data-icon="folder_open" style="font-variation-settings: 'FILL' 1;">folder_open</span>
+<span class="text-[10px] font-bold">Dockets</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-[#45474D]">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+<span class="text-[10px] font-bold">Threats</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-[#45474D]">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-bold">Profile</span>
+</button>
+</nav>
+</body></html>

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | Command Center</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-surface": "#191c1d",
+                        "on-secondary-container": "#48617e",
+                        "background": "#f8f9fa",
+                        "surface-tint": "#545e76",
+                        "primary-fixed": "#d7e2ff",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#c2dcff",
+                        "on-secondary-fixed": "#001d36",
+                        "surface-container-high": "#e7e8e9",
+                        "primary-container": "#1b263b",
+                        "on-secondary-fixed-variant": "#2f4865",
+                        "tertiary-container": "#332306",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#2e3132",
+                        "on-tertiary-container": "#a28963",
+                        "tertiary": "#1a0f00",
+                        "secondary-fixed": "#d1e4ff",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e4",
+                        "on-surface-variant": "#45474d",
+                        "surface-container": "#edeeef",
+                        "secondary": "#47607e",
+                        "inverse-primary": "#bbc6e2",
+                        "on-primary-container": "#828da7",
+                        "tertiary-fixed-dim": "#dfc299",
+                        "on-background": "#191c1d",
+                        "surface": "#f8f9fa",
+                        "outline": "#75777d",
+                        "primary-fixed-dim": "#bbc6e2",
+                        "outline-variant": "#c5c6cd",
+                        "surface-dim": "#d9dadb",
+                        "tertiary-fixed": "#fcdeb3",
+                        "on-tertiary-fixed-variant": "#574423",
+                        "surface-container-highest": "#e1e3e4",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#271901",
+                        "surface-container-low": "#f3f4f5",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#101b30",
+                        "primary": "#051125",
+                        "surface-bright": "#f8f9fa",
+                        "secondary-fixed-dim": "#afc9ea",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#3c475d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .font-headline { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 bg-[#051125] dark:bg-[#051125] z-40 flex flex-col">
+<div class="p-6 flex flex-col gap-1">
+<h1 class="text-xl font-bold tracking-tight text-white font-headline">Sentinel360</h1>
+<p class="text-[0.6875rem] font-medium text-on-primary-container font-label uppercase tracking-widest">Enterprise Intelligence</p>
+</div>
+<nav class="flex-1 mt-4 px-2 space-y-1">
+<!-- Active Tab: Dashboard -->
+<a class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white border-l-4 border-white transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+<span class="font-medium text-sm">Live Surveillance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+<span class="font-medium text-sm">AI Alerts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="search_check">search_check</span>
+<span class="font-medium text-sm">Investigations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person_search">person_search</span>
+<span class="font-medium text-sm">Suspect Database</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="directions_car">directions_car</span>
+<span class="font-medium text-sm">Vehicles Database</span>
+</a>
+</nav>
+<div class="px-6 py-6">
+<button class="w-full py-3 bg-gradient-to-r from-[#051125] to-[#1B263B] text-white rounded-lg flex items-center justify-center gap-2 text-sm font-semibold border border-white/10 hover:shadow-lg transition-all active:scale-95">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                New Investigation
+            </button>
+</div>
+<div class="mt-auto p-4 space-y-1 border-t border-white/5">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white text-xs transition-colors" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="settings_input_component">settings_input_component</span>
+                System Status
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white text-xs transition-colors" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="settings">settings</span>
+                Settings
+            </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen bg-surface">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center h-16 px-8 sticky top-0 z-30 bg-[#F8F9FA]/80 backdrop-blur-xl transition-all">
+<div class="flex items-center gap-8">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full text-sm w-80 focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Global Search Intelligence..." type="text"/>
+</div>
+<nav class="hidden md:flex gap-6">
+<a class="text-[#051125] font-bold border-b-2 border-[#051125] pb-1 text-sm" href="#">Global View</a>
+<a class="text-[#45474D] font-medium hover:text-[#1B263B] text-sm transition-colors" href="#">Analytics</a>
+<a class="text-[#45474D] font-medium hover:text-[#1B263B] text-sm transition-colors" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-colors" data-icon="help">help</span>
+<div class="relative">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-colors" data-icon="notifications">notifications</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full"></span>
+</div>
+</div>
+<div class="flex items-center gap-3 border-l pl-6 border-outline-variant/30">
+<div class="text-right">
+<p class="text-xs font-bold text-primary font-headline">Agent K. Miller</p>
+<p class="text-[10px] text-on-surface-variant font-label">Lead Investigator</p>
+</div>
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-white" data-alt="professional portrait of a male intelligence officer in a dark suit with neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZ-dPqFKFTu9iH3HN1RQSsVC_OQF9VJyTfJEw_xgGo6Q9oyBNi9oE0YjVfd5JeycTf4D9nKDW3qW5q9VIfyVTIOLFuOb_nEwj0HcRJdyxGkHR4ssokTN0H32E-Mhwk1XcxOSZhPAnlPNBx8E4gsLRJbsTuIec6UuwT8stZlkRkHT_2LIUSv8OWGTTA0XVH_hpM17ux4_hCIBf60zQ7Xde83lvRZgusNeplE_znslEmeTF99wrZhAyubduAX4U3JMvCB-FY-Yi5N0M"/>
+</div>
+</div>
+</header>
+<!-- Dashboard Canvas -->
+<div class="p-8">
+<!-- Hero KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-error transition-transform hover:scale-[1.02]">
+<p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">Active Threat Alerts</p>
+<div class="flex items-end justify-between">
+<h2 class="text-3xl font-extrabold font-headline text-primary">12</h2>
+<span class="text-error flex items-center text-xs font-bold">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+                            +30%
+                        </span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-secondary transition-transform hover:scale-[1.02]">
+<p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">Surveillance Streams</p>
+<div class="flex items-end justify-between">
+<h2 class="text-3xl font-extrabold font-headline text-primary">1,248</h2>
+<p class="text-[10px] font-medium text-on-surface-variant">98.2% ONLINE</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-on-tertiary-container transition-transform hover:scale-[1.02]">
+<p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">Pending Investigations</p>
+<div class="flex items-end justify-between">
+<h2 class="text-3xl font-extrabold font-headline text-primary">42</h2>
+<span class="text-on-tertiary-container flex items-center text-xs font-bold">
+<span class="material-symbols-outlined text-sm" data-icon="history">history</span>
+                            8 Urgent
+                        </span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-primary transition-transform hover:scale-[1.02]">
+<p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">AI Processing Load</p>
+<div class="flex items-end justify-between">
+<h2 class="text-3xl font-extrabold font-headline text-primary">24%</h2>
+<div class="w-16 h-2 bg-surface-container rounded-full overflow-hidden">
+<div class="bg-primary h-full w-1/4"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Layout -->
+<div class="grid grid-cols-12 gap-8">
+<!-- 1. Active Threat Alerts (List) - Col 1-4 -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<section class="bg-surface-container-lowest rounded-2xl overflow-hidden flex flex-col h-[600px]">
+<div class="p-6 flex justify-between items-center border-b border-surface-container-low">
+<h3 class="font-headline font-bold text-lg">Active AI Alerts</h3>
+<span class="px-2 py-1 bg-error/10 text-error text-[10px] font-bold rounded">LIVE FEED</span>
+</div>
+<div class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4">
+<!-- Alert Item -->
+<div class="p-4 bg-surface rounded-xl hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex gap-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black">
+<img class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" data-alt="security camera grainy night vision footage of a figure near a restricted perimeter fence" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmO5stqD_j4DxgO-vKmYABi0UgMZElSstCCc0bUZKabueefIR8e0_rXMJTtOrmX-Z9jzJGOb3RkI6XTWMrmw67_DwC9DM8yM4uyKCdH1kHpjOkcbVIBwcc7a8Kz0v-1s2QvyHu5WaB4h7FSrJQE21uDbDQYXGIoDOvm0M7BNtiAGYLtBs_kQiVrj7W0Mat9UKWQoktSUUebknzl75-uAamiMhUFDJP8ZwFEgi9fW1gzxuV5uM7RY-FJRHGsOEUN74fFfLgtXhxgBM"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-error uppercase">Critical Priority</span>
+<span class="text-[10px] text-on-surface-variant">2m ago</span>
+</div>
+<p class="text-sm font-bold text-primary mb-1">Restricted Area Breach</p>
+<p class="text-xs text-on-surface-variant">Gate 4C - Logistics Wing</p>
+<div class="mt-2 flex gap-2">
+<span class="text-[9px] bg-primary/5 text-primary px-2 py-0.5 rounded border border-primary/10">Human Det.</span>
+<span class="text-[9px] bg-primary/5 text-primary px-2 py-0.5 rounded border border-primary/10">Night Vision</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface rounded-xl hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex gap-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black">
+<img class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" data-alt="low angle street surveillance camera view showing a dark car parked in a no-parking zone with blurred city lights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJ_VrNEJ-0CfGdJs8fybsfqcq6lCyn1G-6GfD3SLmbFzy0M4Qhg6Qhd2X3i3Afnd4ATQPjKw2jR6zoW3XQvoeFn4WbvJY4XFyMfzKOuu4rZsLZaCwVUKeDBjm5v7cIsInUnp9ByFZL0uod9vfA0C9fJwFARmAbg2Ha0Fed5NeCR8dpkJR7GYrk0qhcA5k8r-bWlwuHbEfDaZXhrd0WEQX7FZXa-69n0RtYA85cbEZqL7ixAeWfYHqrDle-Ci5EK_rN8vqDqY7JB3k"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-on-tertiary-container uppercase">High Priority</span>
+<span class="text-[10px] text-on-surface-variant">14m ago</span>
+</div>
+<p class="text-sm font-bold text-primary mb-1">Unidentified Vehicle</p>
+<p class="text-xs text-on-surface-variant">Employee Parking - Sector B</p>
+<div class="mt-2 flex gap-2">
+<span class="text-[9px] bg-primary/5 text-primary px-2 py-0.5 rounded border border-primary/10">ALPR Flag</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface rounded-xl hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex gap-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-black">
+<img class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" data-alt="abstract digital data visualization of heat map showing foot traffic density in a commercial building lobby" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIuJNaTR-V615tvhJ5EoFwNiTZ8buIAvCEe1EXVFrHgd8sx3GmEzgD9E8xqJhNJT3T6qVkbLunNe2SeIyPGUVErhDD-Ky2Z7M5OqEVSXMns2pawBFC9SL9WqW01lJJvlIAqXb83UaUaXsMatqiZoOlvf_mdD4KgsLXQrKQ8zwJRAPpO-8DGQuiQTLfe6mLbw1MRykJuQk-gEruJChUjfJ1e97SR13GKTDlsyhS3-vuoV-om_vw-W3JU6dlNFJ7pkgPyj0DrE_RmFw"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-on-secondary-container uppercase">Medium Priority</span>
+<span class="text-[10px] text-on-surface-variant">32m ago</span>
+</div>
+<p class="text-sm font-bold text-primary mb-1">Crowd Density Alert</p>
+<p class="text-xs text-on-surface-variant">Main Lobby - South Entrance</p>
+<div class="mt-2 flex gap-2">
+<span class="text-[9px] bg-primary/5 text-primary px-2 py-0.5 rounded border border-primary/10">Congestion</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-low text-center">
+<button class="text-xs font-bold text-primary hover:underline">View All Intelligence Feeds</button>
+</div>
+</section>
+</div>
+<!-- 2. Geographic Map & Incident Chart - Col 5-12 -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-8">
+<!-- Geographic Map -->
+<div class="bg-surface-container-low rounded-2xl overflow-hidden relative h-[400px]">
+<img class="w-full h-full object-cover mix-blend-multiply opacity-80" data-alt="top-down high contrast map view of a city grid with glowing neon blue and amber data points representing security nodes" data-location="New York" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOJ6ggtjr_Si-NQokHS8c0zTn361dkCuNkhuGKHFMJ_vM7kEuelkrlBHUTyCY7JsUqzf0EidxIsOBODFpnPbky9diZUH10rfavkSUEeDWzOAraFG31m8LfjDh2dS5PVOIe2fKo10W17Wro1ChEiW4v0j6oEC78YVLAj0IZWiOcrCXQA7j7C0eYLW-918hWjCV-Y_at2TOiZ5RrciicNIznft4qFj3j4cGfJ-H98hh5ckq4z8cvWhfp7z2fiDpw8jUNMea49et5hlk"/>
+<!-- Map HUD -->
+<div class="absolute top-6 left-6 glass-panel p-4 rounded-xl shadow-lg border border-white/20">
+<h4 class="text-xs font-bold text-primary font-headline mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="location_on">location_on</span>
+                                LIVE DEPLOYMENT
+                            </h4>
+<div class="space-y-2">
+<div class="flex items-center gap-3">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span class="text-[10px] font-medium">Critical: 03</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-[10px] font-medium">Active: 18</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-[10px] font-medium">Patrol: 05</span>
+</div>
+</div>
+</div>
+<!-- Map Pin Overlays (Abstracted) -->
+<div class="absolute top-1/2 left-1/3 w-4 h-4 bg-error rounded-full ring-4 ring-error/20 animate-bounce"></div>
+<div class="absolute top-1/4 right-1/4 w-3 h-3 bg-primary rounded-full ring-4 ring-primary/20"></div>
+<div class="absolute bottom-1/3 left-1/2 w-3 h-3 bg-secondary rounded-full ring-4 ring-secondary/20"></div>
+<div class="absolute bottom-6 right-6 flex gap-2">
+<button class="glass-panel p-2 rounded-lg text-primary hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="my_location">my_location</span>
+</button>
+<button class="glass-panel p-2 rounded-lg text-primary hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="layers">layers</span>
+</button>
+</div>
+</div>
+<!-- Bottom Widgets: Surveillance & Processing -->
+<div class="grid grid-cols-2 gap-8">
+<!-- Surveillance Status -->
+<div class="bg-surface-container-lowest p-6 rounded-2xl h-[170px]">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline font-bold text-sm">Surveillance Status</h3>
+<span class="material-symbols-outlined text-on-surface-variant text-lg" data-icon="videocam">videocam</span>
+</div>
+<div class="flex gap-4 items-center">
+<div class="flex-1">
+<div class="flex justify-between text-[10px] mb-1 font-bold">
+<span>ACTIVE CAPACITY</span>
+<span class="text-primary">94%</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-secondary to-on-secondary-container" style="width: 94%"></div>
+</div>
+</div>
+<div class="text-right">
+<p class="text-2xl font-black text-primary">1,176</p>
+<p class="text-[10px] text-on-surface-variant font-medium">ONLINE NODES</p>
+</div>
+</div>
+</div>
+<!-- AI Processing -->
+<div class="bg-surface-container-lowest p-6 rounded-2xl h-[170px]">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline font-bold text-sm">AI Performance</h3>
+<span class="material-symbols-outlined text-on-surface-variant text-lg" data-icon="query_stats">query_stats</span>
+</div>
+<div class="flex gap-4 items-center">
+<div class="flex-1 space-y-3">
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-on-surface-variant font-semibold">Latency</span>
+<span class="text-[10px] font-bold text-primary">42ms</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-on-surface-variant font-semibold">Precision</span>
+<span class="text-[10px] font-bold text-primary">99.8%</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-on-surface-variant font-semibold">Throughput</span>
+<span class="text-[10px] font-bold text-primary">4.2 TB/s</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Investigation Queue - Col 1-12 -->
+<div class="col-span-12">
+<section class="bg-surface-container-lowest rounded-2xl overflow-hidden">
+<div class="p-6 flex justify-between items-center">
+<h3 class="font-headline font-bold text-lg">Investigation Queue</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-low rounded text-xs font-medium cursor-pointer">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+                                    Sort: Priority
+                                </div>
+<button class="text-xs font-bold text-primary-container border-b-2 border-primary-container">Export Data</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-surface-container-low text-[10px] uppercase tracking-wider text-on-surface-variant font-bold">
+<tr>
+<th class="px-8 py-4">Case ID</th>
+<th class="px-8 py-4">Incident Type</th>
+<th class="px-8 py-4">Lead Investigator</th>
+<th class="px-8 py-4">Status</th>
+<th class="px-8 py-4">Timestamp</th>
+<th class="px-8 py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
+<td class="px-8 py-5 font-bold text-xs text-primary">INV-8842-A</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-error/10 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-sm" data-icon="lock_open">lock_open</span>
+</div>
+<span class="text-xs font-semibold">Perimeter Breach</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-2">
+<img class="w-6 h-6 rounded-full object-cover" data-alt="professional headshot of a female investigator with glasses in a modern office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9k2l9uk16SciS8maioh98WE3k1gwpLnxbtl4ftJIE3Hc2Nzc1UZOKEvtf3xk3NwAeIomTtQfOjyr8r-56p7QizJAWJZCqg1E0FQcbKtGyuzfwelg0IO8Jo8WSEJYxJHCVEQ7qu8fP68EB4s14h7pfwfYLWpB3Vlq9AuY7oWikXapme8uNYrVUSQveevouSQiNxUQHDnUMYe_JlnRcvipJOK4_NiniAi3F0WzztLZAW6SE8jkUVgaQkxrrC3pfa-cfE_5sPPlDg5c"/>
+<span class="text-xs">S. Jenkins</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 bg-error text-white text-[10px] font-bold rounded">URGENT</span>
+</td>
+<td class="px-8 py-5 text-xs text-on-surface-variant">Today, 14:22</td>
+<td class="px-8 py-5 text-right">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
+<td class="px-8 py-5 font-bold text-xs text-primary">INV-8839-C</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-on-tertiary-container/10 flex items-center justify-center text-on-tertiary-container">
+<span class="material-symbols-outlined text-sm" data-icon="directions_car">directions_car</span>
+</div>
+<span class="text-xs font-semibold">Banned Plate Entry</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-2">
+<img class="w-6 h-6 rounded-full object-cover" data-alt="professional portrait of a young man with focused expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSsdqEWt2c7Dl2MtMHwQLfqbWNnIWrf2yDIRd5Qn6cTt-EWBRaFtsub858iBZHiPnj8VVi5mVdHAYdZXSfHmr7QOHKod-a1rAo4m2jcbqlv-yLg18xcDurDTm9d2pukdisrQBh1M8lHk4YV-Mmlb4Yc0SOlBrUN-4vWUWyieDW1Un2Nt_qQxogC4pjrZLVjlveay0H6ac55xy92eNkwaJHR1iA83EhkgK9cXzgcgFwAaPug_V4mbGK8R4Vf2uWoeaA6o32dYfHw_c"/>
+<span class="text-xs">T. Walsh</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 bg-on-tertiary-container text-white text-[10px] font-bold rounded">IN PROGRESS</span>
+</td>
+<td class="px-8 py-5 text-xs text-on-surface-variant">Today, 11:05</td>
+<td class="px-8 py-5 text-right">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
+<td class="px-8 py-5 font-bold text-xs text-primary">INV-8831-D</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="inventory_2">inventory_2</span>
+</div>
+<span class="text-xs font-semibold">Object Left Behind</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<div class="flex items-center gap-2">
+<img class="w-6 h-6 rounded-full object-cover" data-alt="close-up portrait of a woman working at a tech company" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2toXwRCfVQma7piUHbG7xdfNYWZJ2uO3UMUfkoOX0V9o3YMg_LvaSx5sf2OaZ2Lc0JU6T0vW7i06DXlK92tYQTI8Eeth556RpuaeIGg2SXNX3Jr17dmqyG6uEzLRa-Nc57p9HHNBqSr8LNuFDGVCgJMsg2Few161u_CmbfrxYg3pas1MddxDYEvxmAKDuiDa439TPcL7qDjxpMKHv5OpUHE7j_DDkP3VN3Gj0zSivC8JJLua6pwrG4jXyZfkFtIZz0Xb8unKKXSQ"/>
+<span class="text-xs">M. Rivera</span>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-2 py-1 bg-secondary text-white text-[10px] font-bold rounded">REVIEWED</span>
+</td>
+<td class="px-8 py-5 text-xs text-on-surface-variant">Yesterday, 18:45</td>
+<td class="px-8 py-5 text-right">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t border-surface-container-low text-center">
+<button class="text-xs font-bold text-primary-container">Load 24 More Cases</button>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+</body></html>
