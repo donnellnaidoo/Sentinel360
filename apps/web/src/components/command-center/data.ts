@@ -13,7 +13,8 @@ export type SidebarItem = {
 export type KpiCard = {
   label: string;
   value: string;
-  accentClassName: string;
+  accentClassName?: string;
+  accent?: string;
   detailText?: string;
   detailIcon?: string;
   detailClassName?: string;

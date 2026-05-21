@@ -3,8 +3,11 @@
 import { cn } from "@Sentinel360/ui/lib/utils";
 import type { Route } from "next";
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
+import { supabase } from "@/lib/supabase";
+import { authClient } from "@/lib/auth-client";
 import { agentProfile, navTabs, sidebarItems } from "./data";
 
 type CommandCenterShellProps = {
@@ -247,6 +250,66 @@ export function CommandCenterSidebar({
 }: {
   activeSidebarLabel: string;
 }) {
+  const router = useRouter();
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    caseType: "",
+    description: "",
+    priority: "MEDIUM",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCreate() {
+    if (!formData.title.trim() || !formData.caseType.trim()) return;
+    setSubmitting(true);
+    setError("");
+
+    const { data: session } = await supabase.auth.getSession();
+    const authUserId = session.session?.user?.id;
+
+    let userId: string | null = null;
+    if (authUserId) {
+      const { data: existing } = await supabase
+        .from("user")
+        .select("id")
+        .eq("id", authUserId)
+        .single();
+      if (existing) {
+        userId = authUserId;
+      }
+    }
+
+    const caseNumber = `SR-${Date.now().toString(36).toUpperCase()}`;
+
+    const { data, error: insertError } = await supabase
+      .from("case")
+      .insert({
+        case_number: caseNumber,
+        case_type: formData.caseType,
+        title: formData.title,
+        description: formData.description || null,
+        priority: formData.priority,
+        status: "OPEN",
+        created_by_user_id: userId,
+        assigned_to_user_id: userId,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      setError(insertError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
+    setShowNewDialog(false);
+    setFormData({ title: "", caseType: "", description: "", priority: "MEDIUM" });
+    router.push(`/dashboard/investigations/${data.id}` as unknown as Route);
+  }
+
   return (
     <aside className="w-full bg-[#051125] lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64 lg:flex lg:flex-col">
       <div className="p-6">
@@ -295,12 +358,124 @@ export function CommandCenterSidebar({
       <div className="px-6 py-6">
         <button
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-gradient-to-r from-[#051125] to-[#1b263b] py-3 text-sm font-semibold text-white transition-all hover:shadow-lg active:scale-95"
+          onClick={() => setShowNewDialog(true)}
           type="button"
         >
           <MaterialIcon name="add" className="text-base" />
           <span>New Investigation</span>
         </button>
       </div>
+
+      {showNewDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-extrabold tracking-tight text-[#051125]">
+                New Investigation
+              </h2>
+              <button
+                className="rounded-lg p-2 text-[#45474d] transition-colors hover:bg-[#f3f4f5]"
+                onClick={() => setShowNewDialog(false)}
+                type="button"
+              >
+                <MaterialIcon name="close" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-[#45474d]">
+                  Case Title *
+                </label>
+                <input
+                  className="w-full rounded-lg border border-[#c5c6cd]/50 px-4 py-2.5 text-sm text-[#191c1d] outline-none focus:ring-2 focus:ring-[#051125]/20"
+                  placeholder="e.g. Downtown Transit Incursion"
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
+                  type="text"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-[#45474d]">
+                  Case Type *
+                </label>
+                <input
+                  className="w-full rounded-lg border border-[#c5c6cd]/50 px-4 py-2.5 text-sm text-[#191c1d] outline-none focus:ring-2 focus:ring-[#051125]/20"
+                  placeholder="e.g. Perimeter Breach"
+                  value={formData.caseType}
+                  onChange={(e) =>
+                    setFormData({ ...formData, caseType: e.target.value })
+                  }
+                  type="text"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-[#45474d]">
+                  Description
+                </label>
+                <textarea
+                  className="h-24 w-full resize-none rounded-lg border border-[#c5c6cd]/50 px-4 py-2.5 text-sm text-[#191c1d] outline-none focus:ring-2 focus:ring-[#051125]/20"
+                  placeholder="Brief description of the investigation..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-[#45474d]">
+                  Priority
+                </label>
+                <select
+                  className="w-full rounded-lg border border-[#c5c6cd]/50 px-4 py-2.5 text-sm text-[#191c1d] outline-none focus:ring-2 focus:ring-[#051125]/20"
+                  value={formData.priority}
+                  onChange={(e) =>
+                    setFormData({ ...formData, priority: e.target.value })
+                  }
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+
+              {error && (
+                <p className="rounded-lg bg-[#ffdad6] px-3 py-2 text-xs font-medium text-[#93000a]">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-8 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-[#c5c6cd]/50 px-5 py-2.5 text-sm font-semibold text-[#45474d] transition-colors hover:bg-[#f3f4f5]"
+                onClick={() => setShowNewDialog(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-[#051125] px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-[#1b263b] active:scale-95 disabled:opacity-50"
+                disabled={
+                  !formData.title.trim() ||
+                  !formData.caseType.trim() ||
+                  submitting
+                }
+                onClick={handleCreate}
+                type="button"
+              >
+                {submitting ? "Creating..." : "Create Investigation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-white/5 p-4 lg:mt-auto">
         <button
@@ -319,6 +494,22 @@ export function CommandCenterSidebar({
         >
           <MaterialIcon name="settings" className="text-sm" />
           <span>Settings</span>
+        </button>
+        <button
+          className="flex w-full items-center gap-3 px-4 py-2 text-left text-xs text-error transition-colors hover:text-[#ff6b6b]"
+          onClick={() => {
+            authClient.signOut({
+              fetchOptions: {
+                onSuccess: () => {
+                  router.push("/login");
+                },
+              },
+            });
+          }}
+          type="button"
+        >
+          <MaterialIcon name="logout" className="text-sm" />
+          <span>Logout</span>
         </button>
       </div>
     </aside>

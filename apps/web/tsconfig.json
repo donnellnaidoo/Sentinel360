@@ -23,7 +23,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@Sentinel360/ui/*": ["../../packages/ui/src/*"]
-    }
+    },
+    
   },
   "include": [
     "next-env.d.ts",

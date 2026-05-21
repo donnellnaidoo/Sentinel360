@@ -1,15 +1,13 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@Sentinel360/ui/lib/utils";
 
 import CommandCenterShell, {
   MaterialIcon,
   headlineStyle,
 } from "./command-center-shell";
-import {
-  intelligenceFeedItems,
-  liveFeedCards,
-} from "./live-surveillance-data";
+import { intelligenceFeedItems, liveFeedCards } from "./live-surveillance-data";
 
 type LiveSurveillanceMonitorProps = {
   agentName: string;
@@ -30,6 +28,57 @@ export default function LiveSurveillanceMonitor({
   agentName,
 }: LiveSurveillanceMonitorProps) {
   const profileSubtitle = agentName.trim() || "Admin-04";
+
+  // hidden canvas capture for the first feed: attempts to POST image to /api/analyze every 1.5s
+  useEffect(() => {
+    let mounted = true;
+    const interval = 1500;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const attemptCapture = async () => {
+      if (!mounted) return;
+
+      // Try to capture from video element first, then fallback to image
+      let source: HTMLVideoElement | HTMLImageElement | null =
+        document.querySelector(
+          'video[data-feed-index="0"]',
+        ) as HTMLVideoElement | null;
+      if (!source) {
+        source = document.querySelector(
+          'img[data-feed-index="0"]',
+        ) as HTMLImageElement | null;
+      }
+
+      if (!source || !ctx) return;
+      try {
+        canvas.width = source.clientWidth || 640;
+        canvas.height = source.clientHeight || 360;
+        if (source instanceof HTMLVideoElement) {
+          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        } else if (source instanceof HTMLImageElement) {
+          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        }
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.8),
+        );
+        if (!blob) return;
+        const form = new FormData();
+        form.append("frame", blob, "frame.jpg");
+        await fetch("/api/analyze", { method: "POST", body: form });
+      } catch (e) {
+        // ignore failures (CORS, video not ready, etc.)
+      }
+    };
+
+    const id = setInterval(attemptCapture, interval);
+    // run once immediately
+    attemptCapture();
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
 
   return (
     <CommandCenterShell
@@ -99,7 +148,7 @@ export default function LiveSurveillanceMonitor({
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-3">
-            {liveFeedCards.map((feed) => (
+            {liveFeedCards.map((feed, idx) => (
               <article
                 key={feed.cameraName}
                 className={cn(
@@ -108,11 +157,43 @@ export default function LiveSurveillanceMonitor({
                 )}
               >
                 <div className="relative aspect-video overflow-hidden bg-black">
-                  <img
-                    alt={feed.imageAlt}
-                    className="h-full w-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
-                    src={feed.imageUrl}
-                  />
+                  {idx === 0 ? (
+                    <video
+                      key="stream-video"
+                      autoPlay
+                      muted
+                      playsInline
+                      className="h-full w-full object-cover opacity-90"
+                      data-feed-index={idx}
+                      onError={() => {
+                        // Log error and rely on fallback image
+                        console.log(
+                          "Video stream failed to load, showing fallback image",
+                        );
+                      }}
+                    >
+                      <source
+                        src="/api/demo-stream"
+                        type="video/mp4"
+                      />
+                      {/* Fallback to image if video fails */}
+                      <img
+                        alt={feed.imageAlt}
+                        className="h-full w-full object-cover opacity-90"
+                        src={feed.imageUrl}
+                      />
+                    </video>
+                  ) : (
+                    <img
+                      alt={feed.imageAlt}
+                      className="h-full w-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
+                      src={feed.imageUrl}
+                      data-feed-index={idx}
+                    />
+                  )}
+
+                  {/* AI overlay: simple centered box when any recent event exists */}
+                  <AIOverlay feedIndex={idx} />
 
                   {feed.detections.map((detection) => (
                     <div
@@ -197,7 +278,11 @@ export default function LiveSurveillanceMonitor({
                       )}
                     >
                       <MaterialIcon
-                        name={feed.statusBadge === "ACTIVE ALERT" ? "warning" : "location_on"}
+                        name={
+                          feed.statusBadge === "ACTIVE ALERT"
+                            ? "warning"
+                            : "location_on"
+                        }
                         className={cn("text-sm", feed.footerIconClassName)}
                       />
                     </div>
@@ -233,10 +318,7 @@ export default function LiveSurveillanceMonitor({
         <aside className="w-full xl:w-80 xl:min-w-[20rem]">
           <div className="no-line-shadow flex h-full max-h-[720px] flex-col overflow-hidden rounded-2xl bg-[#f3f4f5] p-6 xl:max-h-none">
             <div className="mb-6 flex items-center justify-between">
-              <h3
-                className="font-bold text-[#051125]"
-                style={headlineStyle}
-              >
+              <h3 className="font-bold text-[#051125]" style={headlineStyle}>
                 Intelligence Feed
               </h3>
               <span className="rounded bg-[#1b263b] px-2 py-1 text-[10px] font-bold text-white">
@@ -297,7 +379,10 @@ export default function LiveSurveillanceMonitor({
 
                   {item.location ? (
                     <p className="mt-2 flex items-center gap-1 text-[10px] text-[#45474d]">
-                      <MaterialIcon name="location_on" className="text-[12px]" />
+                      <MaterialIcon
+                        name="location_on"
+                        className="text-[12px]"
+                      />
                       <span>{item.location}</span>
                     </p>
                   ) : null}
@@ -337,5 +422,45 @@ function FeedActionButton({
     >
       <MaterialIcon name={icon} className="text-sm" />
     </button>
+  );
+}
+
+function AIOverlay({ feedIndex }: { feedIndex: number }) {
+  const [events, setEvents] = useState<any[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/events");
+        const json = await res.json();
+        if (mounted && json?.events) setEvents(json.events || []);
+      } catch (e) {
+        // ignore
+      }
+    };
+    poll();
+    const id = setInterval(poll, 1500);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  const latest = events[0];
+  if (!latest) return null;
+  if (!latest.result || !latest.result.anomaly) return null;
+
+  const label = latest.result.type || "Anomaly";
+  const conf = Math.round((latest.result.confidence || 0) * 100);
+
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+      <div className="relative">
+        <div className="h-28 w-56 rounded border-2 border-[#ba1a1a] bg-[#ba1a1a]/10" />
+        <div className="absolute -top-5 left-0 rounded bg-[#ba1a1a] px-2 py-1 text-xs font-bold text-white">
+          {label} • {conf}%
+        </div>
+      </div>
+    </div>
   );
 }

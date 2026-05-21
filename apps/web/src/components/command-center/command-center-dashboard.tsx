@@ -1,28 +1,81 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@Sentinel360/ui/lib/utils";
 
+import { trpc } from "@/utils/trpc";
 import CommandCenterShell, {
   MaterialIcon,
   headlineStyle,
 } from "./command-center-shell";
 import {
-  aiStats,
-  alertItems,
-  investigationRows,
-  kpiCards,
+  aiStats as fallbackAiStats,
+  alertItems as fallbackAlerts,
+  investigationRows as fallbackInvestigations,
+  kpiCards as fallbackKpiCards,
   mapDeployments,
   mapImageUrl,
-  surveillanceStats,
+  surveillanceStats as fallbackSurveillanceStats,
 } from "./data";
 
 type CommandCenterDashboardProps = {
   agentName: string;
 };
 
+type DashboardKpiCard = {
+  label: string;
+  value: string;
+  accentClassName?: string;
+  accent?: string;
+  detailText?: string;
+  detailIcon?: string;
+  detailClassName?: string;
+  progressPercent?: number;
+};
+
+type DashboardAlertItem = {
+  title: string;
+  location: string;
+  priorityLabel: string;
+  priorityClassName: string;
+  elapsed: string;
+  tags: string[];
+  imageUrl: string;
+  imageAlt: string;
+};
+
+type DashboardInvestigationRow = {
+  caseId: string;
+  incidentType: string;
+  lead: string;
+  leadAvatarUrl: string;
+  leadAvatarAlt: string;
+  status: string;
+  statusBadge?: string;
+  statusClassName: string;
+  timestamp: string;
+  icon: string;
+  iconWrapClassName: string;
+  iconClassName: string;
+};
+
 export default function CommandCenterDashboard({
   agentName,
 }: CommandCenterDashboardProps) {
+  const { data: apiData } = useQuery(
+    trpc.dashboard.overview.queryOptions(),
+  );
+
+  const kpiCards: DashboardKpiCard[] =
+    apiData?.kpiCards ?? fallbackKpiCards;
+  const alertItems: DashboardAlertItem[] =
+    apiData?.alertItems ?? fallbackAlerts;
+  const surveillanceStats =
+    apiData?.surveillanceStats ?? fallbackSurveillanceStats;
+  const aiStats = apiData?.aiStats ?? fallbackAiStats;
+  const investigationRows: DashboardInvestigationRow[] =
+    apiData?.investigationRows ?? fallbackInvestigations;
+
   return (
     <CommandCenterShell
       activeSidebarLabel="Dashboard"
@@ -36,7 +89,7 @@ export default function CommandCenterDashboard({
             key={card.label}
             className={cn(
               "rounded-xl border-l-4 bg-white p-6 transition-transform hover:scale-[1.02]",
-              card.accentClassName,
+              card.accentClassName ?? card.accent,
             )}
           >
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#45474d]">
@@ -50,7 +103,7 @@ export default function CommandCenterDashboard({
                 {card.value}
               </h2>
 
-              {card.progressPercent ? (
+              {card.progressPercent != null ? (
                 <div className="w-16 overflow-hidden rounded-full bg-[#edeeef]">
                   <div
                     className="h-2 bg-[#051125]"
@@ -327,65 +380,68 @@ export default function CommandCenterDashboard({
                 </thead>
 
                 <tbody className="divide-y divide-[#f3f4f5]">
-                  {investigationRows.map((row) => (
-                    <tr
-                      key={row.caseId}
-                      className="group cursor-pointer transition-colors hover:bg-[#f3f4f5]"
-                    >
-                      <td className="px-8 py-5 text-xs font-bold text-[#051125]">
-                        {row.caseId}
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div
+                  {investigationRows.map((row) => {
+                    const displayStatus = row.statusBadge ?? row.status;
+                    return (
+                      <tr
+                        key={row.caseId}
+                        className="group cursor-pointer transition-colors hover:bg-[#f3f4f5]"
+                      >
+                        <td className="px-8 py-5 text-xs font-bold text-[#051125]">
+                          {row.caseId}
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                "flex h-8 w-8 items-center justify-center rounded",
+                                row.iconWrapClassName,
+                              )}
+                            >
+                              <MaterialIcon
+                                name={row.icon}
+                                className={cn("text-sm", row.iconClassName)}
+                              />
+                            </div>
+                            <span className="text-xs font-semibold text-[#191c1d]">
+                              {row.incidentType}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-2">
+                            <img
+                              alt={row.leadAvatarAlt}
+                              className="h-6 w-6 rounded-full object-cover"
+                              src={row.leadAvatarUrl}
+                            />
+                            <span className="text-xs text-[#191c1d]">
+                              {row.lead}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span
                             className={cn(
-                              "flex h-8 w-8 items-center justify-center rounded",
-                              row.iconWrapClassName,
+                              "rounded px-2 py-1 text-[10px] font-bold",
+                              row.statusClassName,
                             )}
                           >
-                            <MaterialIcon
-                              name={row.icon}
-                              className={cn("text-sm", row.iconClassName)}
-                            />
-                          </div>
-                          <span className="text-xs font-semibold text-[#191c1d]">
-                            {row.incidentType}
+                            {displayStatus}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-2">
-                          <img
-                            alt={row.leadAvatarAlt}
-                            className="h-6 w-6 rounded-full object-cover"
-                            src={row.leadAvatarUrl}
+                        </td>
+                        <td className="px-8 py-5 text-xs text-[#45474d]">
+                          {row.timestamp}
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <MaterialIcon
+                            name="chevron_right"
+                            className="text-base text-[#45474d] transition-colors group-hover:text-[#051125]"
                           />
-                          <span className="text-xs text-[#191c1d]">
-                            {row.lead}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span
-                          className={cn(
-                            "rounded px-2 py-1 text-[10px] font-bold",
-                            row.statusClassName,
-                          )}
-                        >
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-xs text-[#45474d]">
-                        {row.timestamp}
-                      </td>
-                      <td className="px-8 py-5 text-right">
-                        <MaterialIcon
-                          name="chevron_right"
-                          className="text-base text-[#45474d] transition-colors group-hover:text-[#051125]"
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

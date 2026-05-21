@@ -5,9 +5,19 @@ import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { toast } from "sonner";
 
+function isNetworkError(message: string) {
+  return (
+    message === "Failed to fetch" ||
+    message === "NetworkError when attempting to fetch resource." ||
+    message === "Load failed"
+  );
+}
+
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => {
+      if (isNetworkError(error.message)) return;
+      if (error.message === "Authentication required") return;
       toast.error(error.message, {
         action: {
           label: "retry",
