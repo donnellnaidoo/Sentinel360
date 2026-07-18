@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 — Sighting Submission</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#60ff99",
+                        "primary": "#00677e",
+                        "tertiary-container": "#ffb440",
+                        "on-surface": "#0b1c30",
+                        "on-background": "#0b1c30",
+                        "on-primary-fixed": "#001f27",
+                        "secondary": "#006d37",
+                        "surface-tint": "#00677e",
+                        "tertiary-fixed-dim": "#ffb952",
+                        "surface-container-high": "#dce9ff",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#00e479",
+                        "on-primary-container": "#00586b",
+                        "primary-fixed-dim": "#3cd7ff",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#633f00",
+                        "tertiary": "#825500",
+                        "surface-container": "#e5eeff",
+                        "primary-fixed": "#b4ebff",
+                        "on-secondary-container": "#006e37",
+                        "on-tertiary-fixed": "#291800",
+                        "on-error-container": "#93000a",
+                        "surface-container-highest": "#d3e4fe",
+                        "secondary-container": "#00fa85",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed-variant": "#004e5f",
+                        "inverse-on-surface": "#eaf1ff",
+                        "inverse-surface": "#213145",
+                        "primary-container": "#00d4ff",
+                        "surface-dim": "#cbdbf5",
+                        "tertiary-fixed": "#ffddb4",
+                        "surface-bright": "#f8f9ff",
+                        "on-primary": "#ffffff",
+                        "on-surface-variant": "#3c494e",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#bbc9cf",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#6f4800",
+                        "inverse-primary": "#3cd7ff",
+                        "surface": "#f8f9ff",
+                        "on-secondary-fixed-variant": "#005228",
+                        "outline": "#6c797f",
+                        "on-secondary-fixed": "#00210c",
+                        "surface-variant": "#d3e4fe",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-xs": "4px",
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "container-max": "1440px",
+                        "stack-sm": "8px",
+                        "stack-lg": "24px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg": ["30px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-xl": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(8px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar -->
+<aside class="w-64 h-full fixed left-0 top-0 bg-surface-container-low shadow-sm flex flex-col py-stack-lg z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Sentinel360</h1>
+<p class="text-on-surface-variant font-body-sm opacity-70">Surveillance Intelligence</p>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+<!-- Navigation Items Mapping from JSON -->
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="dashboard">dashboard</span>
+<span class="font-body-md">Dashboard</span>
+</a>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="folder_open">folder_open</span>
+<span class="font-body-md">Cases</span>
+</a>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="gavel">gavel</span>
+<span class="font-body-md">Docket</span>
+</a>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md">Evidence</span>
+</a>
+<!-- ACTIVE TAB: Sightings -->
+<a class="flex items-center px-4 py-3 rounded-lg text-primary bg-primary-container/10 border-l-4 border-primary font-medium transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="visibility" style="font-variation-settings: 'FILL' 1;">visibility</span>
+<span class="font-body-md">Sightings</span>
+</a>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="notifications">notifications</span>
+<span class="font-body-md">Alerts</span>
+</a>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="person_search">person_search</span>
+<span class="font-body-md">Wanted Feed</span>
+</a>
+<div class="my-4 border-t border-outline-variant opacity-20"></div>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="settings">settings</span>
+<span class="font-body-md">Settings</span>
+</a>
+<a class="flex items-center px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="logout">logout</span>
+<span class="font-body-md">Logout</span>
+</a>
+</nav>
+</aside>
+<!-- Main Canvas Area -->
+<main class="ml-64 min-h-screen flex flex-col relative">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-40 bg-surface flex justify-between items-center w-full px-margin-desktop h-16 border-b border-outline-variant">
+<div class="flex items-center space-x-4">
+<span class="font-body-md text-on-surface-variant">Cases</span>
+<span class="material-symbols-outlined text-outline-variant scale-75" data-icon="chevron_right">chevron_right</span>
+<span class="font-body-md font-bold text-primary">Sighting Submission</span>
+</div>
+<div class="flex items-center space-x-6">
+<div class="relative">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors" data-icon="notifications">notifications</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full"></span>
+</div>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A close-up portrait of a professional male intelligence analyst in his late 30s with a clean-shaven look and short hair. He is wearing a dark navy corporate shirt in a high-tech office environment. The lighting is soft and professional, emphasizing a modern light-mode interface aesthetic with cool tones and a sharp, vigilant gaze." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzm7MtjveN-6_oWPDD1MzNRZ72sgY2Di_VI9S5tg_g_ZGqDPkjdVEiIuYCwrlkQDrXaYgNtSU3_k2tCPfGexbvtD3WLysVvR_V21hdg4yRYD8bg-3fLrCKO-HGqyvwLvT064HHN8tAMdkml1UaG_mQPfmNKZrDb3ZAMMLTUiKMePK6x1pfBHHzc0fgXkdv5OP2ums2lw_7rXpY9N0WPHvvVp3Mm8M5PBEgX0MAFeCfkhAx3UM8adH0hsO5LTzOcbQeWUKZSUTJd85E"/>
+</div>
+</header>
+<!-- Content Body -->
+<div class="flex-1 p-margin-desktop bg-background overflow-y-auto">
+<div class="max-w-5xl mx-auto space-y-stack-lg">
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface">Submit Intelligence Sighting</h2>
+<p class="font-body-md text-on-surface-variant max-w-2xl">Log critical field data for incident SEN-0042. Ensure all fields are populated with verifiable metadata for forensic auditing.</p>
+</div>
+<div class="flex space-x-stack-sm">
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-caps text-label-caps flex items-center">
+<span class="material-symbols-outlined text-[14px] mr-1" data-icon="security">security</span> Secure Protocol Active
+                        </span>
+</div>
+</div>
+<!-- Form Section (Bento Grid Style) -->
+<form class="grid grid-cols-12 gap-gutter" id="submissionForm">
+<!-- Identification & Description -->
+<div class="col-span-12 md:col-span-8 space-y-gutter">
+<section class="bg-surface-container-lowest p-stack-lg rounded-xl shadow-sm border border-outline-variant/30 space-y-stack-md">
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-widest">Subject Intelligence</h3>
+<div class="space-y-stack-md">
+<div class="space-y-stack-xs">
+<label class="font-body-sm font-medium text-on-surface-variant">Suspect Name / Alias</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-3 text-body-md focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Enter primary identifier..." type="text"/>
+</div>
+<div class="space-y-stack-xs">
+<label class="font-body-sm font-medium text-on-surface-variant">Detailed Description</label>
+<textarea class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-3 text-body-md focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Describe physical features, attire, behavior, and surroundings..." rows="6"></textarea>
+</div>
+</div>
+</section>
+<section class="bg-surface-container-lowest p-stack-lg rounded-xl shadow-sm border border-outline-variant/30 space-y-stack-md">
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-widest">Evidence Upload</h3>
+<div class="border-2 border-dashed border-outline-variant rounded-xl p-stack-lg flex flex-col items-center justify-center space-y-stack-md hover:border-primary hover:bg-primary-container/5 transition-all cursor-pointer group">
+<span class="material-symbols-outlined text-[48px] text-outline-variant group-hover:text-primary transition-colors" data-icon="cloud_upload">cloud_upload</span>
+<div class="text-center">
+<p class="font-body-md font-medium text-on-surface">Drag &amp; drop photo or video files</p>
+<p class="font-body-sm text-on-surface-variant">Maximum file size: 500MB (RAW, MP4, JPEG, PNG)</p>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-xl font-body-md font-medium hover:brightness-110 transition-all" type="button">Select Files</button>
+</div>
+</section>
+</div>
+<!-- Metadata & Location -->
+<div class="col-span-12 md:col-span-4 space-y-gutter">
+<section class="bg-surface-container-lowest p-stack-lg rounded-xl shadow-sm border border-outline-variant/30 space-y-stack-md">
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-widest">Temporal Data</h3>
+<div class="space-y-stack-md">
+<div class="space-y-stack-xs">
+<label class="font-body-sm font-medium text-on-surface-variant">Date of Sighting</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-3 text-body-md focus:ring-2 focus:ring-primary" type="date"/>
+</div>
+</div>
+<div class="space-y-stack-xs">
+<label class="font-body-sm font-medium text-on-surface-variant">Time of Sighting (UTC)</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-3 text-body-md focus:ring-2 focus:ring-primary" type="time"/>
+</div>
+</div>
+</section>
+<section class="bg-surface-container-lowest p-stack-lg rounded-xl shadow-sm border border-outline-variant/30 space-y-stack-md">
+<div class="flex justify-between items-center">
+<h3 class="font-label-caps text-label-caps text-primary uppercase tracking-widest">Geospatial Tag</h3>
+<button class="text-primary font-label-caps hover:underline" type="button">GPS LOCK</button>
+</div>
+<div class="h-48 w-full rounded-lg bg-surface-container overflow-hidden relative border border-outline-variant">
+<img alt="Location Map" class="w-full h-full object-cover grayscale brightness-90 contrast-125" data-location="London" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcZcW2gK6JGySW2Tw_jH6UJQT60vnoKjhwFjeeZ8VLF-nf6VnyMSd6152DGpgGec-DPSNUPWEjoYZUxmpfM-R_zSOP7nYDVJnaf7Zx2CQtG18DBKwBUqTvrK_RW_4iN8AzOBWMKvW-gq7O-2512dHOqX8URs2ekRlFAZGc6jWMbBDx0uCEics2QKP6Xd1T1KFySQbXq5e2opuh29upvPJ4NVtnYL-UYYyiQFCPI-1UXUiqAnIXHcuy-N7vPfAJSX5Oda7lbTPa1lBp"/>
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<span class="material-symbols-outlined text-primary text-[32px]" data-icon="location_on" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+</div>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-3 text-body-sm focus:ring-2 focus:ring-primary" placeholder="Search for address or coordinates..." type="text"/>
+</section>
+<section class="pt-stack-md">
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl font-headline-md font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center space-x-stack-sm group" id="submitBtn" type="submit">
+<span>AUTHENTICATE &amp; SUBMIT</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<p class="text-center font-body-sm text-on-surface-variant mt-stack-md opacity-60">Submission will be cryptographically hashed for chain of custody.</p>
+</section>
+</div>
+</form>
+<!-- Status Feedback Overlay (Hidden by Default) -->
+<div class="fixed inset-0 z-[100] flex items-center justify-center bg-on-surface/40 backdrop-blur-sm hidden" id="statusOverlay">
+<div class="bg-surface rounded-2xl p-margin-desktop max-w-md w-full shadow-2xl border border-outline-variant text-center space-y-stack-lg transform transition-all scale-95 opacity-0" id="statusCard">
+<!-- Success State -->
+<div class="hidden space-y-stack-md" id="successContent">
+<div class="w-20 h-20 bg-secondary-container text-on-secondary-container rounded-full flex items-center justify-center mx-auto">
+<span class="material-symbols-outlined text-[40px]" data-icon="verified">verified</span>
+</div>
+<h3 class="font-headline-md font-bold text-on-surface">Submission Encrypted</h3>
+<p class="font-body-md text-on-surface-variant">Sighting log <strong>#SEN-0042-SGT-991</strong> has been successfully transmitted to the central intelligence repository.</p>
+<button class="w-full py-3 bg-primary text-on-primary rounded-lg font-body-md font-bold" onclick="closeStatus()">Return to Dashboard</button>
+</div>
+<!-- Error State -->
+<div class="hidden space-y-stack-md" id="errorContent">
+<div class="w-20 h-20 bg-error-container text-on-error-container rounded-full flex items-center justify-center mx-auto">
+<span class="material-symbols-outlined text-[40px]" data-icon="gpp_maybe">gpp_maybe</span>
+</div>
+<h3 class="font-headline-md font-bold text-error">Transmission Failed</h3>
+<p class="font-body-md text-on-surface-variant">Connectivity lost with Sentinel Core. Please verify your cryptographic credentials and retry.</p>
+<button class="w-full py-3 border border-outline text-on-surface rounded-lg font-body-md font-bold" onclick="closeStatus()">Try Again</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-outline-variant py-stack-md px-margin-desktop flex justify-between items-center w-full">
+<span class="font-label-caps text-label-caps text-on-surface-variant">© 2024 Sentinel360 Intelligence. All rights reserved.</span>
+<div class="flex space-x-6">
+<a class="font-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Privacy Policy</a>
+<a class="font-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Security Disclosure</a>
+<a class="font-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Contact Support</a>
+</div>
+</footer>
+</main>
+<script>
+        const form = document.getElementById('submissionForm');
+        const overlay = document.getElementById('statusOverlay');
+        const card = document.getElementById('statusCard');
+        const success = document.getElementById('successContent');
+        const error = document.getElementById('errorContent');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span>PROCESSING...</span>`;
+            
+            // Simulate API Call
+            setTimeout(() => {
+                const isSuccess = Math.random() > 0.3; // 70% success rate simulation
+                
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    card.classList.remove('scale-95', 'opacity-0');
+                    card.classList.add('scale-100', 'opacity-100');
+                }, 50);
+
+                if (isSuccess) {
+                    success.classList.remove('hidden');
+                    error.classList.add('hidden');
+                } else {
+                    error.classList.remove('hidden');
+                    success.classList.add('hidden');
+                }
+            }, 1500);
+        });
+
+        function closeStatus() {
+            card.classList.add('scale-95', 'opacity-0');
+            card.classList.remove('scale-100', 'opacity-100');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<span>AUTHENTICATE & SUBMIT</span><span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>`;
+            }, 300);
+        }
+    </script>
+</body></html>

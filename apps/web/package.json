@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "@Sentinel360/api": "workspace:*",
-    "@Sentinel360/auth": "workspace:*",
     "@Sentinel360/env": "workspace:*",
     "@Sentinel360/ui": "workspace:*",
+    "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
@@ -19,7 +19,6 @@
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "catalog:",
     "babel-plugin-react-compiler": "^1.0.0",
-    "better-auth": "catalog:",
     "dotenv": "catalog:",
     "lucide-react": "catalog:",
     "next": "^16.2.0",

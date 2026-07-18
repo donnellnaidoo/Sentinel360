@@ -1,0 +1,13 @@
+# Downloaded model weights — large binaries, fetched by README's setup steps
+models/*
+!models/.gitkeep
+
+.venv
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.local
+
+# Rolling clip buffer / captured frames written at runtime
+tmp/

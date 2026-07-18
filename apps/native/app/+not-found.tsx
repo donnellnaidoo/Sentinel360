@@ -22,6 +22,10 @@ export default function NotFoundScreen() {
           </Surface>
         </View>
       </Container>
+
+      
+
+
     </>
   );
 }

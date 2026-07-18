@@ -13,9 +13,9 @@
   "dependencies": {
     "@Sentinel360/db": "workspace:*",
     "@Sentinel360/env": "workspace:*",
-    "@better-auth/expo": "catalog:",
-    "better-auth": "catalog:",
+    "@supabase/supabase-js": "^2.105.1",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.1",
     "zod": "catalog:"
   },
   "devDependencies": {

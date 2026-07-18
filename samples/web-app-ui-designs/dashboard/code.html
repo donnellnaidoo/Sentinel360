@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | Surveillance Intelligence Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        body {
+            background-color: #f8f9ff;
+            color: #0b1c30;
+            overflow-x: hidden;
+        }
+        .custom-shadow {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+        }
+        .bento-card {
+            background: #ffffff;
+            border-radius: 12px;
+            transition: all 0.2s ease-in-out;
+        }
+        .bento-card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            border-color: #00677e;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed": "#60ff99",
+                      "primary": "#00677e",
+                      "tertiary-container": "#ffb440",
+                      "on-surface": "#0b1c30",
+                      "on-background": "#0b1c30",
+                      "on-primary-fixed": "#001f27",
+                      "secondary": "#006d37",
+                      "surface-tint": "#00677e",
+                      "tertiary-fixed-dim": "#ffb952",
+                      "surface-container-high": "#dce9ff",
+                      "on-error": "#ffffff",
+                      "secondary-fixed-dim": "#00e479",
+                      "on-primary-container": "#00586b",
+                      "primary-container": "#00d4ff",
+                      "surface-container": "#e5eeff",
+                      "primary-fixed": "#b4ebff",
+                      "on-secondary-container": "#006e37",
+                      "on-tertiary-fixed": "#291800",
+                      "on-error-container": "#93000a",
+                      "surface-container-highest": "#d3e4fe",
+                      "secondary-container": "#00fa85",
+                      "background": "#f8f9ff",
+                      "on-primary-fixed-variant": "#004e5f",
+                      "inverse-on-surface": "#eaf1ff",
+                      "inverse-surface": "#213145",
+                      "primary-container": "#00d4ff",
+                      "surface-dim": "#cbdbf5",
+                      "tertiary-fixed": "#ffddb4",
+                      "surface-bright": "#f8f9ff",
+                      "on-primary": "#ffffff",
+                      "on-surface-variant": "#3c494e",
+                      "on-tertiary": "#ffffff",
+                      "outline-variant": "#bbc9cf",
+                      "surface-container-low": "#eff4ff",
+                      "on-tertiary-container": "#6f4800",
+                      "inverse-primary": "#3cd7ff",
+                      "surface": "#f8f9ff",
+                      "on-secondary-fixed-variant": "#005228",
+                      "outline": "#6c797f",
+                      "on-secondary-fixed": "#00210c",
+                      "surface-variant": "#d3e4fe",
+                      "on-secondary": "#ffffff",
+                      "surface-container-lowest": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-xs": "4px",
+                      "margin-desktop": "32px",
+                      "margin-mobile": "16px",
+                      "gutter": "24px",
+                      "container-max": "1440px",
+                      "stack-sm": "8px",
+                      "stack-lg": "24px",
+                      "stack-md": "16px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "headline-xl-mobile": ["Inter"],
+                      "body-md": ["Inter"],
+                      "label-caps": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "body-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-lg": ["30px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "headline-xl-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "headline-xl": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="font-body-md text-body-md selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="w-64 h-full fixed left-0 top-0 bg-surface dark:bg-on-surface bg-surface-container-low shadow-sm flex flex-col py-stack-lg z-40 border-r border-outline-variant">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Sentinel360</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Surveillance Intelligence</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto px-4 space-y-1">
+<!-- Active: Dashboard -->
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-primary dark:text-primary-container border-l-4 border-primary bg-primary-container/10 font-medium transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span>Cases</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+<span>Docket</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span>Evidence</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+<span>Sightings</span>
+</a>
+<div class="pt-4 pb-2 px-3">
+<span class="font-label-caps text-label-caps text-outline">SYSTEM</span>
+</div>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span>Alerts</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person_search">person_search</span>
+<span>Wanted Feed</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="px-4 mt-auto">
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-error hover:bg-error-container/10 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col">
+<!-- TopNavBar (Authority: JSON) -->
+<header class="h-16 flex justify-between items-center w-full px-margin-desktop sticky top-0 bg-surface dark:bg-on-surface border-b border-outline-variant dark:border-outline z-30">
+<div class="flex items-center gap-8">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 text-body-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all" placeholder="Global Entity Search..." type="text"/>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-sm text-body-sm" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">Cases</a>
+<span class="text-outline-variant">/</span>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">SEN-0042</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high text-on-surface-variant transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="h-8 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-3 pl-2">
+<div class="text-right hidden sm:block">
+<p class="font-body-sm text-body-sm font-bold">A. Vance</p>
+<p class="text-[10px] text-outline uppercase font-bold tracking-tight">Lead Analyst</p>
+</div>
+<img alt="User Profile" class="w-10 h-10 rounded-full border-2 border-primary-container object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9rbGN67T0dD1pbD2keGSjclnZE4IsddgSWN4vXCVqelRuveJYmwdU8dhb6BC7lU3v9EdzKtI_3ApYN5K480LTl7KcHUy_kJ-8k2b9BQVbJ6h75WUC8OYcYCZ7d-arXNN-JAZv_nCMz4Py3Y640w2V8L8tdRZlln4jsa4xaJwzZo1ml2DpPEhj8hpsQeejVnAEsduqUkloKCITC4wypzAyxSx3EZmsZlChe0Ej_PuRxuzJ3wiKAQFO_rMKKF6wszSKIoO73pi58nNE"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-margin-desktop space-y-stack-lg max-w-container-max mx-auto w-full">
+<!-- Welcome Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface">Intelligence Overview</h2>
+<p class="text-on-surface-variant mt-1">Real-time situational awareness for Precinct 07 operations.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="bg-surface-container-highest text-primary px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary-container/20 transition-all">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+<span>Adjust Filters</span>
+</button>
+<button class="bg-primary text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm hover:shadow-md transition-all">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span>New Investigation</span>
+</button>
+</div>
+</div>
+<!-- Stats Row: 4 Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<div class="bento-card p-6 border-l-4 border-primary custom-shadow">
+<p class="font-label-caps text-label-caps text-on-surface-variant">ACTIVE CASES</p>
+<div class="flex items-baseline justify-between mt-2">
+<h3 class="font-headline-lg text-headline-lg">1,242</h3>
+<span class="text-secondary font-bold text-xs flex items-center">+4%</span>
+</div>
+<p class="text-body-sm text-outline mt-1">High-priority targets</p>
+</div>
+<div class="bento-card p-6 border-l-4 border-tertiary custom-shadow">
+<p class="font-label-caps text-label-caps text-on-surface-variant">PENDING ALERTS</p>
+<div class="flex items-baseline justify-between mt-2">
+<h3 class="font-headline-lg text-headline-lg">89</h3>
+<span class="text-error font-bold text-xs flex items-center">+12</span>
+</div>
+<p class="text-body-sm text-outline mt-1">Requiring immediate review</p>
+</div>
+<div class="bento-card p-6 border-l-4 border-secondary custom-shadow">
+<p class="font-label-caps text-label-caps text-on-surface-variant">OPEN EVIDENCE</p>
+<div class="flex items-baseline justify-between mt-2">
+<h3 class="font-headline-lg text-headline-lg">4,019</h3>
+<span class="text-outline font-bold text-xs flex items-center">Stable</span>
+</div>
+<p class="text-body-sm text-outline mt-1">Digital/Physical assets</p>
+</div>
+<div class="bento-card p-6 border-l-4 border-error custom-shadow">
+<p class="font-label-caps text-label-caps text-on-surface-variant">CRITICAL THREATS</p>
+<div class="flex items-baseline justify-between mt-2">
+<h3 class="font-headline-lg text-headline-lg">03</h3>
+<span class="bg-error/10 text-error px-2 py-0.5 rounded text-[10px] font-bold uppercase">Severe</span>
+</div>
+<p class="text-body-sm text-outline mt-1">Level 5 incidents</p>
+</div>
+</div>
+<!-- Two-Column Grid: Chart & Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Crime Statistics (Bar Chart) -->
+<div class="lg:col-span-2 bento-card p-6 custom-shadow flex flex-col h-[400px]">
+<div class="flex justify-between items-center mb-6">
+<div>
+<h4 class="font-headline-md text-headline-md">Crime Statistics</h4>
+<p class="text-body-sm text-outline">Incident distribution by category (Last 30 days)</p>
+</div>
+<select class="bg-surface-container-low border-none rounded-lg text-body-sm px-3 py-1.5 focus:ring-2 focus:ring-primary">
+<option>Monthly View</option>
+<option>Weekly View</option>
+</select>
+</div>
+<div class="flex-1 flex items-end justify-between gap-4 pt-4 px-2">
+<div class="flex flex-col items-center flex-1 gap-2 group">
+<div class="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all" style="height: 60%">
+<div class="w-full bg-primary rounded-t-lg" style="height: 70%"></div>
+</div>
+<span class="text-[10px] font-bold text-outline">PROPERTY</span>
+</div>
+<div class="flex flex-col items-center flex-1 gap-2 group">
+<div class="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all" style="height: 85%">
+<div class="w-full bg-primary rounded-t-lg" style="height: 80%"></div>
+</div>
+<span class="text-[10px] font-bold text-outline">CYBER</span>
+</div>
+<div class="flex flex-col items-center flex-1 gap-2 group">
+<div class="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all" style="height: 40%">
+<div class="w-full bg-primary rounded-t-lg" style="height: 90%"></div>
+</div>
+<span class="text-[10px] font-bold text-outline">TRAFFIC</span>
+</div>
+<div class="flex flex-col items-center flex-1 gap-2 group">
+<div class="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all" style="height: 70%">
+<div class="w-full bg-primary rounded-t-lg" style="height: 45%"></div>
+</div>
+<span class="text-[10px] font-bold text-outline">DRUGS</span>
+</div>
+<div class="flex flex-col items-center flex-1 gap-2 group">
+<div class="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all" style="height: 95%">
+<div class="w-full bg-primary rounded-t-lg" style="height: 65%"></div>
+</div>
+<span class="text-[10px] font-bold text-outline">VIOLENT</span>
+</div>
+<div class="flex flex-col items-center flex-1 gap-2 group">
+<div class="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all" style="height: 50%">
+<div class="w-full bg-primary rounded-t-lg" style="height: 75%"></div>
+</div>
+<span class="text-[10px] font-bold text-outline">OTHER</span>
+</div>
+</div>
+</div>
+<!-- Recent Activity (Timeline) -->
+<div class="bento-card p-6 custom-shadow flex flex-col h-[400px]">
+<h4 class="font-headline-md text-headline-md mb-6">Recent Activity</h4>
+<div class="flex-1 overflow-y-auto space-y-6 pr-2">
+<div class="relative pl-8">
+<div class="absolute left-0 top-0 w-6 h-6 bg-primary-container/20 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[14px]" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+</div>
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-outline-variant"></div>
+<p class="text-body-sm font-bold">New Evidence Logged</p>
+<p class="text-[12px] text-outline">Case #SEN-0042. Filed by analyst Vance.</p>
+<span class="text-[10px] text-primary-fixed-dim font-bold mt-1">2 mins ago</span>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-0 w-6 h-6 bg-tertiary-container/20 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary text-[14px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-outline-variant"></div>
+<p class="text-body-sm font-bold">Facial Match Alert</p>
+<p class="text-[12px] text-outline">Sightings node 7-B triggered POI match.</p>
+<span class="text-[10px] text-primary-fixed-dim font-bold mt-1">15 mins ago</span>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-0 w-6 h-6 bg-secondary-container/20 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary text-[14px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-outline-variant"></div>
+<p class="text-body-sm font-bold">Case Resolved</p>
+<p class="text-[12px] text-outline">Case #SEN-0031 status changed to Closed.</p>
+<span class="text-[10px] text-primary-fixed-dim font-bold mt-1">1 hr ago</span>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-0 w-6 h-6 bg-on-surface-variant/10 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant text-[14px]">login</span>
+</div>
+<p class="text-body-sm font-bold">Login Event</p>
+<p class="text-[12px] text-outline">Admin login from IP 192.168.1.105</p>
+<span class="text-[10px] text-primary-fixed-dim font-bold mt-1">2 hrs ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Row: Data Table & Quick Actions -->
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-gutter">
+<!-- Recent Cases (Data Table) -->
+<div class="lg:col-span-3 bento-card custom-shadow overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant flex justify-between items-center">
+<h4 class="font-headline-md text-headline-md">Recent Case Folder</h4>
+<button class="text-primary font-bold text-body-sm hover:underline">View All Registry</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-surface-container-low">
+<tr>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant">CASE ID</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant">SUBJECT/TARGET</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant">PRIORITY</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant">STATUS</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant">LAST UPDATED</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 text-body-sm font-bold text-primary">#SEN-0042</td>
+<td class="px-6 py-4 text-body-sm">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+                                            Unidentified Intruder (Sector 4)
+                                        </div>
+</td>
+<td class="px-6 py-4">
+<span class="bg-error/10 text-error px-2 py-0.5 rounded text-[10px] font-bold uppercase">Critical</span>
+</td>
+<td class="px-6 py-4">
+<span class="bg-primary-container/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">Active Investigation</span>
+</td>
+<td class="px-6 py-4 text-body-sm text-outline">Oct 24, 14:32</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 text-body-sm font-bold text-primary">#SEN-0041</td>
+<td class="px-6 py-4 text-body-sm">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+                                            Asset 412 Location Tracking
+                                        </div>
+</td>
+<td class="px-6 py-4">
+<span class="bg-tertiary/10 text-tertiary px-2 py-0.5 rounded text-[10px] font-bold uppercase">High</span>
+</td>
+<td class="px-6 py-4">
+<span class="bg-primary-container/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">Surveillance</span>
+</td>
+<td class="px-6 py-4 text-body-sm text-outline">Oct 24, 11:15</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 text-body-sm font-bold text-primary">#SEN-0039</td>
+<td class="px-6 py-4 text-body-sm">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-outline"></div>
+                                            Vandalism Report (Subway)
+                                        </div>
+</td>
+<td class="px-6 py-4">
+<span class="bg-surface-container-high text-outline px-2 py-0.5 rounded text-[10px] font-bold uppercase">Low</span>
+</td>
+<td class="px-6 py-4">
+<span class="bg-secondary-container/20 text-secondary px-2 py-0.5 rounded text-[10px] font-bold uppercase">Archived</span>
+</td>
+<td class="px-6 py-4 text-body-sm text-outline">Oct 23, 09:45</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Quick Actions (Card with Buttons) -->
+<div class="bento-card p-6 custom-shadow flex flex-col">
+<h4 class="font-headline-md text-headline-md mb-2">Quick Actions</h4>
+<p class="text-body-sm text-outline mb-6">Immediate tactical triggers for verified personnel.</p>
+<div class="space-y-3 flex-1">
+<button class="w-full flex items-center justify-between p-3 bg-surface-container-low rounded-xl hover:bg-primary-container/10 transition-all border border-transparent hover:border-primary-container group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">lock_person</span>
+<span class="font-medium text-body-sm">Lockdown Zone</span>
+</div>
+<span class="material-symbols-outlined text-outline text-[18px]">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 bg-surface-container-low rounded-xl hover:bg-primary-container/10 transition-all border border-transparent hover:border-primary-container group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">emergency_share</span>
+<span class="font-medium text-body-sm">Broadcast Alert</span>
+</div>
+<span class="material-symbols-outlined text-outline text-[18px]">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 bg-surface-container-low rounded-xl hover:bg-primary-container/10 transition-all border border-transparent hover:border-primary-container group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">person_alert</span>
+<span class="font-medium text-body-sm">Trace Signal</span>
+</div>
+<span class="material-symbols-outlined text-outline text-[18px]">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 bg-surface-container-low rounded-xl hover:bg-primary-container/10 transition-all border border-transparent hover:border-primary-container group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">history_edu</span>
+<span class="font-medium text-body-sm">Generate Report</span>
+</div>
+<span class="material-symbols-outlined text-outline text-[18px]">chevron_right</span>
+</button>
+</div>
+<div class="mt-6 pt-6 border-t border-outline-variant">
+<div class="flex items-center gap-3 p-3 bg-primary-container/10 rounded-lg">
+<span class="material-symbols-outlined text-primary">support_agent</span>
+<div class="text-[12px]">
+<p class="font-bold">Command Link Active</p>
+<p class="text-on-surface-variant">24/7 Intel Support</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer (Authority: JSON) -->
+<footer class="mt-auto flex justify-between px-margin-desktop items-center w-[calc(100%-16rem)] ml-64 py-stack-md border-t border-outline-variant bg-surface-container-lowest dark:bg-on-surface">
+<span class="font-label-caps text-label-caps text-on-surface-variant">© 2024 Sentinel360 Intelligence. All rights reserved.</span>
+<div class="flex gap-6">
+<a class="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity" href="#">Terms of Service</a>
+<a class="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity" href="#">Security Disclosure</a>
+<a class="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity" href="#">Contact Support</a>
+</div>
+</footer>
+</main>
+<!-- Micro-interaction Scripts -->
+<script>
+        // Simple hover effect for dashboard items
+        document.querySelectorAll('.bento-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Search bar focus interaction
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('w-96');
+            searchInput.parentElement.classList.remove('w-64');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.add('w-64');
+            searchInput.parentElement.classList.remove('w-96');
+        });
+    </script>
+</body></html>

@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker } from "react-native-maps";
 
+import { trpc } from "@/utils/trpc";
 
 const HERO_BG = "#0b1f22";
 const HERO_ACCENT = "#0e6d7a";
@@ -94,6 +96,7 @@ function AlertItem({
   title,
   subtitle,
   status,
+  time,
 }: {
   accent: string;
   iconBg: string;
@@ -101,6 +104,7 @@ function AlertItem({
   title: string;
   subtitle: string;
   status: string;
+  time: string;
 }) {
   return (
     <View
@@ -139,7 +143,7 @@ function AlertItem({
           <Text style={{ marginTop: 2, fontSize: 12, color: "#94a3b8" }}>{status}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 11, color: "#94a3b8", fontWeight: "700" }}>15m{`\n`}ago</Text>
+          <Text style={{ fontSize: 11, color: "#94a3b8", fontWeight: "700" }}>{time}</Text>
           <Ionicons name="ellipsis-vertical" size={14} color="#94a3b8" />
         </View>
       </View>
@@ -147,7 +151,27 @@ function AlertItem({
   );
 }
 
+const ALERT_ITEM_STYLE: Record<string, { accent: string; iconBg: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  CRITICAL: { accent: "#b91c1c", iconBg: "#fee2e2", icon: "alert-circle" },
+  HIGH: { accent: "#eab308", iconBg: "#fef3c7", icon: "warning" },
+  MEDIUM: { accent: "#3b82f6", iconBg: "#dbeafe", icon: "information-circle" },
+  LOW: { accent: "#cbd5e1", iconBg: "#e2e8f0", icon: "information-circle" },
+};
+
+function getRelativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m\nago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h\nago`;
+  return `${Math.floor(hr / 24)}d\nago`;
+}
+
 export default function HomeScreen() {
+  const { data: alerts, isLoading: isLoadingAlerts } = useQuery(trpc.alerts.listMine.queryOptions());
+  const recentAlerts = (alerts ?? []).slice(0, 3);
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
       <View
@@ -302,22 +326,25 @@ export default function HomeScreen() {
         <View style={{ marginTop: 22 }}>
           <Text style={{ fontSize: 18, fontWeight: "900", color: HERO_BG }}>Recent Alerts</Text>
           <View style={{ marginTop: 12, gap: 12 }}>
-            <AlertItem
-              accent="#b91c1c"
-              iconBg="#fee2e2"
-              icon="alert-circle"
-              title="Vehicle Theft Reported"
-              subtitle="Blue Sedan, 5th Ave"
-              status="Urgent"
-            />
-            <AlertItem
-              accent="#eab308"
-              iconBg="#fef3c7"
-              icon="warning"
-              title="Power Outage Scheduled"
-              subtitle="North Quadrant"
-              status="Maintenance"
-            />
+            {isLoadingAlerts && <Text style={{ color: "#94a3b8" }}>Loading alerts...</Text>}
+            {!isLoadingAlerts && recentAlerts.length === 0 && (
+              <Text style={{ color: "#94a3b8" }}>No recent alerts for your area.</Text>
+            )}
+            {recentAlerts.map((a) => {
+              const style = ALERT_ITEM_STYLE[a.severity] ?? ALERT_ITEM_STYLE.MEDIUM;
+              return (
+                <AlertItem
+                  key={a.id}
+                  accent={style.accent}
+                  iconBg={style.iconBg}
+                  icon={style.icon}
+                  title={a.title}
+                  subtitle={a.alertType.replace(/_/g, " ")}
+                  status={a.severity}
+                  time={getRelativeTime(new Date(a.createdAt))}
+                />
+              );
+            })}
           </View>
         </View>
       </ScrollView>

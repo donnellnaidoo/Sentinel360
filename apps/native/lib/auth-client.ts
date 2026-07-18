@@ -1,16 +1,21 @@
-import { expoClient } from "@better-auth/expo/client";
-import { env } from "@Sentinel360/env/native";
-import { createAuthClient } from "better-auth/react";
-import Constants from "expo-constants";
+import { createClient } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
 
-export const authClient = createAuthClient({
-  baseURL: env.EXPO_PUBLIC_SERVER_URL,
-  plugins: [
-    expoClient({
-      scheme: Constants.expoConfig?.scheme as string,
-      storagePrefix: Constants.expoConfig?.scheme as string,
-      storage: SecureStore,
-    }),
-  ],
-});
+const ExpoSecureStoreAdapter = {
+  getItem: (key: string) => SecureStore.getItemAsync(key),
+  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+};
+
+export const supabase = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL!,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      storage: ExpoSecureStoreAdapter,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  },
+);

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinel360 | AI-Powered Public Safety Intelligence</title>
+<!-- Tailwind CSS with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Style Guidance & Theme Config Mapping -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed": "#60ff99",
+                    "primary": "#00677e",
+                    "tertiary-container": "#ffb440",
+                    "on-surface": "#0b1c30",
+                    "on-background": "#0b1c30",
+                    "on-primary-fixed": "#001f27",
+                    "secondary": "#006d37",
+                    "surface-tint": "#00677e",
+                    "tertiary-fixed-dim": "#ffb952",
+                    "surface-container-high": "#dce9ff",
+                    "on-error": "#ffffff",
+                    "secondary-fixed-dim": "#00e479",
+                    "on-primary-container": "#00586b",
+                    "primary-fixed-dim": "#3cd7ff",
+                    "error": "#ba1a1a",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#633f00",
+                    "tertiary": "#825500",
+                    "surface-container": "#e5eeff",
+                    "primary-fixed": "#b4ebff",
+                    "on-secondary-container": "#006e37",
+                    "on-tertiary-fixed": "#291800",
+                    "on-error-container": "#93000a",
+                    "surface-container-highest": "#d3e4fe",
+                    "secondary-container": "#00fa85",
+                    "background": "#f8f9ff",
+                    "on-primary-fixed-variant": "#004e5f",
+                    "inverse-on-surface": "#eaf1ff",
+                    "inverse-surface": "#213145",
+                    "primary-container": "#00d4ff",
+                    "surface-dim": "#cbdbf5",
+                    "tertiary-fixed": "#ffddb4",
+                    "surface-bright": "#f8f9ff",
+                    "on-primary": "#ffffff",
+                    "on-surface-variant": "#3c494e",
+                    "on-tertiary": "#ffffff",
+                    "outline-variant": "#bbc9cf",
+                    "surface-container-low": "#eff4ff",
+                    "on-tertiary-container": "#6f4800",
+                    "inverse-primary": "#3cd7ff",
+                    "surface": "#f8f9ff",
+                    "on-secondary-fixed-variant": "#005228",
+                    "outline": "#6c797f",
+                    "on-secondary-fixed": "#00210c",
+                    "surface-variant": "#d3e4fe",
+                    "on-secondary": "#ffffff",
+                    "surface-container-lowest": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-xs": "4px",
+                    "margin-desktop": "32px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "container-max": "1440px",
+                    "stack-sm": "8px",
+                    "stack-lg": "24px",
+                    "stack-md": "16px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-lg": ["30px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-xl-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "headline-xl": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .hero-gradient-overlay {
+            background: linear-gradient(to bottom, transparent, #f8f9ff);
+        }
+
+        /* Custom scrollbar for high-tech feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00677e;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- Hero Section -->
+<section class="relative w-full h-[90vh] flex flex-col items-center justify-center overflow-hidden">
+<!-- Background Shader Animation -->
+
+<!-- Subtle Gradient Overlay for Content Legibility -->
+<div class="absolute inset-0 z-10 hero-gradient-overlay"></div>
+<!-- Floating 3D Scene Background Element -->
+<div class="absolute right-0 top-1/2 -translate-y-1/2 w-1/2 h-full z-20 pointer-events-none opacity-60">
+
+</div>
+<!-- Hero Content Container -->
+<div class="relative z-30 container mx-auto px-margin-desktop text-center flex flex-col items-center gap-stack-lg">
+<!-- Branding Header (Top Bar Style in Hero) -->
+<div class="mb-stack-lg animate-fade-in">
+<img alt="Sentinel360 Logo" class="h-12 w-auto object-contain" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAABQCAYAAAA3ICPMAAAQAElEQVR4Aex9CXxcVdn3/5lJ07RQoEW2ksRCW5plUiyLtoli3QCRHfTzFXkVFJSlKKuCFQREBQEB2QThE15BBKGsvsILH2VJUkAQyDaBFvombZG9LN2Teb7/mck0c+eeO0kmM5NJe+7vPHPOec5znnPO/96c5yz3noTgLoeAQ8Ah4BBwCGSBgDMgWYDmsjgEHAIOAYcA4AyIewocAiOFgCvXITDKEXAGZJTfQFd9h4BDwCEwUgg4AzJSyLtyHQIOAYfAKEdg9BiQNp2Fdj0AbfoNtOixaNFT6J/TRyZ8bDwtITNrlN8XV32HgEPAIVD0CBSvAWnTWhqEeTQQC0jvQfECYniI/l8huIl0JemiPjLhm+JpCZkX4nla9B606kkMVxf9nXAVdAg4BBwCowyBUFHVt00nscM/i/QqjUEr6SoaiENJE4dcT8FECA5jvqshaKfOThqk00mTyHPOIeAQGAYCLqtDwCBQHAakQ+ewg7+LBuNdVupi0jRSrt1u1H8p6d14Wa366VwX4PQ5BBwCDoHNCYGRNSBLdGsuL92MXjQR9CNJhXKmrEU0JDfA1KFQpbpyHAIOAYfAJoTAyBmQNv06VuNVLi8dM2g8Fc2UfYCziNuY7zpScg/kujgPeJC+kaHYgE4ocVy8Di16OMOFc64kh4BDwCGwCSAwMgakVW9hR38nDcB2A2D4FGV+gTDmIiKCOqmnfzD9b6NWTiTN76MT47yIHETfyBjj8MV4XuApZLoE21Hubs5G/m8mMZfmEHAIOAQcAl4ECmtAVEvYUd/LKvwnyeaUhqWZ9COUYQcai31oIM5HtTxhE87Ii8jj8bwR2YdyO8V1KhYxHOS+y+W0e2DqGCTh+A4Bh8BoR8DVP4cIFM6AtGop2vAP1v0Qks21k/mZ+AyiTq7CNHmL8dy4iPybeq8izeFsYzaVdpD8zry11Yq/08iV+hMdxyHgEHAIOARSESiMAVmh41noo6QvkbxOsZqMn6IWMznjeI7h/LpaeQZrsTsLORuKNfS9TvAVMh7G61pG3zmHgEPAIeAQCECgMAbkPVzL8j9H8jrFSpRgNg3HxRDpRaGuvWQDy/wNBHNoRN63FDsXq3CVhb/ZsxwADgGHgEMgiUD+DUiH7snCvkPyOoVZoqpHtbR4EwoYi8hLNCKfZYnvkNLdcdwT2Sud6eIOAYeAQ8AhkEAgvwZENYQe2N5uWsGZh9nvsO9FJOpWmN+ItCOMBiiWWwq8ycJzLIeAQ8AhMAIIFF+R+TUgrZjHEX6dpdmHceax1MIfGVa1vIIQjvAVLtyXadETfHzHcAg4BBwCDgF2m/kEQfATi/o7EJFnLfyRZZnNdeAuSyXOtPAcyyHgEHAIbPYI5G8Gktj72CkN4XWMn0oqVncGK2bqSK/PCXbhXsjMvpjzRi8CruYOAYdAjhHInwHpxaHwX/dw9vFvP7tIOBHpYk0WkLwuBFtb4C6HgEPAIbA5I5A/A6KwdboPoNgvgb+OMQR9/FjsrXH1cwg4BBwCeUNg0AZkSDVQDUMQ8eRR9KIED3p42URUQzDHv7fpt7i0dEacTLhdZ8OkZaMzNU8p62jqmsoTzKLuklSWCzsEHAIOgc0dgfwYkHbsYgH2VVTJRxb+4FitWoNW/QPa8BZNURMUt0Hw2ziZcAzNMGltei3lagan1CI1XT4kdzEp1Ql1T05lFCq8Y9XsKeXVDd+vrK7/r4rqhuaK6vpXKqsb3q+oql9dWdWwhPEnK6vrb62cMedHFTMahvTdys5Vn96torrh5/miKVPm+r7mZ12PtpVXWTXnQAzxKq+qP8Kmy2CWVJXvNpryy2c0HJUsb/LUvSsqquvn22jirntunZRL+pTbp8JyDypn1J+SlBmsb+6/TVd51ey5Nh3mubLJ54RXNWe/9DKn8HkwdbGRDRvk8lIVtOse7Bv+A216Ov35pIPJ2ymXxSCqE6j3INJJpPNZ1g844P38sP9thBkct2g99R1DOpcD5zNJh1P3lJzWf4jK8mNAQtjZVw/BCh9vMIxW3ZE34j6KtpGOJ21LCnLb0rCcwMQ25vkbFuv2DA/dCd7wZQpb2uQTyh1jp+mzqyuq6xeUSvh13qQbAfm2ALMFMh3ANiIyjsZzV8Y/B8jRCIWukBCeYwfdXlFVfxqw5xgMdEnJdAEuyBetxMqy9Crw7/hbtvKA0O3b1ey9Y7p8pnhIcKhY6l8C9P9R5bmNpvyQ6DfRd5WUhCsFcqGNysaO3aZPbKMnKg1iaQNCcmXFbnMOTQgO7lcktodNl0iYz4hfR0j1WKu8pT5DlQNkX6Rda8vW7hiS8OM2mlBSZnvdP01DFlHTf7ToXzkA/BAxPE8Nt7OPuJT+haT7yFvBjvhN0q3sjDP1LRTP4FrYubfog+iB+Sj5fkpeTTqXZV2PXizEGqxkn3Qvy5mKoVxtOon5/sT6r4SgkfpuJp3P8CWku6n7dep8jfQjrpLIUFTnQjaUCyU+HTFLZ6tZGJAWnUqwzPlYB/vKGJhxBNbiGT4U/Z3JwHmSEn4DEkN5MjHfPkfW80rCoVaBDKkDSdRLqmlcLqusLnuxsqahNsEbBb+CCWVaeuUoqGnhqhiWS8vL54wrXIGbWElt+lW2qI0d7Tfob0myO8H2lDkaPXiVnfX37UIB3Fd1LDvvq5j/adLXKFVKCnJmL7WDZcwPEvDwW3RfGjizGmJO8pjgSUuNmDdFBVegDU+iWwv6vBTOgAhWYChXu36S4s28KcPpuKfwoXiGN6ySuobi/AZE4Z9VDUXjIGUrqur3pQG4nDTce1ND43vn5Ml7jh9k0SMuJsA3ymfM2X/EK1IkFRDI1NAWcl6RVGd0VaNNP8fO925WehJpcE4wkYI3okVvpj+we1knYi2aIJhHYSEN7ARmZeBC9kn/kVG4RY0xepC6TZ0yiqYkfhYf4CHORMIpvLwGh9tJ2SsnEHvCILnGqsdwHwTbWXOYQxiBp5l2TR89zc5yJcN+J9iezHthdDIwSNfjk1OYG+9j55JRXjPHPOy3EzyuwuREc03J1mP/kBNNBVIiIbka06aNLVBxxV9MCKdNntEwo/grWkQ1NH/rijvYf4zLqlaCY7g3ckDGvP/UMQjhKQj2yCgXlKi4iUbkU9ZkcxK44AbqzqbP+QLacLpVbx6Y+TEgincsdR38+uI6XMb8u5O8TmE69lNRJxMRkc+RTu4jhmE639NoSIyMNx8wC+vw63RmYFzxCV9aCLY2+cSGwxCVE0UkACfdgJj+UWN6Ygyxw1Vj+8eA75N3MaBvBpcr3+YGtdk7ChaxpSgeJ/vR4dCY8ett94Iqg51w1F0R3uFnwRJDTFG8xxwDtkMBa13JbxsofwzSSpk8ORkTFlyfJ+V2tYrXmTAgZhllBEuYPjJuHU5kwUEvvTzMtOMhMMtaV0Pt9x0x/JGDzq0oa3dl+DkTakl+p2gh84J4GYqrrGUIxpH/S8r53WpcQGZQ/TuYdiPzcqaBDxj2O8W5NE47+hNyz8mPAQnhXV9VFQEdY5qkedsKMBvhaQlYCsFeiMgVsF0iyrTfUWZvJv8vyesUJ3NqOtXLDIgJPuFLURTAgOAwX7lkqOoTvdoT6epsOq67s+m6ZR3NC7qjzQ8v62i8ibyfdm1465OquJWiVqcSOsWakIH54dpVh3d1NH5lOPR2e/vHGYoITBLBmbkadS+PNjUPpg2iuspWIdHYVQPlXxZtPNuWN1c84jG3Ykb9MbnSN5AehS4YqM0DpXd3NF0bL2dkfr5nLVZpiCOyPyJyI2rlLvrzIJjLzrgX/msnrMWRfjY5r+pWzBM0yr8VEcxCRM6Ll1EnP0II+1PeX4bgy3hJt6DGfqcapuy8fkZKSPFr6q0hHY86ORBbwhgJY1DguQRbQHCyh5enSH4MiK2zFfg7ZVujFKeQ7a2XGSUoDkFEXmJaZheRFylgNqti9PudYAxB/XE/I0NILXUNI68GZMqUuWUq4jsyhX/Mq1f19B68PPrsKwi6Fi9e1/vh2hO49hm1iQh0N/LDpNHhBGUFH3UXOzIiF28z5VPbFHs1R7x+LVrBOthmBv9CBCcxzesi0kjGX0h+JzBvPPr563A0+5LxvgTFk4jIdyDiNRa18hgEt/nkgbEogfdFmTaYvY8y+K/3EMF8D3sXWcu47bxBLkrAOhilfE6dt6POleoS2DrbbQdUryoQfN0nF8IvUScv+/hBjEjc0PzKknwEO1mx8L0sm7GL4W2vUG5jvWM3RFixEovWN95b/MyHFr6HtWLF86u53PJHD3NjRMZUTKvP5m20jRoKHRCODMtn1H+70OUWa3nEY7utysZfXKz1K5p6CSaxLg9C0UmffxL8NU5xO0S8g0rDNyQwy5Qm5CWFMUZenokp7LNBgVl6NxI2+huZ/yDdCsFv6ZuO/xiE8U+G+53Ca1DQdwn+Clv9a/F3Stj62xpEdQbT8uryY0AEtiWsKey8bR1kfwM7YN5XNw9APw+IEeTLUxmDCo+N36R00Z0Qxex0pieemELu6uGZyHjYbpJJyQmpxvxvfgEQ7glMrppTj0Fc0htaoMB/E+e7Af0z/RsYv0I59d1QEvOOigahb6RFQiKXbONG3f23QeT4wT4L/Zk2s1BEXkJEDkKdVGELjKchaSACJ9G/h36Q28GaIPD/j6BXdTv+Ue7pkzerJFvjf3z8JCMiD7BeXyV9B7VyFv1LSH9ClRhDl5QCddv7pxjMvgp8V2K24zVCSaEefCUZzJefHwMyQ0xn6x01C8ahFZ9C0NWqB9FU+A8yVLQR5I+CsgXyp4spv8OX3osHuBdyoI+fZETxad7EdEP3LnaRlUmRfPjLXmlezs6+26Y7LKE7yqsbvgfMTa+XR7zr1adf6+5oPKAr2nRkV0fT0fR/0N3ReGp3tPGcf0cXLfUIj4aIYKcJZVuYD75GQ20LUscwxGyohwtS2GgvxCzx1EkTO+prMVNeszZHuerBPyx7Gl7w8deyf/AxyRB0okLWMDRcN9WqQGBdno7LKl6N+/6fKj8rt5xQbtV5tD3piZlICHOM5yPzSpzCrEOmzz6MaJP5yYoUzZZ820LwF47OxZIG9FrqqHjKKptjpqg+a1PJilbwRv2xonp9tKJqzuWVVbMP2q6mJvjDKJuS4udZT2kWbgZWDPGIluJv6qBqGICH1FVUN5h9wkEpcUIZEDDGow1m2ck2sF2KCO7y5RbM8vESDO/+7MtahVY9kXQyzBEqqvwTRuYrqrtQwP4hYhkH0ky0OsEyKx+w7+EECGfDHrhR2Wg1eWydt8JuQPaSDRCYLy5NztyRoIdTV5u+DohwwG9Lgn+5SGAzRNbMw2Jq7Heqal+npWLhcpZI6FRI+P4ynfh+RXX9E5VVc86vqKrftzzHXyxvMW58Q3nV7LnZ0M7VDfZpONsAQQDuepaqve2SeI11sxp1x2K4nEB1G8jSiU/u+ZOn7m1fn08Xzi4+OZv7nswz1CNpsqviKWrQ7QAAEABJREFUMHK16SyuQpyBNkSp5VSS1yl6+ZTOg4jtb9FmbED5/40radFzaDTeQQgdjF9D+j1ieJ5lrSL/AZJ5c4psi+tF8EfT0+QtS44ES/BBIuD73dnHyTEjfwYE8M8cFJk6ltN5E/g3k9ZCwZfTOIOLmtGFMq+kiWu8lLPSuKnRuamRvrC/LX0JufS6Ohc1CmT+YHQKUCKQfSChc0XkYZkQ+rCyqv6xyuo5/4nBnIM1QCFhyIOhgHOLBuRDbx1AvT9Z5AUBzB+cJQ17llc1nOBP2HQ5tLMfSyx2urWFggnh0tJLrWk5YPJ5+uaA9zjDszEuVrpfDqqRHxUtehF7gBcgMBvZ5u1EbzkK8z3QMaiTB70JfTFFUKf8MY3SAuq9iJLbktJdGRkHsuyXKGfrY8C8E2C7EnWypSR5Qa/L2/Ulc+XAD+VAh13FlljEBK8FF+yCDrWBC9TKY7TatjenphLw52i5P0t9g3MtOheteBYC/2Y4cAEfjoVWRa1aSb63fubm1aIwMxAW3hVt/A29R0lDcux8SyDyRSB0S0XV2NfKq+rnDUlBroWz0LcmtPIcZrMu3YQEFxT9yJaVz6Xr6my+SxXWjVmBO/YlS6ynBeZT9lmC3dk//FegjNnLtSfOh8D+BhVSLsH2lHsMbfqDFG4i2IugDn99QiDgV2Fe5/UnaqA+v2yWnPwZkF1kLRT/8tWrF0f4eElGLUffilXJ6EZfsBfDT9GI3Evg59E/mLQ7XtIt6G9J2p10MA3NKaQHeYMeJ5k8zOZxq1Anv/BwUiMC8/1IKgfU8zxEelG4S3s+WHtITEFDopkfnIA6cQRZHhK5qqKq4b68H5MdUIdAtkJsaaoqb7e3f6xQ/5JCIsNEjmzzNupOFFFEv6EETut1ww+IyWpbzSQkV7tjX2zIZOTZBpWJDInX9w9iHzMpwbD+jrdygw2LTTwExRXo1J2RegnsBkTis6JUSW84KF2wtVcw97FQ7lWmaAzhgZRYIqg4LhEI+BWY95oDEnEIFFcx8T7SiwjDTN0+ioeB+yC4EgLzIQ5ZVuevT6qYwj8qUGTOk5o/R+EVK55fHf+6WWQPdqyPZKtWBAdvWVr26A47zNwiWx2Fztfd0XSHBoy6eW+P2nlGwxcKXaeRLO/NzmdfF9ULbXUQ7olVjNl+vi3N8QIQMKsgAUlkTyP9hn1MZ3zjmxGLG2vh9bMUyxHCYaTJ3PuYRF3mjU/bK/pl2IDr+jPGQ2aZKx5I++lJi3ujypK8nGQsBHMuWDKWBz+/BkRwA+uspH4n2Is3J9LP8IWu9HFyxQjDGB+7tlb9NBNqSalOIbgplVHIcFd7Y1t3tGm/nvXrK2lIuEekQ15KoxHZq3TSln8uZL2HW1amUXdY9NrNbdTdFR17Ke+/9TsAUTkjV8e+DPe+FX3+19V00AvZqZ9POpx0Ism2XPwJdskLORMx36WlN8u+XJSQehdlmIUauZf0BmbK+6iThxCGeTHnnYSI59fMdg5J4axLCacGS1MjlnBw+nQJ0mlRM3RWfg1IjbzBG/SYr1oxBG+IRsQcLXC3L89QGcoMhujFneJOVEumDtj2fwAeRkSsa/JxnQX6WbHkuW4aksu7ok31ukGnmQMVOUq/hfTKYKogkEMrdmuw/TEEZu+FHhjT3i9kRRBu5AeqHjDBjLqhcpFVUKSqYswOmV6CsGYb3cyFPTHAPzs2jRLk/NgXVb0jlu29Z741ofUPm6oVHZll9YgcyU79F6QFpOsQwX6s5+2kdDcBilthPjHwpliXE+MiissxXfwnVlTLUgjT4kJpP4pjUzhmRSUl2hdUZJ71CIJOHbbr61ObCy+/BsTUUHCz8TykOIp7FsFWcwx+SPklpH6XNAbGV5g9CbPH0sOb3EMhEzY8Bvuc0DdEj24xQgg2WuafsJg6UdDjbHX3CBQ+0r24aYk5ULE72vhd0ozeDT0V0Bg7F/XvN6VUT8J6fEp0wOCqNasbl0UXLcyGlnc0mhcoBiwjk0B3dMwlqmoddQP608rpnw1ey86keBBpxSiyPNrUDFUzo/dVj7PMueUzGo7yJWTPWJHNfU/mebv9uREfdA266SIxbIHvUT7xGi4DKW4KyjAvJW6CZsnc+H4KcZDq5yY4pbC/YQhMTQjwV2A3ToIxTA12CrsB0QB9wZqGnJJ/AzIW97CTX+mpmWBrxk8i2d0MeYcWe38o3twokDQGxheEAd5aQQnlSvrCYfp+Z3SE8RXUijnW259uOCtxMvV4N8cUH6AGC0xyMdPyxc8s64o239DV0bQnYrEfs9PlYNVWY/myjVu8vOBRt0DGaziWvn6c0hQxw4yU+KYR/HDt6p+owj/CZfNCgt/GNGT+rhhLd7pJ4pHeyqzjZmYC2F/QUHw9Ta+9k+eoBmtgM0KJ7NPlQwZsfVDqx37BM4bE8htVWJywL7SwyQrWx8RcuPwbkOlcgwvhL5bKzscK9XbaqUK1sphmYhbMq3Wp/KGFn4XgU6iWpQi6ojqBMraNyFshYmY3QTlzxv9k9Z47lVc1HF5ZNef4iqqGcyrM1+bV9bdWVjUMZe9Cuzqbr4TgvICK7bjDKNpMN20wo26F+mewTBSRfYEgo6iCTfBaufRFDsTUvnwn2CkUwmn2ZssmiYe9rVlyFa3WnIJpafzutHgy+j7MB9HJmM1XLLOwS5H476tgf2dLT2RZi+APEGMBaQL/WV4JbTn7zb0BsVUthEug8C4xAZPwHn5iE9/Iq5E3EIFZuz+XvKFsBq1jefNRiwYMtIexAT+l7q1I/U6xgTfzsn5GfkM9sbHVHEHeDQn9QQQXifnaHGKOjD6qsqYhfWM/c2Vi8o8ggfA2E4K/dA3KNML8mPacxfGzddTNqgX/UTFxU3Td0aY/qeoTAW3b7PAIwGHo7DDeCcj0Cc8+iCJgWRUTPXJ2Zfb+NozEQDVxsOJ6a9ZezLDyDVOQOosxnAQp2hKB/P3aG5Tr8qplKRLHUXg1K07HyzrRy0yLmVlARC6kQZhOHWbZ4t00idTou3GZsZiGOm7CmrypqenhxMmap6WzEcK1qJHg6agvw/AYq9atfiFQQwwHB6ZZEjQUCzziomd9D0ewlkxFzFoeffZdaMwY+SKuZWGr1qti9rzsHU1hq1J8pbXoV9CiZ6JNr6X/EKmF+60fMp4+k/DWvRe7eRl9MUU3UmcWIQTtNQpK0b+f0Zfd43GW6IknI7thRTJIP+hgxOlMC3JBbXs5KEOu+KFcKRpQTww/h2KVR06wBTv88z28oEiddKNWTkQttmcHP4f5jqK+M+MkOCrOM2lGZroETwVT9a+HKdu82tfPNXXsjfP7eXkOrVz64koFnrEXoz+evGtDpT3Nzw2p7O/nxjkr33r9mf49pThrdPx0dzbfnGHUPToakcNaruhs7NSY2P43SA5LGaWqBMdCcAn7hRPoH0CKsCUTGN+Pfib3jYBEbyes/DtVfGCVDeHrVr5hJt7m2tYE02gJxLNn15yWnox+Phnw+GZvRANmJyH8j0c2D5FQHnTaVc6U9yHwP/SCeejQKfZMFq5IDDWyCLVyO+rk0jiZsOGZNEsWK6tFp/KhOsGXFsJFMHX1JeSZoXqntQSR7cOl+redqz5te/g8Wcq5jwIR69tWXAb6u0d4lEXcqNt7w7p737yIz2+nl+tiRCBoCfcMmH9FSwGf69DdILB3/gLv6kBE1lN2gU9HgvHjwDLGwbxZmpDy/npP+lbc503eGDsQS3TrjbFk4GMcA8H4ZHSjr3iZfeTijfE8BQpnQEwDJuEyPvT+UXAP/mKSC0aqQtBv85WneAuluNzHLwDjo7WrOcrGO7aiRGTvMEqWVFTVX9S3J+K5b+W7zdm5orrhupBoII4x1SF9EDmc03jL+07xrZz2mRpbe7LhxUfdCvubMtkoHO15Fi9eF0NvUKc03NYN6zTe5P2fPHlPf8cWUDMNx3ZP5svGp9rEW5gx3M+wzU3BWjyMqE72JLboXPTAfEzo+Zvqk/mY/dWNfeF+TxB0VtYklvEP37J8i36Nei7qV5ASUtySEgMEj1B2FfxXGVbjNhqo/m9CzJHxwK/9ouQI7kUBLhto+St2sqymcrNsRC/FCWZzjfLsFE5+g604hwV8huRxvHnzMV3WeZmFia1c+uJKlv+rwNJEtqYhOYcPV2tFdcMHlVUNT1dW1/+rsrrhjVA4tEwAdiZSas2v6Fze2fS4NS2AGYZkfxpv30mtGBPO6T3Vj/WXbL/9HwMFtGNTZi+LLlpIPPwDoWE2ms/ZsE7jTZ7kiy1LB730KghdncyXjb9dTc04mGumvE/PPgg0/cwGtHJf5B7ui1xD/yX+zT1OqmAemzsdZuk8PaVW/h9Zj5H8TmCW11uo+w7SlSznYeo3xyFN8AkrnkedLPTwzQzH7MF6mH0RwdewDq9R5w3U/RD1tpD8sxLgIz4X1/blyqtXWANimlIn17Fxz5ughxS/Qrvu4eHlI9KiexH0X1pUP4eI+EcbFsF8sbrl/Wugah7OjEUIsCXb0ADIpwAM8OaNbugbqSplR7Vbtqx5jUL9y46julXDq/ya0PozqGElybkkArU4k31MUzLq8QUTITiMvBMhmEk/yD2GiNwQlEj+t1nGW/T9TrAzdf8f0ilM3JckJK9TrGa6+YDRyzex8TBvnaZurBtukswM6jjmNfs7JUmmxxf8jIbpTQ8vT5HCGxDTkDEwX836z5Tpxe2eKZqRzSUlDhaz7TWsRRhBm2i5rEFmXe3t69eEVh7CTtK7Lpo5V8ZULl19Nz5SzSg1ehK7o02PcEP9jtFT4/zW1Hz1zeflZ/ktpRDac1iG2QsdB2MkbIcYDqagxRiL7yLTZT4PCIGDOCzFUC/FKvY3R9FAvWTNmviw8QCmvUcaqnsEtfL7oWbKVn5kDEjifWczcvLWWzCDUzT79NMrmV1sHX4PwS6+zIpTUS1DfxB8iobPeLu9/ePujtIvagwXcsrQk61GdrIt7Fg+vyzabDvnJ1u1RZFvbWiDOfLdjbr77kZ3RxNn9drcF3WeQWCamNmBWdH4E2cK6d+gGQk/me+/FGZPoRaDeZPTfOwMzKH+obztZJasqmEOXPTXoJ8TEWNcvkhGF2mwbiG2xqEo4DUyBsQ0MCLX0HuYlO5O5H7IUcj11aLHUuVxJK9TPMrp3vVe5kjHFvZ0dzae27t+/a7Q2Nk0BE9B4Z+xpVdT8RGNzn8rYid3R0v3YMfyZLrIphA3o27OrMw0f1NoTi7aYF4LOZ6DhoBjbHJRxCjUYWYJETkGJZjFv5+/k+yv35qmmf2IEuzJvuAcRGS9YQ2KTBl1si91n0DyvvKbqkCxhtHTqPsLLCPoa3aKpDhjRMZhJvX+mbQ6JSU9uITp5hOHL6JCTDnp6XmLj5wBMU0aA7OOaDa9TKyfYriFG0UDvbfdLz9QqFX3g8C2v/EOH65vDpR9pNLNKbxd0ebf0BDs0xVduxW0Zy/tjeoHiB8AAATFSURBVB1Go/IDPjDnmLOv6H9XYziEM5a9u6KNE7s7Gg/o7mimcV444OxleUfTQ10djZI/ajo6HbvuaONXbeV1dzTZj5JIV9AXXxZt+n1XQN2Xmc3lPrnBel3Rpm2s+qLNmdbBfeq7Ohc1WvWwrm90NPk+Tu2KNv7aJt/d0TSkTVDKt3ZHm8JdLCed+Exc6KsoGWxzfbpsLuMrXmmOspiN7t/RRUtzqT9Vl5m5bywoPVAtLaiTr5G2QQxTmfx19gfn0Td/R19gH7Az0/aCkSMzK1cn11PH7tRrvjv5Dv8uf8bwOfQPRxgzGd4GEfndkHVPlQ+o92hEYE7L+Cz1fY+6zqN/FukI6t4FEZlGmesgwvEjCnqNrAGZIe9A4F9rFMIC3EsjYjaJMayrVfdm/ntJ/rYKvsmH5l2mjQL3/Iau6DPPd7/SfG8XO7Uu0/F0Nl9J/5buzsb7Sf9kIwY3Vaegcw6BzRKBmfIaO9y/oVYuoH8DO96FqJKgDeuhQ1QrbdR7K/X+imX8mv4C9jEt5A1+VmMrVaSXOhqp72bqvYD+b0n3UPeILr37O1Vb5fPJi4h5b/uXliLMF+KP4mXd1ZI2OJb5QEjxCIWNLnopTnAeb4T9VbwUMRd0CDgEHAIZEdiME0fegBjwI/JzKP5sgmm0LUJo5Exk6B+kteru6MHTnOFsk6bTRG+i8bjABBw5BBwCDgGHQHYIhLLLlodcEXyHWm3HEOxI/iK06z70B+fa9EtQNNF4bGfJcD9q4d9Mtwg6lkPAIeAQcAgEI1A8BkQkhrEwr6A9C/81Ab14lDORI/1JaZw2/RZieJjGY3xaiok+jbU4ElL4zSZTuCMbAo7nEHAIjFYEiseAGASnx48R+RKDjSSvE4wh404akdPo212bns2Zx22Q+CY8PJfiCWyNfZF6NLNHwEUcAg4Bh4BDYCgIFJcBMTWPyMf0zAc099BPd0LGZWjRB2lIzNIWo3StumOcp/gVYzZ3HyL4Mgr8jrStIo7nEHAIOASKBYHh1qP4DIhpUUTWIyJHMGh/F94cKgZ00mj8kIbkJMq9ggSPwTSnuIq6DoXIgN9FpOV0UYeAQ8Ah4BDIgEAoQ9rIJ0XEGIegL463guA6VvJq0gSSzZ2NOvmRLcHxHAIOAYeAQ2B4CBS3ATFtM//OFjiSwY9Ig3VG9mDOPH4z2AxOziEwZARcBofAZo5A8RsQc4MicjcUsxh8kZTZKV5ACXan8TBn8GeWdakOAYeAQ8AhkDUCo8OAmObVyRKMxWwo/mCiVlJcD8EcVMnr1nTHdAg4BBwCDoGcITCCBiSLNpjXfOvkh8x5JA3JKvoJZ87XN8tcdXICZx7DO3MmodH9OgQcAg4Bh8AACIwuA5JsTGJJayaNyPw4jUEdDcfdyWTnOwQcAg4Bh0D+ERidBsTgMlNeQ51cFCe3ZGUQceQQGDQCTtAhkAsERq8ByUXrnQ6HgEPAIeAQyBoBZ0Cyhs5ldAg4BBwCmzcCzoBkc/9dHoeAQ8Ah4BCAMyDuIXAIOAQcAg6BrBBwBiQr2Fwmh4BDYIQQcMUWEQLOgBTRzXBVcQg4BBwCowkBZ0BG091ydXUIOAQcAkWEgDMgRXQzClEVV4ZDwCHgEMgVAv8fAAD//8f/PZwAAAAGSURBVAMAC9V0ZOutAgcAAAAASUVORK5CYII="/>
+</div>
+<!-- Main Heading -->
+<div class="max-w-4xl space-y-stack-md">
+<h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight leading-none md:text-[64px]">
+                    AI-Powered Public Safety <br/>
+<span class="text-primary">Intelligence</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">
+                    A sophisticated instrument for intelligence analysts and law enforcement, delivering surgical precision through real-time surveillance data and predictive analytics.
+                </p>
+</div>
+<!-- CTAs -->
+<div class="flex flex-col sm:flex-row items-center gap-stack-md mt-stack-md">
+<button class="px-8 py-4 bg-primary-container text-on-primary-container font-bold rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-stack-sm">
+                    Login
+                    <span class="material-symbols-outlined">login</span>
+</button>
+<button class="px-8 py-4 bg-surface-container-highest text-primary font-bold rounded-xl border border-outline-variant hover:bg-surface-container-high transition-colors flex items-center gap-stack-sm">
+                    Explore Wanted Feed
+                    <span class="material-symbols-outlined">person_search</span>
+</button>
+</div>
+<!-- Bottom Indicator -->
+<div class="absolute bottom-10 animate-bounce text-on-surface-variant/40">
+<span class="material-symbols-outlined text-[32px]">expand_more</span>
+</div>
+</div>
+</section>
+<!-- Features Bento Grid -->
+<section class="py-24 bg-background relative z-40">
+<div class="container mx-auto px-margin-desktop">
+<div class="flex flex-col items-center text-center mb-16">
+<span class="font-label-caps text-label-caps text-primary uppercase tracking-widest mb-stack-xs">Operational Capabilities</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Precision Surveillance Tools</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Card 1: Real-Time Detection -->
+<div class="glass-card p-stack-lg rounded-xl shadow-sm hover:shadow-md transition-shadow group">
+<div class="w-12 h-12 bg-primary-container/20 text-primary rounded-lg flex items-center justify-center mb-stack-md group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">visibility</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-stack-sm">Real-Time Detection</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                        Instantaneous identification of anomalies and high-value targets across distributed camera networks with sub-second latency.
+                    </p>
+<div class="mt-stack-md flex items-center text-primary font-bold text-xs uppercase tracking-tighter">
+                        Active Monitoring <span class="ml-2 w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+</div>
+</div>
+<!-- Card 2: 3D Scene Reconstruction -->
+<div class="glass-card p-stack-lg rounded-xl shadow-sm hover:shadow-md transition-shadow group border-primary/20 bg-primary/5">
+<div class="w-12 h-12 bg-primary-container text-white rounded-lg flex items-center justify-center mb-stack-md group-hover:rotate-12 transition-transform">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">layers</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-stack-sm">3D Scene Reconstruction</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                        Advanced spatial temporal mapping to recreate environments in three dimensions for evidence gathering and situational analysis.
+                    </p>
+<div class="mt-stack-md flex items-center text-primary font-bold text-xs uppercase tracking-tighter">
+                        Spatial Analysis Engine
+                    </div>
+</div>
+<!-- Card 3: Automated Reporting -->
+<div class="glass-card p-stack-lg rounded-xl shadow-sm hover:shadow-md transition-shadow group">
+<div class="w-12 h-12 bg-tertiary-container/20 text-tertiary rounded-lg flex items-center justify-center mb-stack-md group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">description</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-stack-sm">Automated Reporting</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                        Generate comprehensive dockets and evidence summaries with AI-assisted narratives for courtroom-ready documentation.
+                    </p>
+<div class="mt-stack-md flex items-center text-primary font-bold text-xs uppercase tracking-tighter">
+                        ISO 27001 Compliant
+                    </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Statistics Section (Atmospheric) -->
+<section class="py-20 border-t border-outline-variant bg-surface-container-low">
+<div class="container mx-auto px-margin-desktop grid grid-cols-2 md:grid-cols-4 gap-gutter text-center">
+<div class="space-y-stack-xs">
+<div class="font-headline-xl text-headline-xl text-primary">2.4M</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Nodes Connected</div>
+</div>
+<div class="space-y-stack-xs">
+<div class="font-headline-xl text-headline-xl text-primary">99.9%</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Uptime Reliability</div>
+</div>
+<div class="space-y-stack-xs">
+<div class="font-headline-xl text-headline-xl text-primary">42ms</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Avg Detection Speed</div>
+</div>
+<div class="space-y-stack-xs">
+<div class="font-headline-xl text-headline-xl text-primary">150+</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Federal Agencies</div>
+</div>
+</div>
+</section>
+<!-- Footer Component Mapping from JSON -->
+<footer class="bg-surface-container-lowest dark:bg-on-surface flex justify-between px-margin-desktop items-center w-full py-stack-md border-t border-outline-variant">
+<div class="flex flex-col md:flex-row items-center gap-stack-md">
+<div class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest font-bold">Sentinel360 Intelligence</div>
+<span class="hidden md:block text-outline">|</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">© 2024 Sentinel360 Intelligence. All rights reserved.</p>
+</div>
+<div class="flex gap-stack-md">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Privacy Policy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Terms of Service</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Security Disclosure</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity" href="#">Contact Support</a>
+</div>
+</footer>
+<!-- Micro-interactions Script -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Smooth scroll indicator fade
+            const scrollIndicator = document.querySelector('.animate-bounce');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 100) {
+                    scrollIndicator.style.opacity = '0';
+                    scrollIndicator.style.transition = 'opacity 0.3s ease';
+                } else {
+                    scrollIndicator.style.opacity = '1';
+                }
+            });
+
+            // Intersection Observer for feature cards
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('opacity-100', 'translate-y-0');
+                        entry.target.classList.remove('opacity-0', 'translate-y-10');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.glass-card').forEach(card => {
+                card.classList.add('opacity-0', 'translate-y-10', 'transition-all', 'duration-700', 'ease-out');
+                observer.observe(card);
+            });
+        });
+    </script>
+</body></html>

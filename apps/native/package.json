@@ -14,7 +14,7 @@
   "dependencies": {
     "@Sentinel360/api": "workspace:*",
     "@Sentinel360/env": "workspace:*",
-    "@better-auth/expo": "catalog:",
+    "@supabase/supabase-js": "^2.105.1",
     "@expo/metro-runtime": "~55.0.6",
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5",
@@ -25,7 +25,6 @@
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "catalog:",
-    "better-auth": "catalog:",
     "dotenv": "catalog:",
     "expo": "~55.0.18",
     "expo-constants": "~55.0.7",

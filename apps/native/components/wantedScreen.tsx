@@ -1,6 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { trpc } from "@/utils/trpc";
 
 const SHEET_BG = "#ffffff";
 const BRAND_BLUE = "#1e3a8a";
@@ -205,7 +208,18 @@ function SafetyTipCard() {
   );
 }
 
+const WATCHLIST_TAG: Record<string, { label: string; bg: string; fg: string }> = {
+  CRITICAL: { label: "WANTED", bg: "#fee2e2", fg: "#991b1b" },
+  HIGH: { label: "WANTED", bg: "#fee2e2", fg: "#991b1b" },
+  MEDIUM: { label: "UNDER INVESTIGATION", bg: "#fef3c7", fg: "#92400e" },
+  LOW: { label: "ADVISORY", bg: "#e2e8f0", fg: "#475569" },
+};
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=900&q=70";
+
 export default function WantedScreen() {
+  const { data: wanted, isLoading } = useQuery(trpc.profiles.listPublicWanted.queryOptions());
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
       <Header />
@@ -224,58 +238,28 @@ export default function WantedScreen() {
           Help secure your neighborhood through informed vigilance.
         </Text>
 
-        <Pressable
-          onPress={() => {}}
-          style={({ pressed }) => ({
-            marginTop: 14,
-            alignSelf: "flex-start",
-            backgroundColor: "#f1f5f9",
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            opacity: pressed ? 0.9 : 1,
-          })}
-        >
-          <Ionicons name="options-outline" size={16} color="#0f172a" />
-          <Text style={{ fontWeight: "800", color: "#0f172a" }}>Filters</Text>
-        </Pressable>
-
         <View style={{ marginTop: 18, gap: 16 }}>
-          <WantedCard
-            topTag="WANTED"
-            topTagBg="#fee2e2"
-            topTagFg="#991b1b"
-            name="Marcus Hale"
-            subtitle="Armed robbery suspect"
-            imageUri="https://i.pravatar.cc/900?img=13"
-            secondaryCta="View Case File"
-            dark
-          />
-
-          <WantedCard
-            topTag="UNDER INVESTIGATION"
-            topTagBg="#fef3c7"
-            topTagFg="#92400e"
-            name="Elena Rodriguez"
-            subtitle="Cyber fraud syndicate"
-            imageUri="https://images.unsplash.com/photo-1550525811-e5869dd03032?auto=format&fit=crop&w=900&q=70"
-            primaryCta="Provide Anonymous Tip"
-          />
+          {isLoading && <Text style={{ color: "#94a3b8" }}>Loading wanted persons...</Text>}
+          {!isLoading && (wanted ?? []).length === 0 && (
+            <Text style={{ color: "#94a3b8" }}>No active watchlist entries right now.</Text>
+          )}
+          {wanted?.map((entity) => {
+            const tag = WATCHLIST_TAG[entity.watchlistStatus] ?? WATCHLIST_TAG.MEDIUM;
+            return (
+              <WantedCard
+                key={entity.id}
+                topTag={tag.label}
+                topTagBg={tag.bg}
+                topTagFg={tag.fg}
+                name={entity.displayName ?? "Unidentified subject"}
+                subtitle={entity.entityType}
+                imageUri={entity.primaryFaceImageUrl ?? FALLBACK_IMAGE}
+                primaryCta="Provide Anonymous Tip"
+              />
+            );
+          })}
 
           <SafetyTipCard />
-
-          <WantedCard
-            topTag="UNDER INVESTIGATION"
-            topTagBg="#fef3c7"
-            topTagFg="#92400e"
-            name="Daniel Cross"
-            subtitle="Organized crime suspect"
-            imageUri="https://i.pravatar.cc/900?img=12"
-            primaryCta="Provide Anonymous Tip"
-          />
         </View>
       </ScrollView>
     </SafeAreaView>

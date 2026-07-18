@@ -1,14 +1,14 @@
-import { authClient } from "@/lib/auth-client";
+import { useSession } from "@/contexts/session-context";
 import { Redirect } from "expo-router";
 
 export default function Home() {
-  const { data: session } = authClient.useSession();
+  const { session, loading } = useSession();
 
-  // Don't show the drawer landing screen during onboarding/auth.
+  if (loading) return null;
+
   if (!session?.user) {
     return <Redirect href="/onboarding" />;
   }
 
-  // Once authenticated, keep the drawer index route but send them to the first tab.
   return <Redirect href="/(drawer)/(tabs)" />;
 }

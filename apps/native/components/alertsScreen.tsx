@@ -1,6 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { queryClient, trpc } from "@/utils/trpc";
 
 const SHEET_BG = "#ffffff";
 const BRAND_BLUE = "#1e3a8a";
@@ -104,6 +108,8 @@ function AlertCard({
   body,
   location,
   action,
+  onAction,
+  actionDisabled,
 }: {
   accent: string;
   badge: string;
@@ -116,6 +122,8 @@ function AlertCard({
   body: string;
   location: string;
   action: string;
+  onAction?: () => void;
+  actionDisabled?: boolean;
 }) {
   return (
     <View
@@ -160,7 +168,11 @@ function AlertCard({
             <Ionicons name="location-outline" size={14} color="#94a3b8" />
             <Text style={{ color: "#94a3b8", fontWeight: "700" }}>{location}</Text>
           </View>
-          <Pressable onPress={() => {}} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+          <Pressable
+            onPress={onAction}
+            disabled={actionDisabled}
+            style={({ pressed }) => ({ opacity: actionDisabled ? 0.5 : pressed ? 0.85 : 1 })}
+          >
             <Text style={{ color: BRAND_BLUE, fontWeight: "900", letterSpacing: 0.6 }}>{action}</Text>
           </Pressable>
         </View>
@@ -225,7 +237,43 @@ function MonitoringMapCard() {
   );
 }
 
+const SEVERITY_STYLE: Record<
+  string,
+  { accent: string; badgeBg: string; badgeFg: string; icon: keyof typeof Ionicons.glyphMap }
+> = {
+  CRITICAL: { accent: "#991b1b", badgeBg: "#fee2e2", badgeFg: "#991b1b", icon: "warning" },
+  HIGH: { accent: "#eab308", badgeBg: "#fef3c7", badgeFg: "#92400e", icon: "alert-circle" },
+  MEDIUM: { accent: "#3b82f6", badgeBg: "#dbeafe", badgeFg: "#1d4ed8", icon: "information-circle" },
+  LOW: { accent: "#cbd5e1", badgeBg: "#e2e8f0", badgeFg: "#475569", icon: "information-circle" },
+};
+
+function getRelativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
 export default function AlertsScreen() {
+  const [search, setSearch] = useState("");
+
+  const { data: alerts, isLoading } = useQuery(trpc.alerts.listMine.queryOptions());
+
+  const acknowledge = useMutation(
+    trpc.alerts.acknowledge.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.alerts.listMine.queryKey() }),
+    }),
+  );
+
+  const visible = (alerts ?? []).filter((a) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return a.title.toLowerCase().includes(q) || (a.description ?? "").toLowerCase().includes(q);
+  });
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
       <Header />
@@ -236,7 +284,7 @@ export default function AlertsScreen() {
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={{ fontSize: 22, fontWeight: "900", color: "#0f172a" }}>Active Alerts</Text>
-          <Pill label="LIVE: 12 NEARBY" />
+          <Pill label={`${visible.length} NEARBY`} />
         </View>
 
         <View
@@ -255,54 +303,41 @@ export default function AlertsScreen() {
         >
           <Ionicons name="search-outline" size={18} color="#94a3b8" />
           <TextInput
-            placeholder="Filter by area or type..."
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Filter by title or description..."
             placeholderTextColor="#94a3b8"
             style={{ flex: 1, color: "#0f172a", fontWeight: "700", paddingVertical: 0 }}
           />
         </View>
 
         <View style={{ marginTop: 18, gap: 14 }}>
-          <AlertCard
-            accent="#991b1b"
-            badge="CRITICAL ALERT"
-            badgeBg="#fee2e2"
-            badgeFg="#991b1b"
-            iconName="snow"
-            iconBg="#991b1b"
-            title="Flash Flood Warning"
-            time="2m ago"
-            body="Severe water levels rising on Maple Ridge Road. Evacuation advised for residents in Zone 4."
-            location="West Valley District"
-            action="VIEW ROUTE"
-          />
-
-          <AlertCard
-            accent="#eab308"
-            badge="SEVERE WARNING"
-            badgeBg="#fef3c7"
-            badgeFg="#92400e"
-            iconName="warning"
-            iconBg="#fef3c7"
-            title="Power Grid Instability"
-            time="15m ago"
-            body="Unscheduled maintenance affecting the Central Grid. Rolling blackouts expected until 22:00."
-            location="Downtown Core"
-            action="DETAILS"
-          />
-
-          <AlertCard
-            accent="#cbd5e1"
-            badge="ADVISORY"
-            badgeBg="#e2e8f0"
-            badgeFg="#475569"
-            iconName="information-circle"
-            iconBg="#e2e8f0"
-            title="Traffic Congestion"
-            time="42m ago"
-            body="Heavy delays on Hwy 101 North due to a stalled vehicle. Expect additional 20 min travel time."
-            location="East Intersection"
-            action="MAP"
-          />
+          {isLoading && <Text style={{ color: "#94a3b8" }}>Loading alerts...</Text>}
+          {!isLoading && visible.length === 0 && (
+            <Text style={{ color: "#94a3b8" }}>No active alerts for your area right now.</Text>
+          )}
+          {visible.map((a) => {
+            const style = SEVERITY_STYLE[a.severity] ?? SEVERITY_STYLE.MEDIUM;
+            const acknowledged = !!a.acknowledgedAt;
+            return (
+              <AlertCard
+                key={a.id}
+                accent={style.accent}
+                badge={a.severity}
+                badgeBg={style.badgeBg}
+                badgeFg={style.badgeFg}
+                iconName={style.icon}
+                iconBg={style.badgeBg}
+                title={a.title}
+                time={getRelativeTime(new Date(a.createdAt))}
+                body={a.description ?? ""}
+                location={a.alertType.replace(/_/g, " ")}
+                action={acknowledged ? "ACKNOWLEDGED" : "ACKNOWLEDGE"}
+                actionDisabled={acknowledged || acknowledge.isPending}
+                onAction={() => acknowledge.mutate({ alertId: a.id })}
+              />
+            );
+          })}
         </View>
 
         <View style={{ marginTop: 18 }}>

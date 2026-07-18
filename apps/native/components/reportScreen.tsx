@@ -1,11 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { trpc } from "@/utils/trpc";
 
 const SHEET_BG = "#ffffff";
 const BRAND_BLUE = "#1e3a8a";
 
 export default function ReportScreen() {
+  const [description, setDescription] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  const submitSighting = useMutation(
+    trpc.sightings.submit.mutationOptions({
+      onSuccess: () => {
+        setDescription("");
+        setLocationAddress("");
+      },
+    }),
+  );
+
+  const canSubmit = description.trim().length > 0 && !submitSighting.isPending;
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
       {/* Header (same style as Home) */}
@@ -100,9 +119,9 @@ export default function ReportScreen() {
           </Text>
         </Pressable>
 
-        {/* Detected location */}
+        {/* Location */}
         <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12, fontWeight: "900", color: "#0f172a" }}>Detected Location</Text>
+          <Text style={{ fontSize: 12, fontWeight: "900", color: "#0f172a" }}>Location</Text>
           <View
             style={{
               marginTop: 10,
@@ -113,49 +132,17 @@ export default function ReportScreen() {
               padding: 12,
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
+              gap: 10,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  backgroundColor: "rgba(30, 58, 138, 0.10)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ionicons name="location-sharp" size={16} color={BRAND_BLUE} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#0f172a", fontWeight: "900" }}>
-                  Oakwood Heights, Block C-12
-                </Text>
-                <Text style={{ marginTop: 2, fontSize: 10, color: "#94a3b8", fontWeight: "800" }}>
-                  GPS ACCURACY: HIGH
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={{
-                width: 56,
-                height: 34,
-                borderRadius: 10,
-                overflow: "hidden",
-                backgroundColor: "#cbd5e1",
-              }}
-            >
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=160&h=120&q=50",
-                }}
-                style={{ width: 56, height: 34 }}
-              />
-            </View>
+            <Ionicons name="location-sharp" size={16} color={BRAND_BLUE} />
+            <TextInput
+              value={locationAddress}
+              onChangeText={setLocationAddress}
+              placeholder="Where did this happen? (e.g. Oakwood Heights, Block C-12)"
+              placeholderTextColor="#94a3b8"
+              style={{ flex: 1, color: "#0f172a", fontWeight: "700", paddingVertical: 0 }}
+            />
           </View>
         </View>
 
@@ -174,6 +161,8 @@ export default function ReportScreen() {
             }}
           >
             <TextInput
+              value={description}
+              onChangeText={setDescription}
               placeholder="Provide details about the individual, clothing, or behavior observed..."
               placeholderTextColor="#94a3b8"
               multiline
@@ -186,6 +175,61 @@ export default function ReportScreen() {
             />
           </View>
         </View>
+
+        {/* Anonymous toggle */}
+        <Pressable
+          onPress={() => setIsAnonymous((v) => !v)}
+          style={({ pressed }) => ({
+            marginTop: 18,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Ionicons name={isAnonymous ? "checkbox" : "square-outline"} size={20} color={BRAND_BLUE} />
+          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Submit anonymously</Text>
+        </Pressable>
+
+        {submitSighting.isSuccess && (
+          <View style={{ marginTop: 16, backgroundColor: "#ecfdf5", borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: "#065f46", fontWeight: "800" }}>
+              Sighting submitted — reference {submitSighting.data.referenceCode}
+            </Text>
+          </View>
+        )}
+        {submitSighting.isError && (
+          <View style={{ marginTop: 16, backgroundColor: "#fef2f2", borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: "#991b1b", fontWeight: "700" }}>{submitSighting.error.message}</Text>
+          </View>
+        )}
+
+        <Pressable
+          disabled={!canSubmit}
+          onPress={() =>
+            submitSighting.mutate({
+              description,
+              location: locationAddress ? { address: locationAddress } : undefined,
+              isAnonymous,
+            })
+          }
+          style={({ pressed }) => ({
+            marginTop: 18,
+            backgroundColor: BRAND_BLUE,
+            borderRadius: 14,
+            paddingVertical: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            gap: 8,
+            opacity: !canSubmit ? 0.5 : pressed ? 0.9 : 1,
+          })}
+        >
+          {submitSighting.isPending && <ActivityIndicator color="#ffffff" />}
+          <Text style={{ color: "#ffffff", fontWeight: "900", fontSize: 16 }}>
+            {submitSighting.isPending ? "Submitting..." : "Submit Report"}
+          </Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

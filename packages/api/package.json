@@ -16,12 +16,14 @@
     "@Sentinel360/env": "workspace:*",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
+    "drizzle-orm": "^0.45.1",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@Sentinel360/config": "workspace:*",
     "hono": "catalog:",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }

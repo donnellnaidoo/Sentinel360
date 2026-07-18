@@ -1,0 +1,5 @@
+Sentinel360 is an AI-powered surveillance intelligence platform that transforms CCTV footage into real-time forensic intelligence.
+Target Audience: Security operators, law enforcement, and community members.
+Core Features: Real-time detection, 3D scene reconstruction, automated reporting, and a centralized wanted person feed.
+Roles: Community Member, Security Operator, Law Enforcement Officer, Admin, Super Admin.
+Visual Identity: Premium Light Theme, Inter typography, Blue #00d4ff accent.

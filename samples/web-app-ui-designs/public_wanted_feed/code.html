@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Wanted Persons Feed | Sentinel360</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9ff;
+            color: #0b1c30;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#60ff99",
+                        "primary": "#00677e",
+                        "tertiary-container": "#ffb440",
+                        "on-surface": "#0b1c30",
+                        "on-background": "#0b1c30",
+                        "on-primary-fixed": "#001f27",
+                        "secondary": "#006d37",
+                        "surface-tint": "#00677e",
+                        "tertiary-fixed-dim": "#ffb952",
+                        "surface-container-high": "#dce9ff",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#00e479",
+                        "on-primary-container": "#00586b",
+                        "primary-fixed-dim": "#3cd7ff",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#633f00",
+                        "tertiary": "#825500",
+                        "surface-container": "#e5eeff",
+                        "primary-fixed": "#b4ebff",
+                        "on-secondary-container": "#006e37",
+                        "on-tertiary-fixed": "#291800",
+                        "on-error-container": "#93000a",
+                        "surface-container-highest": "#d3e4fe",
+                        "secondary-container": "#00fa85",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed-variant": "#004e5f",
+                        "inverse-on-surface": "#eaf1ff",
+                        "inverse-surface": "#213145",
+                        "primary-container": "#00d4ff",
+                        "surface-dim": "#cbdbf5",
+                        "tertiary-fixed": "#ffddb4",
+                        "surface-bright": "#f8f9ff",
+                        "on-primary": "#ffffff",
+                        "on-surface-variant": "#3c494e",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#bbc9cf",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#6f4800",
+                        "inverse-primary": "#3cd7ff",
+                        "surface": "#f8f9ff",
+                        "on-secondary-fixed-variant": "#005228",
+                        "outline": "#6c797f",
+                        "on-secondary-fixed": "#00210c",
+                        "surface-variant": "#d3e4fe",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "spacing": {
+                        "stack-xs": "4px",
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "container-max": "1440px",
+                        "stack-sm": "8px",
+                        "stack-lg": "24px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg": ["30px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-xl": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background">
+<!-- SideNavBar Shell -->
+<aside class="w-64 h-full fixed left-0 top-0 bg-surface-container-low shadow-sm flex flex-col py-stack-lg z-40">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Sentinel360</h1>
+<p class="text-xs text-on-surface-variant tracking-wider uppercase">Surveillance Intelligence</p>
+</div>
+<nav class="flex-1 overflow-y-auto space-y-1">
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="folder_open">folder_open</span>
+<span class="font-body-md text-body-md">Cases</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="gavel">gavel</span>
+<span class="font-body-md text-body-md">Docket</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md text-body-md">Evidence</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="visibility">visibility</span>
+<span class="font-body-md text-body-md">Sightings</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="notifications">notifications</span>
+<span class="font-body-md text-body-md">Alerts</span>
+</a>
+<!-- Active Tab: Wanted Feed -->
+<a class="flex items-center px-6 py-3 text-primary border-l-4 border-primary bg-primary-container/10 font-medium" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="person_search">person_search</span>
+<span class="font-body-md text-body-md">Wanted Feed</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="group">group</span>
+<span class="font-body-md text-body-md">Users</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="badge">badge</span>
+<span class="font-body-md text-body-md">Profiles</span>
+</a>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant">
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+<a class="flex items-center px-6 py-3 text-error hover:bg-error-container/10 transition-colors" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="logout">logout</span>
+<span class="font-body-md text-body-md">Logout</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="ml-64 max-w-[calc(100%-16rem)] h-16 bg-surface sticky top-0 z-30 flex justify-between items-center px-margin-desktop border-b border-outline-variant">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-body-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Search wanted persons, case IDs, or aliases..." type="text"/>
+</div>
+<nav class="flex items-center gap-6 ml-4">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">Cases</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-sm text-body-sm" href="#">Wanted Persons</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a security analyst in a clean-cut corporate attire, set against a blurred background of a high-tech control room with blue monitors. The lighting is soft and professional, reflecting a modern surveillance intelligence office aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe5be4YXiHQjLmzk9HX10PrIYYaVzJ2p24dFvdo6BGTuBOuePyzk4BGWZtRnzFZNgYu_lwbJPDTr0V3KYw2Duuw3BVArRAHaTtUBAcYmBLKDY1nl4vOkBTtMcG0mwvAv5Gr1XK80DWQYI_5iBqMzRb5I-lQBQLptP6XL8cJNXYeXgQAORubzAvykZN-HZwsKGmc0_blJ7ocDS3XJZHUijPCWZdRv22Fej01EzSma-WWr-F3ZslX9txNVj5Xh2MkxPpFjw_X-PCrIQz"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 p-margin-desktop min-h-screen">
+<!-- Page Header & Filters -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-stack-lg mb-stack-lg">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface mb-stack-xs">Wanted Persons Feed</h2>
+<p class="text-on-surface-variant font-body-md flex items-center gap-2">
+<span class="w-2 h-2 bg-error rounded-full animate-pulse"></span>
+                    Currently tracking 142 high-priority suspects
+                </p>
+</div>
+<div class="flex flex-wrap gap-stack-sm">
+<select class="px-4 py-2 bg-white border border-outline-variant rounded-xl text-body-sm text-on-surface-variant outline-none focus:border-primary">
+<option>Crime Type: All</option>
+<option>Felony Theft</option>
+<option>Public Safety</option>
+<option>Cyber Crime</option>
+<option>Organized Fraud</option>
+</select>
+<select class="px-4 py-2 bg-white border border-outline-variant rounded-xl text-body-sm text-on-surface-variant outline-none focus:border-primary">
+<option>Location: Nationwide</option>
+<option>North Sector</option>
+<option>Metro Central</option>
+<option>International</option>
+</select>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all font-body-sm font-medium">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+                    Advanced Filters
+                </button>
+</div>
+</div>
+<!-- Suspect Cards Grid -->
+<div class="bento-grid">
+<!-- Suspect Card 1 -->
+<div class="bg-white rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col hover:shadow-md transition-all group">
+<div class="relative h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A moody, high-contrast portrait of a male suspect with a stern expression, photographed against a neutral concrete wall. The image has a slight surveillance camera grain effect with subtle technical data overlays in the corners, maintaining a professional law enforcement intelligence aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAllQXXHUkoDriYc8DdCbY3E_vBz-5IQqkhrgSN8HEeNwYHj-boSgUSij9c_XzHMVISDameiRK8K7ZbeP6VedWxroJIvRcQM9IwLsoL2Qwv1KiKuULU6lpsV-wFYa5qAdRIsBYC-YQ6eCH_XApfz9Mvsz14HKIiDWBWDQcNrdFSCIRfptRvlE058fHPe-v-7K5jwAlNFvUu5uek_3k7__x5-ylwi2lFixA2mxZPbI17a9B02SuOSvaFvIj_Jhj3FQEQ9rEWXnVxhO5a"/>
+<div class="absolute top-4 left-4">
+<span class="px-3 py-1 bg-error text-white font-label-caps text-label-caps rounded-full shadow-lg">WANTED</span>
+</div>
+<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-on-surface/80 to-transparent p-4">
+<p class="text-white font-label-caps text-label-caps opacity-80">CASE #SEN-2024-089</p>
+<h3 class="text-white font-headline-md text-headline-md font-bold">Marcus Vancity</h3>
+</div>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="space-y-3 mb-6 flex-1">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="gavel">gavel</span>
+<span class="text-body-sm text-on-surface-variant">Felony Embezzlement &amp; Fraud</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="location_on">location_on</span>
+<span class="text-body-sm text-on-surface-variant">Metro Central, Last seen: Block 42</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="warning">warning</span>
+<span class="text-body-sm font-semibold text-error">Armed and Dangerous</span>
+</div>
+</div>
+<button class="w-full py-3 bg-error/10 text-error hover:bg-error hover:text-white transition-all rounded-xl font-body-md font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add_alert">add_alert</span>
+                        Report Sighting
+                    </button>
+</div>
+</div>
+<!-- Suspect Card 2 -->
+<div class="bg-white rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col hover:shadow-md transition-all group">
+<div class="relative h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A high-fidelity surveillance-style headshot of a female suspect with sharp features, set against a dimly lit urban background with bokeh street lights. The lighting is cold and clinical, with a deep blue and teal color palette consistent with a high-stakes intelligence platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXwvrXcGqPVuXUwjfkmL4C-LyL4Ib0iSHI-UUpaF5hmHHzCkPK52Z_KZtyQs3VN0Z1JVLcKFLlxwXWPr2ThN_LcFPsZd04Op0DL643PTKdUY3bF-jiudmOJOM6ykyRO9qXBMeMS8U8tD4cxoaDpSFSZJku93Y062-LPGEDLT-qWMKWKDGe747QMiiCPUxUt6CRL7TeY0C5cdbRIyBmD3VNEMdiqh09Bg1Jp4W877znSTJrQeWYg41O9CelhDHBgeOrC8yCF8qjUE5P"/>
+<div class="absolute top-4 left-4">
+<span class="px-3 py-1 bg-error text-white font-label-caps text-label-caps rounded-full shadow-lg">WANTED</span>
+</div>
+<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-on-surface/80 to-transparent p-4">
+<p class="text-white font-label-caps text-label-caps opacity-80">CASE #SEN-2024-112</p>
+<h3 class="text-white font-headline-md text-headline-md font-bold">Elena Draskovic</h3>
+</div>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="space-y-3 mb-6 flex-1">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="terminal">terminal</span>
+<span class="text-body-sm text-on-surface-variant">Cyber Espionage / Infrastructure Tampering</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="location_on">location_on</span>
+<span class="text-body-sm text-on-surface-variant">North Sector, Tech District</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="verified_user">verified_user</span>
+<span class="text-body-sm font-semibold text-secondary">Low Physical Threat</span>
+</div>
+</div>
+<button class="w-full py-3 bg-error/10 text-error hover:bg-error hover:text-white transition-all rounded-xl font-body-md font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add_alert">add_alert</span>
+                        Report Sighting
+                    </button>
+</div>
+</div>
+<!-- Suspect Card 3 -->
+<div class="bg-white rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col hover:shadow-md transition-all group">
+<div class="relative h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A gritty, professional mugshot of a suspect with a beard, lit by harsh fluorescent light that creates deep shadows. The background is a clinical white tiled wall, and the image includes subtle digital metadata tags in a clean, modern font typical of a sophisticated law enforcement interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSfMwY-5MtXO5DKyZ9b9-A7lXFthtWSM1F3KNnzq6OwNukIEEFtACpHIQVyVGQOy-56NQsFf7ySkDkWYRjTskBT86E5aDhQzOPGzauUAAMQlLPuGN7lyXgURto5b3OqrgGHgiEZr-hp6CWbMY8DedFihFtxV4o8_UzABAS8sqRXtClj3u4LYHTP32ZcD697BVwz6Kr2QmYheX7He8yZjQfu5u4Xe7Rh4zBaJFBKmRtrw4awZ6Cv96tQNxiAx27gqE-B7NP05vynC3A"/>
+<div class="absolute top-4 left-4">
+<span class="px-3 py-1 bg-error text-white font-label-caps text-label-caps rounded-full shadow-lg">WANTED</span>
+</div>
+<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-on-surface/80 to-transparent p-4">
+<p class="text-white font-label-caps text-label-caps opacity-80">CASE #SEN-2024-405</p>
+<h3 class="text-white font-headline-md text-headline-md font-bold">Julian Vane</h3>
+</div>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="space-y-3 mb-6 flex-1">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="inventory_2">inventory_2</span>
+<span class="text-body-sm text-on-surface-variant">Grand Larceny &amp; Distribution</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="location_on">location_on</span>
+<span class="text-body-sm text-on-surface-variant">Port District, Warehouse Row</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="warning">warning</span>
+<span class="text-body-sm font-semibold text-tertiary">Known Escape Risk</span>
+</div>
+</div>
+<button class="w-full py-3 bg-error/10 text-error hover:bg-error hover:text-white transition-all rounded-xl font-body-md font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add_alert">add_alert</span>
+                        Report Sighting
+                    </button>
+</div>
+</div>
+<!-- Suspect Card 4 -->
+<div class="bg-white rounded-xl shadow-sm border border-outline-variant overflow-hidden flex flex-col hover:shadow-md transition-all group">
+<div class="relative h-64 overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A sharp, detailed headshot of a suspect under neutral lighting, presented with a forensic aesthetic. The composition is clean and centered, utilizing a muted color palette of greys and deep blues that fits perfectly within a modern security intelligence application's light-themed interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKE8mX469mYwi_a0G0zPp8j65qYkm3E5qBeHEI-KJcFKMbfBzD4MvUr4EoSVhnyS85z237rLLBu_-6Jva3tBxofFR7FUV6w5MPxOxuIbuQCLJEB_TdNUOnqHza8oYHSzNUDYj0D0VZmiw7uXngrvtZzW9akoNsEiW9znNif5R5oGpCjVJuf3rVs-0pkMEfTUCSo-Yvba2QbPs9At9DW6SEGvsW9N3kezsD8eeX9PXfJ5zi8ndOShsEHFheMcKIaMIFKXBNCKpYLIIR"/>
+<div class="absolute top-4 left-4">
+<span class="px-3 py-1 bg-error text-white font-label-caps text-label-caps rounded-full shadow-lg">WANTED</span>
+</div>
+<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-on-surface/80 to-transparent p-4">
+<p class="text-white font-label-caps text-label-caps opacity-80">CASE #SEN-2024-671</p>
+<h3 class="text-white font-headline-md text-headline-md font-bold">Katarina Sokol</h3>
+</div>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="space-y-3 mb-6 flex-1">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="history_edu">history_edu</span>
+<span class="text-body-sm text-on-surface-variant">Corporate Document Forgery</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="location_on">location_on</span>
+<span class="text-body-sm text-on-surface-variant">Downtown, Financial Plaza</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" data-icon="info">info</span>
+<span class="text-body-sm font-semibold text-primary">Intelligence Asset</span>
+</div>
+</div>
+<button class="w-full py-3 bg-error/10 text-error hover:bg-error hover:text-white transition-all rounded-xl font-body-md font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add_alert">add_alert</span>
+                        Report Sighting
+                    </button>
+</div>
+</div>
+</div>
+<!-- Pagination -->
+<div class="mt-stack-lg py-stack-md flex justify-between items-center border-t border-outline-variant">
+<p class="text-body-sm text-on-surface-variant">Showing 4 of 142 suspects</p>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-primary text-white font-bold">1</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">2</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">3</button>
+<span class="px-2 text-on-surface-variant">...</span>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">36</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Footer Shell -->
+<footer class="ml-64 w-[calc(100%-16rem)] flex justify-between px-margin-desktop items-center py-stack-md border-t border-outline-variant bg-surface-container-lowest">
+<p class="font-body-sm text-body-sm text-on-surface-variant opacity-60">© 2024 Sentinel360 Intelligence. All rights reserved.</p>
+<div class="flex gap-6">
+<a class="text-on-surface-variant font-body-sm text-body-sm hover:text-primary transition-opacity" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant font-body-sm text-body-sm hover:text-primary transition-opacity" href="#">Terms of Service</a>
+<a class="text-on-surface-variant font-body-sm text-body-sm hover:text-primary transition-opacity" href="#">Security Disclosure</a>
+<a class="text-on-surface-variant font-body-sm text-body-sm hover:text-primary transition-opacity" href="#">Contact Support</a>
+</div>
+</footer>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.style.transform = 'scale(0.98)';
+            });
+            button.addEventListener('mouseup', () => {
+                button.style.transform = 'scale(1)';
+            });
+            button.addEventListener('mouseleave', () => {
+                button.style.transform = 'scale(1)';
+            });
+        });
+
+        // Simple report sighting modal simulation
+        const reportButtons = document.querySelectorAll('button:has([data-icon="add_alert"])');
+        reportButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const suspectName = e.currentTarget.closest('.bg-white').querySelector('h3').innerText;
+                alert(`Redirecting to Secure Reporting Channel for suspect: ${suspectName}. \n\nEnsure GPS tagging is enabled.`);
+            });
+        });
+    </script>
+</body></html>
