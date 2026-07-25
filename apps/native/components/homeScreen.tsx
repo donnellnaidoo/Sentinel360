@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker } from "react-native-maps";
+import CommunityMap from "./communityMap";
+import { useRouter } from "expo-router";
 
 import { trpc } from "@/utils/trpc";
 
@@ -171,6 +173,7 @@ function getRelativeTime(date: Date): string {
 export default function HomeScreen() {
   const { data: alerts, isLoading: isLoadingAlerts } = useQuery(trpc.alerts.listMine.queryOptions());
   const recentAlerts = (alerts ?? []).slice(0, 3);
+  const router = useRouter();
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
@@ -187,14 +190,18 @@ export default function HomeScreen() {
         }}
       >
         <Pressable
-          onPress={() => {}}
+          onPress={() => router.push("/(drawer)/(tabs)/profile")}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
           style={({ pressed }) => ({
             width: 40,
             height: 40,
-            borderRadius: 12,
+            borderRadius: 999, //12
+            overflow: "hidden",
             alignItems: "center",
             justifyContent: "center",
             opacity: pressed ? 0.85 : 1,
+            backgroundColor: "#e2e8f0",
           })}
         >
           <Ionicons name="menu" size={22} color={BRAND_BLUE} />
@@ -262,6 +269,7 @@ export default function HomeScreen() {
             overflow: "hidden",
           }}
         >
+          <CommunityMap height={150}/>
             <MapView
               style={{ height: 150 }}
               initialRegion={{

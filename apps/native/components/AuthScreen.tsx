@@ -5,6 +5,7 @@ import { Pressable, StatusBar, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useToast } from "heroui-native";
 import { useForm } from "@tanstack/react-form";
+import { supabase } from "@/lib/supabase";
 import z from "zod";
 
 type AuthMode = "sign-in" | "sign-up";
@@ -192,27 +193,49 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
     },
     onSubmit: async ({ value, formApi }) => {
       if (mode === "sign-in") {
-        const email = value.email.trim().toLowerCase();
-        const password = value.password;
+        const { error } = await supabase.auth.signInWithPassword({
+          email: value.email.trim().toLowerCase(),
+          password: value.password,
+        });
 
-        if (email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
+        if (error) {
           toast.show({
             variant: "danger",
-            label: `Use demo login: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`,
+            label: error.message,
           });
           return;
         }
 
         formApi.reset();
-        toast.show({ variant: "success", label: "Signed in (demo) successfully" });
         router.replace("/(drawer)/(tabs)");
         return;
       }
 
-      // Demo sign-up: accept and continue (no backend)
+      const { error } = await supabase.auth.signUp({
+        email: value.email.trim().toLowerCase(),
+        password: value.password,
+        options: {
+          data: {
+            name: value.name.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        toast.show({
+          variant: "danger",
+          label: error.message,
+        });
+        return;
+      }
+
+      toast.show({
+        variant: "success",
+        label: "Account created successfully. Please check your email.",
+      });
+
       formApi.reset();
-      toast.show({ variant: "success", label: "Account created (demo) successfully" });
-      router.replace("/(drawer)/(tabs)");
+      router.replace("/sign-in");
     },
   });
 
