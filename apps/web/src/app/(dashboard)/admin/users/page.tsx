@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { DataTable } from "@Sentinel360/ui/components/data-table";
 import type { Column } from "@Sentinel360/ui/components/data-table";
@@ -8,19 +8,93 @@ import { SearchBar } from "@Sentinel360/ui/components/search-bar";
 import type { SearchFilter } from "@Sentinel360/ui/components/search-bar";
 import { StatusBadge } from "@Sentinel360/ui/components/status-badge";
 import { ProfileAvatar } from "@Sentinel360/ui/components/profile-avatar";
+import { createClient } from "@/lib/supabase/client";
 
-import { queryClient, trpc } from "@/lib/trpc/client";
+// import { queryClient, trpc } from "@/lib/trpc/client";
 
 const PAGE_SIZE = 20;
 
+type FetchUsersInput = {
+  search: string;
+  status?: string;
+  limit: number;
+  offset: number;
+};
+
+type FetchUsersResult = {
+  items: UserRow[];
+  total: number;
+};
+
 interface UserRow {
-  id: string;
+  user_id: string; //id
+  created_at: string;
   name: string;
   email: string;
-  isActive: boolean;
-  isLocked: boolean;
-  lastLoginAt: string | Date | null;
+  status: string | null; //isActive: boolean
+  avatar_url: string | null;
+  role_id: string | null;
+  // isLocked: boolean;
+  // lastLoginAt: string | Date | null;
 }
+
+async function fetchUsers({
+  search,
+  status,
+  limit,
+  offset,
+}: FetchUsersInput): Promise<FetchUsersResult> {
+  const supabase = createClient();
+
+  const from = offset;
+  const to = offset + limit - 1;
+
+  let query = supabase
+    .from("User")
+    .select(
+      `
+        user_id,
+        name,
+        email,
+        status,
+        avatar_url,
+        role_id
+      `,
+      {
+        count : "exact",
+      },
+    )
+    .order("created_at", {
+      ascending: false,
+    })
+    .range(from, to);
+
+    const filteredSearch = search.trim();
+
+    if(filteredSearch)
+    {
+      query = query.or(
+        `name.ilike.%${filteredSearch}%,email.ilike.%${filteredSearch}%`,
+      );
+    }
+
+    if(status)
+    {
+      query = query.eq("status", status);
+    }
+
+    const { data, error, count } = await query;
+
+    if(error){
+      throw new Error(error.message);
+    }
+
+    return{
+      items: (data ?? []) as UserRow[],
+      total: count ?? 0,
+    };
+}
+
 
 const searchFilters: SearchFilter[] = [
   {
@@ -53,46 +127,62 @@ export default function AdminUsersPage() {
 
   const input = useMemo(
     () => ({
-      search: searchQuery || undefined,
-      status: (activeFilters.status || undefined) as "active" | "inactive" | "locked" | undefined,
+      search: searchQuery,
+      status: activeFilters.status || undefined,
       limit: PAGE_SIZE,
       offset: 0,
     }),
     [searchQuery, activeFilters],
   );
 
-  const { data, isLoading } = useQuery(trpc.users.list.queryOptions(input));
-  const { data: roles } = useQuery(trpc.roles.list.queryOptions());
-  const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
-  const { data: editingUser } = useQuery({
-    ...trpc.users.getById.queryOptions({ id: editUserId ?? "" }),
-    enabled: !!editUserId,
+  const {
+    data, 
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: [
+      "users",
+      input.search,
+      input.status,
+      input.limit,
+      input.offset,
+    ],
+    queryFn: () => fetchUsers(input),
   });
 
-  const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: trpc.users.list.queryKey() });
+  // const { data, isLoading } = useQuery(trpc.users.list.queryOptions(input));
+  // const { data: roles } = useQuery(trpc.roles.list.queryOptions());
+  // const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
+  // const { data: editingUser } = useQuery({
+  //   ...trpc.users.getById.queryOptions({ id: editUserId ?? "" }),
+  //   enabled: !!editUserId,
+  // });
 
-  const createUser = useMutation(
-    trpc.users.create.mutationOptions({
-      onSuccess: () => {
-        invalidateUsers();
-        setShowAddModal(false);
-        setForm(emptyForm);
-      },
-    }),
-  );
+  // const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: trpc.users.list.queryKey() });
 
-  const updateUser = useMutation(
-    trpc.users.update.mutationOptions({
-      onSuccess: () => {
-        invalidateUsers();
-        setEditUserId(null);
-      },
-    }),
-  );
+  // const createUser = useMutation(
+  //   trpc.users.create.mutationOptions({
+  //     onSuccess: () => {
+  //       invalidateUsers();
+  //       setShowAddModal(false);
+  //       setForm(emptyForm);
+  //     },
+  //   }),
+  // );
 
-  const deactivateUser = useMutation(
-    trpc.users.deactivate.mutationOptions({ onSuccess: invalidateUsers }),
-  );
+  // const updateUser = useMutation(
+  //   trpc.users.update.mutationOptions({
+  //     onSuccess: () => {
+  //       invalidateUsers();
+  //       setEditUserId(null);
+  //     },
+  //   }),
+  // );
+
+  // const deactivateUser = useMutation(
+  //   trpc.users.deactivate.mutationOptions({ onSuccess: invalidateUsers }),
+  // );
 
   const columns: Column<UserRow>[] = [
     {
@@ -101,7 +191,7 @@ export default function AdminUsersPage() {
       sortable: true,
       render: (u) => (
         <div className="flex items-center gap-3">
-          <ProfileAvatar alt={u.name} size="sm" fallback={u.name} />
+          <ProfileAvatar alt={u.name} size="sm" fallback={u.name} src={u.avatar_url ?? undefined}/>
           <div>
             <p className="font-medium text-sm">{u.name}</p>
             <p className="text-xs text-muted-foreground">{u.email}</p>
@@ -113,25 +203,31 @@ export default function AdminUsersPage() {
       key: "status",
       label: "Status",
       sortable: true,
-      render: (u) =>
-        u.isLocked ? (
-          <StatusBadge status="critical">Locked</StatusBadge>
-        ) : u.isActive ? (
-          <StatusBadge status="active">Active</StatusBadge>
-        ) : (
-          <StatusBadge status="archived">Inactive</StatusBadge>
-        ),
+      render: (u) => {
+        const normalizedStatus = u.status?.toLowerCase();
+
+        if (normalizedStatus === "active") {
+          return <StatusBadge status="active">Active</StatusBadge>;
+        }
+
+        if (normalizedStatus === "locked") {
+          return <StatusBadge status="critical">Locked</StatusBadge>;
+        }
+
+        return <StatusBadge status="archived">Inactive</StatusBadge>;
+      },
+        
     },
-    {
-      key: "lastLoginAt",
-      label: "Last Login",
-      sortable: true,
-      render: (u) => (
-        <span className="text-sm text-muted-foreground">
-          {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : "Never"}
-        </span>
-      ),
-    },
+    // {
+    //   key: "lastLoginAt",
+    //   label: "Last Login",
+    //   sortable: true,
+    //   render: (u) => (
+    //     <span className="text-sm text-muted-foreground">
+    //       {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : "Never"}
+    //     </span>
+    //   ),
+    // },
     {
       key: "actions",
       label: "Actions",
@@ -139,19 +235,20 @@ export default function AdminUsersPage() {
       render: (u) => (
         <div className="flex justify-end gap-2">
           <button
-            onClick={() => setEditUserId(u.id)}
+            onClick={() => setEditUserId(u.user_id)}
             className="p-1.5 text-muted-foreground hover:text-primary rounded-lg transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">edit</span>
           </button>
-          <button
+          {/* TO DO - ALLOW ADMINS TO DEACTIVATE USERS */}
+          {/* <button
             onClick={() => {
-              if (confirm(`Deactivate ${u.name}?`)) deactivateUser.mutate({ id: u.id });
+              if (confirm(`Deactivate ${u.name}?`)) deactivateUser.mutate({ id: u.user_id });
             }}
             className="p-1.5 text-muted-foreground hover:text-red-400 rounded-lg transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">delete</span>
-          </button>
+          </button> */}
         </div>
       ),
     },
@@ -189,6 +286,12 @@ export default function AdminUsersPage() {
         />
       </div>
 
+      {isError && (
+        <p className="mb-4 text-sm text-destructive">
+          Failed to load users: {error.message}
+        </p>
+      )}
+
       <DataTable
         columns={columns as unknown as Column<Record<string, unknown>>[]}
         data={(data?.items ?? []) as unknown as Record<string, unknown>[]}
@@ -196,6 +299,14 @@ export default function AdminUsersPage() {
         pageSize={10}
         emptyMessage="No users found matching your filters."
       />
+
+      {/* <DataTable<UserRow>
+        columns={columns}
+        data={data?.items ?? []}
+        isLoading={isLoading}
+        pageSize={10}
+        emptyMessage="No users found matching your filters."
+      /> */}
 
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -216,17 +327,17 @@ export default function AdminUsersPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                createUser.mutate({
-                  name: form.name,
-                  email: form.email,
-                  password: form.password || undefined,
-                  roleIds: form.roleIds,
-                  organizationId: form.organizationId || undefined,
-                });
+                // createUser.mutate({
+                //   name: form.name,
+                //   email: form.email,
+                //   password: form.password || undefined,
+                //   roleIds: form.roleIds,
+                //   organizationId: form.organizationId || undefined,
+                // });
               }}
             >
               <div className="p-6 space-y-4">
-                {createUser.error && <p className="text-sm text-destructive">{createUser.error.message}</p>}
+                {/* {createUser.error && <p className="text-sm text-destructive">{createUser.error.message}</p>} */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Full Name</label>
                   <input
@@ -265,15 +376,15 @@ export default function AdminUsersPage() {
                     className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">None</option>
-                    {organizations?.map((org) => (
+                    {/* {organizations?.map((org) => (
                       <option key={org.id} value={org.id}>{org.name}</option>
-                    ))}
+                    ))} */}
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Roles</label>
                   <div className="flex flex-wrap gap-2">
-                    {roles?.map((r) => (
+                    {/* {roles?.map((r) => (
                       <label key={r.id} className="flex items-center gap-1.5 text-sm border border-input rounded-lg px-2.5 py-1.5">
                         <input
                           type="checkbox"
@@ -289,7 +400,7 @@ export default function AdminUsersPage() {
                         />
                         {r.name}
                       </label>
-                    ))}
+                    ))} */}
                   </div>
                 </div>
               </div>
@@ -303,10 +414,10 @@ export default function AdminUsersPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createUser.isPending}
+                  // disabled={createUser.isPending}
                   className="px-5 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
                 >
-                  {createUser.isPending ? "Creating..." : "Create User"}
+                  {/* {createUser.isPending ? "Creating..." : "Create User"} */}
                 </button>
               </div>
             </form>
@@ -314,7 +425,7 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {editUserId && editingUser && (
+      {/* {editUserId && editingUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditUserId(null)} />
           <div className="bg-background rounded-xl w-full max-w-lg shadow-2xl relative z-10 border border-border">
@@ -378,7 +489,7 @@ export default function AdminUsersPage() {
             </form>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

@@ -1,62 +1,156 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import { queryClient, trpc } from "@/lib/trpc/client";
+// import { queryClient, trpc } from "@/lib/trpc/client";
+import { createClient } from "@/lib/supabase/client";
 
 const PAGE_SIZE = 12;
 
-const STATUS_FILTERS = [
-  { value: undefined, label: "All" },
-  { value: "PENDING", label: "Pending" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "DUPLICATE", label: "Duplicate" },
-  { value: "REJECTED", label: "Rejected" },
-] as const;
-
-const STATUS_STYLES: Record<string, string> = {
-  PENDING: "bg-tertiary-container/20 text-tertiary",
-  APPROVED: "bg-secondary-container/20 text-secondary",
-  DUPLICATE: "bg-surface-container text-on-surface-variant",
-  REJECTED: "bg-error-container/20 text-error",
+type FetchSightingsInput = {
+  search: string;
+  page: number;
 };
 
+async function fetchSightings({
+  search,
+  page,
+}: FetchSightingsInput): Promise<{
+  items: Sighting[];
+  total: number;
+}> {
+  const supabase = createClient();
+
+  const from = page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  console.log("Current Supabase user:", {
+    id: user?.id,
+    email: user?.email,
+    userError,
+  });
+
+  let query = supabase
+     .from("Sighting")
+     .select(
+      `
+        sighting_id,
+        criminal_id,
+        location,
+        description,
+        latitude,
+        longitude,
+        image,
+        timestamp,
+        created_at,
+        updated_at
+      `,
+      {
+        count: "exact",
+      },
+     )
+     .order("created_at", {
+      ascending: false,
+     })
+     .range(from, to);
+
+  const filteredSearch = escapeSearchValue(search.trim());
+
+     if(filteredSearch){
+      query = query.or(
+        `description.ilike.%${filteredSearch}%,location.ilike.%${filteredSearch}%`,
+      );
+     }
+
+     function escapeSearchValue(value:string): string {
+      return value.replace(/[%_,()]/g, "");
+     }
+
+     const { data, error, count } = await query;
+
+    console.log("Sightings query result:", {
+      data,
+      error,
+      count,
+    });
+
+     if(error){
+      throw new Error(error.message);
+     }
+
+     return {
+      items: (data ?? []) as Sighting[],
+      total: count ?? 0,
+     };
+}
+
+// const STATUS_FILTERS = [
+//   { value: undefined, label: "All" },
+//   { value: "PENDING", label: "Pending" },
+//   { value: "APPROVED", label: "Approved" },
+//   { value: "DUPLICATE", label: "Duplicate" },
+//   { value: "REJECTED", label: "Rejected" },
+// ] as const;
+
+// const STATUS_STYLES: Record<string, string> = {
+//   PENDING: "bg-tertiary-container/20 text-tertiary",
+//   APPROVED: "bg-secondary-container/20 text-secondary",
+//   DUPLICATE: "bg-surface-container text-on-surface-variant",
+//   REJECTED: "bg-error-container/20 text-error",
+// };
+
 type Sighting = {
-  id: string;
-  referenceCode: string;
+  sighting_id: string;
+  criminal_id: string | null;
+  location: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  image: string | null;
+  timestamp: string | null;
+  created_at: string;
+  updated_at: string;
   description: string;
-  moderationStatus: string;
-  isAnonymous: boolean;
-  visibility: string;
-  mediaIds: string[];
-  moderationReason: string | null;
-  createdAt: string | Date;
 };
 
 export default function SightingsPage() {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string | undefined>(undefined);
+  // const [status, setStatus] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Sighting | null>(null);
-  const [notes, setNotes] = useState("");
+  // const [notes, setNotes] = useState("");
 
-  const input = useMemo(
-    () => ({ search: search || undefined, moderationStatus: status as never, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
-    [search, status, page],
-  );
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["sightings", search, page],
 
-  const { data, isLoading, isError, error } = useQuery(trpc.sightings.list.queryOptions(input));
+    queryFn: () => 
+      fetchSightings({
+        search,
+        page,
+      }),
+  });
 
-  const verify = useMutation(
-    trpc.sightings.verify.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.sightings.list.queryKey() });
-        setSelected(null);
-        setNotes("");
-      },
-    }),
-  );
+  // const { data, isLoading, isError, error } = useQuery(trpc.sightings.list.queryOptions(input));
+
+  // const verify = useMutation(
+  //   trpc.sightings.verify.mutationOptions({
+  //     onSuccess: () => {
+  //       queryClient.invalidateQueries({ queryKey: trpc.sightings.list.queryKey() });
+  //       setSelected(null);
+  //       setNotes("");
+  //     },
+  //   }),
+  // );
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
@@ -83,7 +177,7 @@ export default function SightingsPage() {
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {STATUS_FILTERS.map((f) => (
+          {/* {STATUS_FILTERS.map((f) => (
             <button
               key={f.label}
               onClick={() => {
@@ -98,7 +192,7 @@ export default function SightingsPage() {
             >
               {f.label}
             </button>
-          ))}
+          ))} */}
         </div>
       </div>
 
@@ -111,32 +205,37 @@ export default function SightingsPage() {
       <div className="space-y-4">
         {data?.items.map((item) => (
           <button
-            key={item.id}
+            key={item.sighting_id}
             onClick={() => {
               setSelected(item as Sighting);
-              setNotes(item.moderationReason ?? "");
             }}
             className="w-full text-left bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant hover:shadow-md transition-all p-6 flex items-start justify-between gap-4"
           >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-label-caps font-mono text-on-surface-variant">{item.referenceCode}</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_STYLES[item.moderationStatus] ?? "bg-surface-container"}`}>
-                  {item.moderationStatus}
-                </span>
-                {item.isAnonymous && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-surface-container text-on-surface-variant">
-                    Anonymous
+                <span className="text-label-caps font-mono text-on-surface-variant">{item.sighting_id.slice(0, 8).toUpperCase()}</span>
+                {item.image && (
+                  <span className="material-symbols-outlined text-on-surface-variant text-sm">
+                    photo_camera
                   </span>
                 )}
-                {Array.isArray(item.mediaIds) && item.mediaIds.length > 0 && (
-                  <span className="material-symbols-outlined text-on-surface-variant text-sm">photo_camera</span>
-                )}
               </div>
-              <p className="text-on-surface text-body-md line-clamp-2">{item.description}</p>
+
+              <p className="text-on-surface text-body-md">{item.description || "No description given."}</p>
+
+              <p className="text-on-surface text-body-md">{item.location ?? "No location given."}</p>
+
+              {item.latitude !== null && item.longitude !== null && (
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Coordinates: {item.latitude}, {item.longitude}
+                </p>
+              )}
             </div>
+
             <span className="text-body-sm text-on-surface-variant whitespace-nowrap">
-              {new Date(item.createdAt).toLocaleDateString()}
+              {new Date(
+                item.timestamp ?? item.created_at, 
+                ).toLocaleDateString()}
             </span>
           </button>
         ))}
@@ -175,21 +274,20 @@ export default function SightingsPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
           <div className="bg-surface rounded-xl w-full max-w-lg shadow-2xl relative z-10 border border-outline-variant">
             <div className="p-5 border-b border-outline-variant flex justify-between items-center">
-              <h3 className="font-semibold text-on-surface">{selected.referenceCode}</h3>
+              {/* <h3 className="font-semibold text-on-surface">{selected.referenceCode}</h3> */}
               <button onClick={() => setSelected(null)} className="p-1 hover:bg-surface-container rounded-lg transition-colors">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             <div className="p-5 space-y-4">
               <p className="text-on-surface text-body-md whitespace-pre-wrap">{selected.description}</p>
-              {verify.error && <p className="text-error text-body-sm">{verify.error.message}</p>}
               <div>
                 <label className="text-label-caps text-on-surface-variant uppercase block mb-1.5">
                   Verification notes
                 </label>
                 <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  // value={notes}
+                  // onChange={(e) => setNotes(e.target.value)}
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm bg-surface-container-low min-h-[80px]"
                   placeholder="Optional notes for this decision..."
                 />
@@ -197,25 +295,25 @@ export default function SightingsPage() {
             </div>
             <div className="p-5 border-t border-outline-variant flex flex-wrap justify-end gap-2">
               <button
-                disabled={verify.isPending}
-                onClick={() => verify.mutate({ id: selected.id, decision: "REJECTED", notes })}
+                // disabled={verify.isPending}
+                // onClick={() => verify.mutate({ id: selected.id, decision: "REJECTED", notes })}
                 className="px-4 py-2 text-sm font-medium text-error hover:bg-error-container/10 rounded-lg transition-colors disabled:opacity-50"
               >
                 Reject
               </button>
               <button
-                disabled={verify.isPending}
-                onClick={() => verify.mutate({ id: selected.id, decision: "DUPLICATE", notes })}
+                // disabled={verify.isPending}
+                // onClick={() => verify.mutate({ id: selected.id, decision: "DUPLICATE", notes })}
                 className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors disabled:opacity-50"
               >
                 Mark Duplicate
               </button>
               <button
-                disabled={verify.isPending}
-                onClick={() => verify.mutate({ id: selected.id, decision: "APPROVED", notes })}
+                // disabled={verify.isPending}
+                // onClick={() => verify.mutate({ id: selected.id, decision: "APPROVED", notes })}
                 className="px-5 py-2 text-sm font-medium bg-primary text-on-primary rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
               >
-                {verify.isPending ? "Saving..." : "Verify"}
+                {/* {verify.isPending ? "Saving..." : "Verify"} */}
               </button>
             </div>
           </div>
