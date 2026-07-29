@@ -17,15 +17,34 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+type IntegrityResult = { isValid: boolean; computedHash: string; storedHash: string };
+
 export function EvidenceTab({ caseId }: { caseId: string }) {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [verifyResults, setVerifyResults] = useState<Record<string, IntegrityResult>>({});
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   const evidenceQuery = useQuery(
     trpc.evidence.list.queryOptions({ caseId, limit: 50, offset: 0 }),
   );
   const getDownloadUrl = useMutation(trpc.evidence.getDownloadUrl.mutationOptions());
+  const verifyIntegrity = useMutation(trpc.evidence.verifyIntegrity.mutationOptions());
+
+  async function handleVerify(evidenceId: string) {
+    setVerifyingId(evidenceId);
+    setVerifyResults((prev) => {
+      const { [evidenceId]: _discard, ...rest } = prev;
+      return rest;
+    });
+    try {
+      const result = await verifyIntegrity.mutateAsync({ evidenceId });
+      setVerifyResults((prev) => ({ ...prev, [evidenceId]: result }));
+    } finally {
+      setVerifyingId(null);
+    }
+  }
 
   const uploadEvidence = useMutation(
     trpc.evidence.upload.mutationOptions({
@@ -95,29 +114,64 @@ export function EvidenceTab({ caseId }: { caseId: string }) {
         <p className="text-sm text-on-surface-variant">No evidence linked to this case yet.</p>
       )}
       <div className="space-y-3">
-        {evidenceQuery.data?.items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between bg-surface-container-low p-4 rounded-xl border border-outline-variant/30"
-          >
-            <div>
-              <p className="text-sm font-bold">{item.title}</p>
-              <p className="text-xs text-on-surface-variant font-mono">
-                {item.fileHash.slice(0, 16)}... · {item.mimeType} ·{" "}
-                {(item.fileSize / 1024).toFixed(1)} KB
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                const result = await getDownloadUrl.mutateAsync({ id: item.id });
-                window.open(result.url, "_blank", "noopener,noreferrer");
-              }}
-              className="px-4 py-2 border border-outline rounded-xl text-sm font-semibold hover:bg-surface transition-colors"
+        {evidenceQuery.data?.items.map((item) => {
+          const verification = verifyResults[item.id];
+          const isVerifying = verifyingId === item.id;
+          return (
+            <div
+              key={item.id}
+              className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30"
             >
-              Download
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">{item.title}</p>
+                  <p className="text-xs text-on-surface-variant font-mono">
+                    {item.fileHash.slice(0, 16)}... · {item.mimeType} ·{" "}
+                    {(item.fileSize / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => handleVerify(item.id)}
+                    disabled={isVerifying}
+                    className="px-4 py-2 border border-outline rounded-xl text-sm font-semibold hover:bg-surface transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-base">verified</span>
+                    {isVerifying ? "Verifying..." : "Verify Integrity"}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const result = await getDownloadUrl.mutateAsync({ id: item.id });
+                      window.open(result.url, "_blank", "noopener,noreferrer");
+                    }}
+                    className="px-4 py-2 border border-outline rounded-xl text-sm font-semibold hover:bg-surface transition-colors"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+
+              {verification && (
+                <div
+                  className={`mt-3 pt-3 border-t border-outline-variant/30 rounded-lg text-xs font-mono ${
+                    verification.isValid ? "text-primary" : "text-error"
+                  }`}
+                >
+                  <p className="font-bold flex items-center gap-1.5 font-sans">
+                    <span className="material-symbols-outlined text-base">
+                      {verification.isValid ? "check_circle" : "error"}
+                    </span>
+                    {verification.isValid
+                      ? "Integrity verified — recomputed hash matches chain of custody"
+                      : "INTEGRITY CHECK FAILED — hash mismatch"}
+                  </p>
+                  <p className="mt-1 break-all">Stored: {verification.storedHash}</p>
+                  <p className="break-all">Computed: {verification.computedHash}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

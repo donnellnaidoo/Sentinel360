@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { LogoMark } from "@Sentinel360/ui/components/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function LoginPage() {
     <div className="w-full max-w-[440px] bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.04),0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-300 hover:shadow-lg">
       <div className="px-stack-lg pt-12 pb-8 flex flex-col items-center">
         <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-          <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+          <LogoMark className="size-8 text-white" />
         </div>
         <h1 className="font-headline-md text-headline-md text-on-surface font-semibold text-center mt-4">Welcome Back</h1>
         <p className="font-body-sm text-body-sm text-on-surface-variant text-center mt-2">Enter your credentials to access the intelligence portal.</p>

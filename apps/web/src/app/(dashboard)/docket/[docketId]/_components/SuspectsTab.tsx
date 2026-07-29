@@ -107,8 +107,14 @@ export function SuspectsTab({ caseId }: { caseId: string }) {
         >
           {linkCriminal.isPending ? "Linking..." : "Link to case"}
         </button>
+        {linkCriminal.isError && (
+          <p className="text-xs text-error">{linkCriminal.error.message}</p>
+        )}
       </div>
 
+      {unlinkCriminal.isError && (
+        <p className="text-xs text-error">{unlinkCriminal.error.message}</p>
+      )}
       {criminalsQuery.isLoading && (
         <p className="text-sm text-on-surface-variant">Loading linked profiles...</p>
       )}

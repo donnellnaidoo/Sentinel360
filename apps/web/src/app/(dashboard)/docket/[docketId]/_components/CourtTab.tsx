@@ -54,6 +54,127 @@ function invalidateCase(caseId: string) {
   queryClient.invalidateQueries({ queryKey: trpc.cases.nextActions.queryKey({ caseId }) });
 }
 
+type JudicialEvent = {
+  id: string;
+  at: Date;
+  icon: string;
+  title: string;
+  detail?: string;
+  citation: string;
+  warning?: string;
+};
+
+const SCHEDULE_LABEL: Record<string, string> = {
+  SCHEDULE_1: "Schedule 1",
+  SCHEDULE_5: "Schedule 5",
+  SCHEDULE_6: "Schedule 6",
+  NONE: "no schedule",
+};
+
+// Merges arrests, hearings, and prosecution decisions into one chronological
+// timeline with the actual SA legal citation each event maps to — the
+// judicial sequence this schema is modeled on (see cases.ts's header
+// comment: arrest -> first appearance (48h, CPA s50) -> bail -> NPA charge
+// decision -> hearings -> verdict -> sentencing). Also flags the one thing
+// that's actually checkable from the data: whether a first appearance was
+// scheduled within the CPA s50 48-hour window of the earliest arrest.
+function JudicialTimeline({ caseId }: { caseId: string }) {
+  const arrestsQuery = useQuery(trpc.cases.listArrests.queryOptions({ caseId }));
+  const hearingsQuery = useQuery(trpc.cases.listHearings.queryOptions({ caseId }));
+  const decisionsQuery = useQuery(trpc.cases.listProsecutionDecisions.queryOptions({ caseId }));
+
+  if (arrestsQuery.isLoading || hearingsQuery.isLoading || decisionsQuery.isLoading) {
+    return <p className="text-sm text-on-surface-variant">Loading judicial timeline...</p>;
+  }
+
+  const earliestArrestAt = (arrestsQuery.data ?? [])
+    .map((a) => new Date(a.arrestedAt).getTime())
+    .sort((a, b) => a - b)[0];
+
+  const events: JudicialEvent[] = [
+    ...(arrestsQuery.data ?? []).map((a) => ({
+      id: `arrest-${a.id}`,
+      at: new Date(a.arrestedAt),
+      icon: "local_police",
+      title: `Arrest — ${a.entityDisplayName ?? "Suspect"}`,
+      detail: `${a.custodyStatus.replace(/_/g, " ")}${a.withWarrant ? " · with warrant" : " · without warrant"}`,
+      citation: "Constitution s35(1)(a) — right to be informed of the reason for arrest",
+      warning: a.rightsInformedAt ? undefined : "Rights-informed timestamp not recorded",
+    })),
+    ...(hearingsQuery.data ?? []).map((h) => {
+      const isFirstAppearance = h.hearingType === "FIRST_APPEARANCE";
+      let warning: string | undefined;
+      if (isFirstAppearance && earliestArrestAt !== undefined) {
+        const hoursSinceArrest = (new Date(h.scheduledAt).getTime() - earliestArrestAt) / 3_600_000;
+        if (hoursSinceArrest > 48) {
+          warning = `Scheduled ${Math.round(hoursSinceArrest)}h after arrest — exceeds the CPA s50 48-hour first-appearance window`;
+        }
+      }
+      const citation =
+        h.hearingType === "BAIL_HEARING"
+          ? `CPA bail classification: ${SCHEDULE_LABEL[h.bailScheduleClassification ?? "NONE"] ?? h.bailScheduleClassification}`
+          : isFirstAppearance
+            ? "CPA s50 — first appearance required within 48 hours of arrest"
+            : "Criminal Procedure Act 51 of 1977";
+      return {
+        id: `hearing-${h.id}`,
+        at: new Date(h.scheduledAt),
+        icon: "account_balance",
+        title: `${h.hearingType.replace(/_/g, " ")} — ${h.outcomeType.replace(/_/g, " ")}`,
+        detail: h.courtName ?? undefined,
+        citation,
+        warning,
+      };
+    }),
+    ...(decisionsQuery.data ?? []).map((d) => ({
+      id: `decision-${d.id}`,
+      at: new Date(d.decidedAt),
+      icon: "policy",
+      title: `NPA decision — ${d.decision.replace(/_/g, " ")}`,
+      detail: d.prosecutorName ?? undefined,
+      citation: "National Prosecuting Authority Act 32 of 1998",
+      warning: undefined,
+    })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime());
+
+  if (events.length === 0) {
+    return (
+      <p className="text-sm text-on-surface-variant">
+        No judicial lifecycle events recorded yet — record an arrest below to begin one.
+      </p>
+    );
+  }
+
+  return (
+    <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant shadow-sm">
+      <h4 className="font-label-caps text-on-surface-variant mb-5">
+        Judicial Lifecycle (CPA 51/1977)
+      </h4>
+      <ol className="relative border-l-2 border-outline-variant/40 ml-4 space-y-6">
+        {events.map((e) => (
+          <li key={e.id} className="relative ml-6">
+            <span className="absolute -left-[35px] top-0 flex items-center justify-center w-6 h-6 rounded-full bg-primary text-on-primary">
+              <span className="material-symbols-outlined text-[14px]">{e.icon}</span>
+            </span>
+            <p className="text-sm font-bold">{e.title}</p>
+            <p className="text-xs text-on-surface-variant">
+              {e.at.toLocaleString()}
+              {e.detail ? ` · ${e.detail}` : ""}
+            </p>
+            <p className="text-[11px] text-primary/80 italic mt-0.5">{e.citation}</p>
+            {e.warning && (
+              <p className="text-[11px] text-error font-semibold mt-0.5 flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">warning</span>
+                {e.warning}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function ArrestsSection({ caseId }: { caseId: string }) {
   const [entityProfileId, setEntityProfileId] = useState("");
   const [arrestedAt, setArrestedAt] = useState("");
@@ -75,16 +196,25 @@ function ArrestsSection({ caseId }: { caseId: string }) {
     }),
   );
 
+  const hasNoSuspects = criminalsQuery.data?.length === 0;
+
   return (
     <div className="space-y-4">
       <h4 className="font-label-caps text-on-surface-variant">Arrests</h4>
+      {hasNoSuspects && (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-secondary/10 text-secondary text-sm">
+          <span className="material-symbols-outlined text-base mt-0.5">info</span>
+          <p>No suspects linked to this case yet. Link one on the Suspects tab before recording an arrest.</p>
+        </div>
+      )}
       <div className="bg-surface-container-low rounded-2xl p-6 border border-dashed border-outline flex flex-col gap-3">
         <select
           className="border border-outline-variant rounded-xl px-3 py-2 text-sm bg-surface-container-lowest"
           value={entityProfileId}
           onChange={(e) => setEntityProfileId(e.target.value)}
+          disabled={hasNoSuspects}
         >
-          <option value="">Select suspect (link on Suspects tab first)...</option>
+          <option value="">Select suspect...</option>
           {criminalsQuery.data?.map((c) => (
             <option key={c.entityProfileId} value={c.entityProfileId}>
               {c.entityDisplayName ?? "Unnamed profile"}
@@ -134,6 +264,9 @@ function ArrestsSection({ caseId }: { caseId: string }) {
         >
           {recordArrest.isPending ? "Recording..." : "Record arrest"}
         </button>
+        {recordArrest.isError && (
+          <p className="text-xs text-error">{recordArrest.error.message}</p>
+        )}
       </div>
 
       {arrestsQuery.data?.length === 0 && (
@@ -218,6 +351,9 @@ function ProsecutionSection({ caseId }: { caseId: string }) {
         >
           {recordDecision.isPending ? "Saving..." : "Record decision"}
         </button>
+        {recordDecision.isError && (
+          <p className="text-xs text-error">{recordDecision.error.message}</p>
+        )}
       </div>
 
       {decisionsQuery.data?.length === 0 && (
@@ -368,6 +504,9 @@ function HearingsSection({ caseId }: { caseId: string }) {
         >
           {scheduleHearing.isPending ? "Scheduling..." : "Schedule hearing"}
         </button>
+        {scheduleHearing.isError && (
+          <p className="text-xs text-error">{scheduleHearing.error.message}</p>
+        )}
       </div>
 
       {hearingsQuery.data?.length === 0 && (
@@ -441,6 +580,9 @@ function HearingsSection({ caseId }: { caseId: string }) {
                 >
                   {recordOutcome.isPending ? "Saving..." : "Save outcome"}
                 </button>
+                {recordOutcome.isError && (
+                  <p className="text-xs text-error">{recordOutcome.error.message}</p>
+                )}
               </div>
             )}
           </div>
@@ -453,6 +595,7 @@ function HearingsSection({ caseId }: { caseId: string }) {
 export function CourtTab({ caseId }: { caseId: string }) {
   return (
     <div className="space-y-10">
+      <JudicialTimeline caseId={caseId} />
       <ArrestsSection caseId={caseId} />
       <ProsecutionSection caseId={caseId} />
       <HearingsSection caseId={caseId} />

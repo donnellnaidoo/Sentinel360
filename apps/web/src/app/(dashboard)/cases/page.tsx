@@ -4,25 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { STATUS_OPTIONS, STATUS_STYLES } from "@/lib/case-status";
 import { trpc } from "@/lib/trpc/client";
 
 const PAGE_SIZE = 20;
-
-const STATUS_OPTIONS = [
-  "OPEN",
-  "UNDER_INVESTIGATION",
-  "AWAITING_REVIEW",
-  "CLOSED",
-  "ARCHIVED",
-] as const;
-
-const STATUS_STYLES: Record<(typeof STATUS_OPTIONS)[number], string> = {
-  OPEN: "bg-primary/10 text-primary",
-  UNDER_INVESTIGATION: "bg-tertiary/10 text-tertiary",
-  AWAITING_REVIEW: "bg-secondary/10 text-secondary",
-  CLOSED: "bg-on-surface-variant/10 text-on-surface-variant",
-  ARCHIVED: "bg-on-surface-variant/10 text-on-surface-variant",
-};
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();

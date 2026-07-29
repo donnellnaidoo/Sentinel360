@@ -164,6 +164,7 @@ export const createCaseSchema = z.object({
   description: z.string().max(10000).optional(),
   priority: casePrioritySchema.default("MEDIUM"),
   assignedToUserId: z.string().min(1).optional(),
+  isSensitive: z.boolean().default(false),
 });
 
 export const updateCaseSchema = z.object({
@@ -173,6 +174,7 @@ export const updateCaseSchema = z.object({
   description: z.string().max(10000).optional(),
   priority: casePrioritySchema.optional(),
   assignedToUserId: z.string().min(1).nullable().optional(),
+  isSensitive: z.boolean().optional(),
 });
 
 export const updateCaseStatusSchema = z.object({
@@ -210,6 +212,12 @@ export const linkEvidenceSchema = z.object({
 
 export const caseIdSchema = z.object({
   caseId: z.string().uuid(),
+});
+
+export const assignCaseInvestigatorSchema = z.object({
+  caseId: z.string().uuid(),
+  // null unassigns the case (returns it to OPEN's "no investigator" state).
+  userId: z.string().min(1).nullable(),
 });
 
 // --- Case judicial lifecycle: suspects, arrest, prosecution, court hearings ---
@@ -362,19 +370,37 @@ export const verifyEvidenceIntegritySchema = z.object({
 
 export const entityTypeSchema = z.enum(["PERSON", "VEHICLE", "OBJECT"]);
 
+// A raw photo upload — mirrors createEvidenceSchema's fileBase64 shape.
+// Unlike evidence, the resulting file lands in a public bucket since it's
+// meant to be shown on the public wanted feed and community mobile app.
+export const entityProfilePhotoSchema = z.object({
+  fileBase64: z.string().min(1),
+  originalFilename: z.string().min(1).max(300),
+  mimeType: z.string().min(1).max(100),
+});
+
+// physicalDescription/charges are stored inside the `attributes` jsonb
+// column (there's no dedicated column for them) but are typed and exposed
+// as first-class fields here so forms don't have to know that detail.
 export const createEntityProfileSchema = z.object({
   entityType: entityTypeSchema,
   displayName: z.string().min(1).max(200).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
+  physicalDescription: z.string().max(2000).optional(),
+  charges: z.array(z.string().min(1).max(200)).max(20).optional(),
   notes: z.string().max(5000).optional(),
+  photo: entityProfilePhotoSchema.optional(),
 });
 
 export const updateEntityProfileSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().min(1).max(200).optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
+  physicalDescription: z.string().max(2000).optional(),
+  charges: z.array(z.string().min(1).max(200)).max(20).optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "MERGED"]).optional(),
   notes: z.string().max(5000).optional(),
+  photo: entityProfilePhotoSchema.optional(),
 });
 
 export const entityProfileListSchema = z.object({
@@ -491,4 +517,24 @@ export const auditListSchema = z.object({
   offset: z.coerce.number().min(0).default(0),
   domain: z.string().optional(),
   eventType: z.string().optional(),
+});
+
+// --- POPIA (subject access / deletion requests) ---
+
+export const requestDataDeletionSchema = z.object({
+  reason: z.string().max(2000).optional(),
+});
+
+export const dataDeletionStatusSchema = z.enum(["PENDING", "APPROVED", "REJECTED", "COMPLETED"]);
+
+export const reviewDataDeletionRequestSchema = z.object({
+  id: z.string().uuid(),
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  reviewNotes: z.string().max(2000).optional(),
+});
+
+export const dataDeletionRequestListSchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+  status: dataDeletionStatusSchema.optional(),
 });

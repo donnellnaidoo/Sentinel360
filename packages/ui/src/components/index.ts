@@ -7,6 +7,7 @@ export { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 export { GlassCard } from "./glass-card";
 export { Input } from "./input";
 export { Label } from "./label";
+export { Logo, LogoMark } from "./logo";
 export { ProfileAvatar } from "./profile-avatar";
 export { RiskIndicator } from "./risk-indicator";
 export { SearchBar, type SearchFilter } from "./search-bar";

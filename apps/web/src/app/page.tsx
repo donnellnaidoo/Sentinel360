@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "@Sentinel360/ui/components/logo";
 
 const features = [
   {
@@ -56,7 +57,7 @@ export default function Home() {
         <div className="relative z-30 container mx-auto px-margin-desktop text-center flex flex-col items-center gap-stack-lg">
           <div className="mb-stack-lg animate-fade-in">
             <div className="h-12 w-auto inline-flex items-center justify-center">
-              <span className="material-symbols-outlined text-on-surface text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>security</span>
+              <LogoMark className="size-10 text-on-surface" />
             </div>
           </div>
           <div className="max-w-4xl space-y-stack-md">
@@ -132,7 +133,10 @@ export default function Home() {
 
       <footer className="bg-surface-container-lowest dark:bg-on-surface flex justify-between px-margin-desktop items-center w-full py-stack-md border-t border-outline-variant">
         <div className="flex flex-col md:flex-row items-center gap-stack-md">
-          <div className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest font-bold">Sentinel360 Intelligence</div>
+          <div className="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest font-bold">
+            <LogoMark className="size-4" />
+            Sentinel360 Intelligence
+          </div>
           <span className="hidden md:block text-outline">|</span>
           <p className="font-body-sm text-body-sm text-on-surface-variant">© 2024 Sentinel360 Intelligence. All rights reserved.</p>
         </div>

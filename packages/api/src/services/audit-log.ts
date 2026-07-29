@@ -14,10 +14,28 @@ export interface RecordAuditEventInput {
   payload?: Record<string, unknown>;
 }
 
-// Top-level-only key sort — good enough for a demo audit trail, not a
-// legally-canonical hash chain (nested object key order isn't normalized).
+// Recursively sorts object keys (including inside nested objects and inside
+// array elements) before stringifying, so two payloads with the same data
+// but different key insertion order always hash identically. Array
+// *element order* is preserved — only object keys are reordered — since
+// element order can itself be meaningful (e.g. an ordered list of steps).
+function canonicalValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue);
+  }
+  if (value !== null && typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(source).sort()) {
+      sorted[key] = canonicalValue(source[key]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
 function canonical(payload: Record<string, unknown>): string {
-  return JSON.stringify(payload, Object.keys(payload).sort());
+  return JSON.stringify(canonicalValue(payload));
 }
 
 /**

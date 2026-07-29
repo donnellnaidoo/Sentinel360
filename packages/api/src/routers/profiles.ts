@@ -11,11 +11,26 @@ import {
   idSchema,
   updateEntityProfileSchema,
 } from "../validators";
+import { uploadProfilePhoto } from "../services/entity-photo-storage";
 
 function pushIf<T>(arr: T[], item: T | undefined): void {
   if (item !== undefined) {
     arr.push(item);
   }
+}
+
+function readPublicAttributes(attributes: unknown): {
+  physicalDescription?: string;
+  charges?: string[];
+} {
+  const attrs = (attributes ?? {}) as Record<string, unknown>;
+  return {
+    physicalDescription:
+      typeof attrs.physicalDescription === "string" ? attrs.physicalDescription : undefined,
+    charges: Array.isArray(attrs.charges)
+      ? attrs.charges.filter((c): c is string => typeof c === "string")
+      : undefined,
+  };
 }
 
 async function getProfileOrThrow(id: string) {
@@ -76,10 +91,11 @@ export const profilesRouter = router({
   }),
 
   // Public-safe wanted feed for any authenticated user (incl. community) —
-  // deliberately not gated by profiles:read, which also exposes internal
-  // notes/attributes not meant for citizen consumption.
+  // deliberately not gated by profiles:read. The raw `attributes` blob can
+  // hold arbitrary internal metadata, so only the two keys meant for public
+  // consumption (physicalDescription, charges) are ever surfaced here.
   listPublicWanted: protectedProcedure.query(async () => {
-    return db
+    const rows = await db
       .select({
         id: entityProfile.id,
         entityType: entityProfile.entityType,
@@ -87,25 +103,46 @@ export const profilesRouter = router({
         primaryFaceImageUrl: entityProfile.primaryFaceImageUrl,
         watchlistStatus: entityProfile.watchlistStatus,
         lastSeenAt: entityProfile.lastSeenAt,
+        attributes: entityProfile.attributes,
       })
       .from(entityProfile)
       .where(ne(entityProfile.watchlistStatus, "NONE"))
       .orderBy(desc(entityProfile.updatedAt));
+
+    return rows.map(({ attributes, ...rest }) => ({
+      ...rest,
+      ...readPublicAttributes(attributes),
+    }));
   }),
 
   // Only the manually-entered fields are writable here. primaryFaceEmbedding,
   // detectionCount, locationsSeen etc. are populated by the AI/CCTV pipeline
   // (deferred) and are intentionally not exposed on this schema.
+  // physicalDescription/charges have no dedicated column — they're folded
+  // into `attributes` — and photo, if provided, is uploaded to public
+  // storage and its resulting URL stored as primaryFaceImageUrl.
   create: requirePermission("profiles:create")
     .input(createEntityProfileSchema)
     .mutation(async ({ input }) => {
+      const { photo, physicalDescription, charges, attributes, ...rest } = input;
+
+      let primaryFaceImageUrl: string | undefined;
+      if (photo) {
+        const fileBytes = Buffer.from(photo.fileBase64, "base64");
+        const uploaded = await uploadProfilePhoto(fileBytes, photo.originalFilename, photo.mimeType);
+        primaryFaceImageUrl = uploaded.publicUrl;
+      }
+
       const [created] = await db
         .insert(entityProfile)
         .values({
-          entityType: input.entityType,
-          displayName: input.displayName,
-          attributes: input.attributes ?? {},
-          notes: input.notes,
+          ...rest,
+          primaryFaceImageUrl,
+          attributes: {
+            ...(attributes ?? {}),
+            ...(physicalDescription !== undefined ? { physicalDescription } : {}),
+            ...(charges !== undefined ? { charges } : {}),
+          },
         })
         .returning();
       return created;
@@ -114,12 +151,35 @@ export const profilesRouter = router({
   update: requirePermission("profiles:update")
     .input(updateEntityProfileSchema)
     .mutation(async ({ input }) => {
-      const { id, ...updateData } = input;
-      await getProfileOrThrow(id);
+      const { id, photo, physicalDescription, charges, attributes, ...rest } = input;
+      const existing = await getProfileOrThrow(id);
+
+      let primaryFaceImageUrl: string | undefined;
+      if (photo) {
+        const fileBytes = Buffer.from(photo.fileBase64, "base64");
+        const uploaded = await uploadProfilePhoto(fileBytes, photo.originalFilename, photo.mimeType);
+        primaryFaceImageUrl = uploaded.publicUrl;
+      }
+
+      const touchesAttributes =
+        attributes !== undefined || physicalDescription !== undefined || charges !== undefined;
 
       const [updated] = await db
         .update(entityProfile)
-        .set({ ...updateData, updatedAt: new Date() })
+        .set({
+          ...rest,
+          ...(primaryFaceImageUrl !== undefined ? { primaryFaceImageUrl } : {}),
+          ...(touchesAttributes
+            ? {
+                attributes: {
+                  ...(attributes ?? (existing.attributes as Record<string, unknown>) ?? {}),
+                  ...(physicalDescription !== undefined ? { physicalDescription } : {}),
+                  ...(charges !== undefined ? { charges } : {}),
+                },
+              }
+            : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(entityProfile.id, id))
         .returning();
       return updated;

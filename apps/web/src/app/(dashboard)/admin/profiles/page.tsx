@@ -16,6 +16,36 @@ const watchlistStyles: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-800",
 };
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function chargesToLines(attributes: unknown): string {
+  const attrs = (attributes && typeof attributes === "object" ? attributes : {}) as Record<string, unknown>;
+  const charges = attrs.charges;
+  return Array.isArray(charges) ? charges.filter((c): c is string => typeof c === "string").join("\n") : "";
+}
+
+function physicalDescriptionOf(attributes: unknown): string {
+  const attrs = (attributes && typeof attributes === "object" ? attributes : {}) as Record<string, unknown>;
+  return typeof attrs.physicalDescription === "string" ? attrs.physicalDescription : "";
+}
+
+function linesToCharges(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 interface Profile {
   id: string;
   entityType: string;
@@ -23,6 +53,8 @@ interface Profile {
   status: string;
   watchlistStatus: string;
   notes: string | null;
+  primaryFaceImageUrl: string | null;
+  attributes: Record<string, unknown> | null;
   updatedAt: string | Date;
 }
 
@@ -31,7 +63,16 @@ export default function AdminProfilesPage() {
   const [entityType, setEntityType] = useState<string | undefined>(undefined);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selected, setSelected] = useState<Profile | null>(null);
-  const [addForm, setAddForm] = useState({ entityType: ENTITY_TYPES[0] as string, displayName: "", notes: "" });
+  const [addForm, setAddForm] = useState({
+    entityType: ENTITY_TYPES[0] as string,
+    displayName: "",
+    physicalDescription: "",
+    charges: "",
+    notes: "",
+  });
+  const [addPhoto, setAddPhoto] = useState<File | null>(null);
+  const [editPhoto, setEditPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [watchlistForm, setWatchlistForm] = useState({ priorityLevel: PRIORITY_LEVELS[1] as string, reason: "" });
 
   const input = useMemo(
@@ -52,7 +93,8 @@ export default function AdminProfilesPage() {
       onSuccess: () => {
         invalidate();
         setShowAddModal(false);
-        setAddForm({ entityType: ENTITY_TYPES[0], displayName: "", notes: "" });
+        setAddForm({ entityType: ENTITY_TYPES[0], displayName: "", physicalDescription: "", charges: "", notes: "" });
+        setAddPhoto(null);
       },
     }),
   );
@@ -62,6 +104,7 @@ export default function AdminProfilesPage() {
       onSuccess: () => {
         invalidate();
         setSelected(null);
+        setEditPhoto(null);
       },
     }),
   );
@@ -139,16 +182,31 @@ export default function AdminProfilesPage() {
             onClick={() => setSelected(p as Profile)}
             className="text-left border border-border rounded-xl p-5 hover:shadow-md transition-shadow"
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-foreground">{p.displayName ?? "Unnamed profile"}</h3>
-                <span className="inline-block mt-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-muted">{p.entityType}</span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                {p.primaryFaceImageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={p.primaryFaceImageUrl}
+                    alt={p.displayName ?? "Profile photo"}
+                    className="w-12 h-12 rounded-lg object-cover border border-border shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground truncate">{p.displayName ?? "Unnamed profile"}</h3>
+                  <span className="inline-block mt-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-muted">{p.entityType}</span>
+                </div>
               </div>
-              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${watchlistStyles[p.watchlistStatus] ?? watchlistStyles.NONE}`}>
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded shrink-0 ${watchlistStyles[p.watchlistStatus] ?? watchlistStyles.NONE}`}>
                 {p.watchlistStatus === "NONE" ? "Not watchlisted" : p.watchlistStatus}
               </span>
             </div>
-            {p.notes && <p className="mt-3 text-sm text-muted-foreground line-clamp-2">{p.notes}</p>}
+            {chargesToLines(p.attributes) && (
+              <p className="mt-3 text-xs font-medium text-destructive line-clamp-1">
+                {chargesToLines(p.attributes).split("\n").join(" · ")}
+              </p>
+            )}
+            {p.notes && <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{p.notes}</p>}
           </button>
         ))}
       </div>
@@ -164,17 +222,35 @@ export default function AdminProfilesPage() {
               </button>
             </div>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
+                setPhotoError(null);
+                let photo: { fileBase64: string; originalFilename: string; mimeType: string } | undefined;
+                if (addPhoto) {
+                  try {
+                    photo = {
+                      fileBase64: await fileToBase64(addPhoto),
+                      originalFilename: addPhoto.name,
+                      mimeType: addPhoto.type || "application/octet-stream",
+                    };
+                  } catch {
+                    setPhotoError("Could not read the selected photo. Please try again.");
+                    return;
+                  }
+                }
                 createProfile.mutate({
                   entityType: addForm.entityType as never,
                   displayName: addForm.displayName || undefined,
+                  physicalDescription: addForm.physicalDescription || undefined,
+                  charges: addForm.charges ? linesToCharges(addForm.charges) : undefined,
                   notes: addForm.notes || undefined,
+                  photo,
                 });
               }}
             >
               <div className="p-6 space-y-4">
                 {createProfile.error && <p className="text-sm text-destructive">{createProfile.error.message}</p>}
+                {photoError && <p className="text-sm text-destructive">{photoError}</p>}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Entity Type</label>
                   <select
@@ -193,6 +269,33 @@ export default function AdminProfilesPage() {
                     value={addForm.displayName}
                     onChange={(e) => setAddForm((f) => ({ ...f, displayName: e.target.value }))}
                     className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Photo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setAddPhoto(e.target.files?.[0] ?? null)}
+                    className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-muted file:text-sm file:font-medium hover:file:bg-muted/80"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Physical Description</label>
+                  <textarea
+                    value={addForm.physicalDescription}
+                    onChange={(e) => setAddForm((f) => ({ ...f, physicalDescription: e.target.value }))}
+                    placeholder="Height, build, distinguishing marks, last known clothing..."
+                    className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Charges (one per line)</label>
+                  <textarea
+                    value={addForm.charges}
+                    onChange={(e) => setAddForm((f) => ({ ...f, charges: e.target.value }))}
+                    placeholder={"Armed robbery\nEvading arrest"}
+                    className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -232,14 +335,31 @@ export default function AdminProfilesPage() {
               </button>
             </div>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
+                setPhotoError(null);
                 const fd = new FormData(e.currentTarget);
+                let photo: { fileBase64: string; originalFilename: string; mimeType: string } | undefined;
+                if (editPhoto) {
+                  try {
+                    photo = {
+                      fileBase64: await fileToBase64(editPhoto),
+                      originalFilename: editPhoto.name,
+                      mimeType: editPhoto.type || "application/octet-stream",
+                    };
+                  } catch {
+                    setPhotoError("Could not read the selected photo. Please try again.");
+                    return;
+                  }
+                }
                 updateProfile.mutate({
                   id: selected.id,
                   displayName: (fd.get("displayName") as string) || undefined,
+                  physicalDescription: (fd.get("physicalDescription") as string) || undefined,
+                  charges: linesToCharges(fd.get("charges") as string),
                   notes: (fd.get("notes") as string) || undefined,
                   status: fd.get("status") as never,
+                  photo,
                 });
               }}
             >
@@ -249,9 +369,47 @@ export default function AdminProfilesPage() {
                     {updateProfile.error?.message ?? addToWatchlist.error?.message ?? removeFromWatchlist.error?.message}
                   </p>
                 )}
+                {photoError && <p className="text-sm text-destructive">{photoError}</p>}
+                {selected.primaryFaceImageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selected.primaryFaceImageUrl}
+                    alt={selected.displayName ?? "Profile photo"}
+                    className="w-20 h-20 rounded-lg object-cover border border-border"
+                  />
+                )}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {selected.primaryFaceImageUrl ? "Replace Photo" : "Photo"}
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setEditPhoto(e.target.files?.[0] ?? null)}
+                    className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-muted file:text-sm file:font-medium hover:file:bg-muted/80"
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Display Name</label>
                   <input name="displayName" defaultValue={selected.displayName ?? ""} className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Physical Description</label>
+                  <textarea
+                    name="physicalDescription"
+                    defaultValue={physicalDescriptionOf(selected.attributes)}
+                    placeholder="Height, build, distinguishing marks, last known clothing..."
+                    className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm min-h-[60px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Charges (one per line)</label>
+                  <textarea
+                    name="charges"
+                    defaultValue={chargesToLines(selected.attributes)}
+                    placeholder={"Armed robbery\nEvading arrest"}
+                    className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm min-h-[60px]"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label>

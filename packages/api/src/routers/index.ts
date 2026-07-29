@@ -4,6 +4,7 @@ import { auditRouter } from "./audit";
 import { casesRouter } from "./cases";
 import { evidenceRouter } from "./evidence";
 import { organizationsRouter } from "./organizations";
+import { popiaRouter } from "./popia";
 import { profilesRouter } from "./profiles";
 import { rolesRouter } from "./roles";
 import { settingsRouter } from "./settings";
@@ -24,6 +25,7 @@ export const appRouter = router({
   alerts: alertsRouter,
   audit: auditRouter,
   settings: settingsRouter,
+  popia: popiaRouter,
 });
 
 export type AppRouter = typeof appRouter;

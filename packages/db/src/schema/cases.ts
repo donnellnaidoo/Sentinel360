@@ -78,6 +78,12 @@ export const investigationCase = pgTable("case", {
   createdByUserId: text("created_by_user_id").references(() => user.id, {
     onDelete: "set null",
   }),
+  // POPIA condition 6 (security safeguards): restricts read access to the
+  // assigned investigator and admin/super_admin — enforced in
+  // routers/cases.ts#assertCaseVisible, not just at the query-builder level,
+  // since sub-resource reads (notes, evidence, timeline, ...) all gate
+  // through the same case row.
+  isSensitive: boolean("is_sensitive").default(false).notNull(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
   resolutionNotes: text("resolution_notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

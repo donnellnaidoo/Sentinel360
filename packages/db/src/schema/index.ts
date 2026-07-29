@@ -7,3 +7,4 @@ export * from "./entities";
 export * from "./sightings";
 export * from "./alerts";
 export * from "./settings";
+export * from "./popia";

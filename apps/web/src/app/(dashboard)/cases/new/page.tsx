@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -8,12 +8,31 @@ import { queryClient, trpc } from "@/lib/trpc/client";
 
 const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
+const CASE_TYPE_OPTIONS = [
+  "Burglary",
+  "Robbery",
+  "Assault",
+  "Murder",
+  "Fraud",
+  "Cyber Intrusion",
+  "Drug-Related",
+  "Vehicle Theft",
+  "Missing Person",
+  "Domestic Violence",
+  "Other",
+] as const;
+
 export default function NewCasePage() {
   const router = useRouter();
-  const [caseType, setCaseType] = useState("");
+  const [caseType, setCaseType] = useState<(typeof CASE_TYPE_OPTIONS)[number] | "">("");
+  const [customCaseType, setCustomCaseType] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<(typeof PRIORITY_OPTIONS)[number]>("MEDIUM");
+  const [assignedToUserId, setAssignedToUserId] = useState("");
+  const [isSensitive, setIsSensitive] = useState(false);
+
+  const assignableQuery = useQuery(trpc.cases.listAssignableInvestigators.queryOptions());
 
   const createCase = useMutation(
     trpc.cases.create.mutationOptions({
@@ -30,7 +49,14 @@ export default function NewCasePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createCase.mutate({ caseType, title, description: description || undefined, priority });
+    createCase.mutate({
+      caseType: caseType === "Other" ? customCaseType : caseType,
+      title,
+      description: description || undefined,
+      priority,
+      assignedToUserId: assignedToUserId || undefined,
+      isSensitive,
+    });
   };
 
   return (
@@ -69,15 +95,32 @@ export default function NewCasePage() {
           <label className="font-label-caps text-label-caps text-on-surface-variant mb-1 block">
             Case Type
           </label>
-          <input
+          <select
             required
-            minLength={2}
-            maxLength={100}
             value={caseType}
-            onChange={(e) => setCaseType(e.target.value)}
+            onChange={(e) => setCaseType(e.target.value as (typeof CASE_TYPE_OPTIONS)[number])}
             className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-body-sm outline-none focus:border-primary"
-            placeholder="e.g. Burglary, Fraud, Cyber Intrusion"
-          />
+          >
+            <option value="" disabled>
+              Select a case type...
+            </option>
+            {CASE_TYPE_OPTIONS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          {caseType === "Other" && (
+            <input
+              required
+              minLength={2}
+              maxLength={100}
+              value={customCaseType}
+              onChange={(e) => setCustomCaseType(e.target.value)}
+              className="w-full mt-2 bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-body-sm outline-none focus:border-primary"
+              placeholder="Describe the case type"
+            />
+          )}
         </div>
 
         <div>
@@ -96,6 +139,36 @@ export default function NewCasePage() {
             ))}
           </select>
         </div>
+
+        <div>
+          <label className="font-label-caps text-label-caps text-on-surface-variant mb-1 block">
+            Assign Investigator (optional)
+          </label>
+          <select
+            value={assignedToUserId}
+            onChange={(e) => setAssignedToUserId(e.target.value)}
+            className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-body-sm outline-none focus:border-primary"
+          >
+            <option value="">Leave unassigned</option>
+            {assignableQuery.data?.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <label className="flex items-center gap-2.5 bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isSensitive}
+            onChange={(e) => setIsSensitive(e.target.checked)}
+          />
+          <span className="material-symbols-outlined text-base text-on-surface-variant">lock</span>
+          <span className="text-body-sm">
+            Sensitive case — restrict visibility to the assigned investigator and admins
+          </span>
+        </label>
 
         <div>
           <label className="font-label-caps text-label-caps text-on-surface-variant mb-1 block">

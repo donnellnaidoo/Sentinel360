@@ -16,6 +16,16 @@ const PRIORITY_STYLES: Record<string, { badge: string; match: string }> = {
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=900&q=70";
 
+function chargesOf(attributes: unknown): string[] {
+  const attrs = (attributes && typeof attributes === "object" ? attributes : {}) as Record<string, unknown>;
+  return Array.isArray(attrs.charges) ? attrs.charges.filter((c): c is string => typeof c === "string") : [];
+}
+
+function physicalDescriptionOf(attributes: unknown): string | undefined {
+  const attrs = (attributes && typeof attributes === "object" ? attributes : {}) as Record<string, unknown>;
+  return typeof attrs.physicalDescription === "string" ? attrs.physicalDescription : undefined;
+}
+
 export default function WantedFeedPage() {
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string | undefined>(undefined);
@@ -128,6 +138,18 @@ export default function WantedFeedPage() {
               </div>
               <div className="p-stack-md space-y-3">
                 {entry && <p className="text-body-sm text-on-surface-variant">{entry.reason}</p>}
+                {physicalDescriptionOf(subject.attributes) && (
+                  <p className="text-body-sm text-on-surface-variant line-clamp-2">{physicalDescriptionOf(subject.attributes)}</p>
+                )}
+                {chargesOf(subject.attributes).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {chargesOf(subject.attributes).map((charge) => (
+                      <span key={charge} className="bg-error/10 text-error text-[10px] font-bold uppercase px-2 py-0.5 rounded">
+                        {charge}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {!apprehended && (
                   <div className="pt-2 flex gap-3">
                     <button

@@ -20,6 +20,10 @@ export async function GET() {
     { count: criticalIncidents },
     { count: totalUsers },
     { count: totalSightings },
+    { count: lowSeverity },
+    { count: mediumSeverity },
+    { count: highSeverity },
+    { count: criticalSeverity },
     { data: recentCases },
   ] = await Promise.all([
     adminClient.from("case").select("*", { count: "exact", head: true }),
@@ -29,6 +33,10 @@ export async function GET() {
     adminClient.from("incident").select("*", { count: "exact", head: true }).eq("severity", "CRITICAL").neq("status", "CLOSED"),
     adminClient.from("user").select("*", { count: "exact", head: true }),
     adminClient.from("sighting").select("*", { count: "exact", head: true }),
+    adminClient.from("incident").select("*", { count: "exact", head: true }).eq("severity", "LOW"),
+    adminClient.from("incident").select("*", { count: "exact", head: true }).eq("severity", "MEDIUM"),
+    adminClient.from("incident").select("*", { count: "exact", head: true }).eq("severity", "HIGH"),
+    adminClient.from("incident").select("*", { count: "exact", head: true }).eq("severity", "CRITICAL"),
     adminClient.from("case").select("id, case_number, title, priority, status, updated_at").order("updated_at", { ascending: false }).limit(5),
   ]);
 
@@ -41,6 +49,12 @@ export async function GET() {
       totalCases: totalCases ?? 0,
       totalUsers: totalUsers ?? 0,
       totalSightings: totalSightings ?? 0,
+    },
+    severityDistribution: {
+      LOW: lowSeverity ?? 0,
+      MEDIUM: mediumSeverity ?? 0,
+      HIGH: highSeverity ?? 0,
+      CRITICAL: criticalSeverity ?? 0,
     },
     recentCases: recentCases ?? [],
   });

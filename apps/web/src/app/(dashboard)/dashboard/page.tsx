@@ -1,7 +1,11 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { trpc } from "@/lib/trpc/client";
 
 interface DashboardStats {
   stats: {
@@ -13,6 +17,12 @@ interface DashboardStats {
     totalUsers: number;
     totalSightings: number;
   };
+  severityDistribution: {
+    LOW: number;
+    MEDIUM: number;
+    HIGH: number;
+    CRITICAL: number;
+  };
   recentCases: Array<{
     id: string;
     case_number: string;
@@ -23,30 +33,39 @@ interface DashboardStats {
   }>;
 }
 
-const chartCategories = [
-  { label: "PROPERTY", outerH: "60%", innerH: "70%" },
-  { label: "CYBER", outerH: "85%", innerH: "80%" },
-  { label: "TRAFFIC", outerH: "40%", innerH: "90%" },
-  { label: "DRUGS", outerH: "70%", innerH: "45%" },
-  { label: "VIOLENT", outerH: "95%", innerH: "65%" },
-  { label: "OTHER", outerH: "50%", innerH: "75%" },
-];
-
-const timeline = [
-  { icon: "add_circle", iconBg: "bg-primary-container/20", iconColor: "text-primary", fill: true, title: "New Evidence Logged", desc: "Case #SEN-0042. Filed by analyst Vance.", time: "2 mins ago" },
-  { icon: "warning", iconBg: "bg-tertiary-container/20", iconColor: "text-tertiary", fill: true, title: "Facial Match Alert", desc: "Sightings node 7-B triggered POI match.", time: "15 mins ago" },
-  { icon: "check_circle", iconBg: "bg-secondary-container/20", iconColor: "text-secondary", fill: true, title: "Case Resolved", desc: "Case #SEN-0031 status changed to Closed.", time: "1 hr ago" },
-  { icon: "login", iconBg: "bg-on-surface-variant/10", iconColor: "text-on-surface-variant", fill: false, title: "Login Event", desc: "Admin login from IP 192.168.1.105", time: "2 hrs ago" },
+const SEVERITY_BARS: Array<{ key: keyof DashboardStats["severityDistribution"]; label: string }> = [
+  { key: "LOW", label: "LOW" },
+  { key: "MEDIUM", label: "MEDIUM" },
+  { key: "HIGH", label: "HIGH" },
+  { key: "CRITICAL", label: "CRITICAL" },
 ];
 
 const quickActions = [
-  { icon: "lock_person", label: "Lockdown Zone" },
-  { icon: "emergency_share", label: "Broadcast Alert" },
-  { icon: "person_alert", label: "Trace Signal" },
-  { icon: "history_edu", label: "Generate Report" },
-];
+  { icon: "emergency_share", label: "Broadcast Alert", href: "/alerts" },
+  { icon: "inventory_2", label: "Evidence Locker", href: "/evidence" },
+  { icon: "visibility", label: "Sightings Queue", href: "/sightings" },
+  { icon: "person_search", label: "Wanted Feed", href: "/wanted-feed" },
+] as const;
 
-function humanTime(dateStr: string): string {
+function activityIcon(eventType: string): { icon: string; iconBg: string; iconColor: string; fill: boolean } {
+  const t = eventType.toUpperCase();
+  if (t.includes("ALERT")) return { icon: "warning", iconBg: "bg-tertiary-container/20", iconColor: "text-tertiary", fill: true };
+  if (t.includes("SIGHTING")) return { icon: "visibility", iconBg: "bg-primary-container/20", iconColor: "text-primary", fill: true };
+  if (t.includes("EVIDENCE")) return { icon: "inventory_2", iconBg: "bg-primary-container/20", iconColor: "text-primary", fill: true };
+  if (t.includes("ARREST") || t.includes("HEARING") || t.includes("PROSECUTION")) return { icon: "gavel", iconBg: "bg-secondary-container/20", iconColor: "text-secondary", fill: true };
+  if (t.includes("CASE") || t.includes("STATUS") || t.includes("INVESTIGATOR") || t.includes("NOTE")) return { icon: "folder", iconBg: "bg-secondary-container/20", iconColor: "text-secondary", fill: true };
+  if (t.includes("POPIA")) return { icon: "privacy_tip", iconBg: "bg-on-surface-variant/10", iconColor: "text-on-surface-variant", fill: false };
+  return { icon: "history", iconBg: "bg-on-surface-variant/10", iconColor: "text-on-surface-variant", fill: false };
+}
+
+function activityTitle(eventType: string): string {
+  return eventType
+    .replace(/[._]/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function humanTime(dateStr: string | Date): string {
   const d = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
@@ -61,16 +80,17 @@ const priorityConfig: Record<string, { label: string; class: string }> = {
   CRITICAL: { label: "Critical", class: "bg-error/10 text-error" },
   HIGH: { label: "High", class: "bg-tertiary/10 text-tertiary" },
   MEDIUM: { label: "Medium", class: "bg-primary-container/20 text-primary" },
-  LOW: { label: "Low", class: "bg-surface-container-high text-outline" },
+  LOW: { label: "Low", class: "bg-surface-container-high text-on-surface-variant" },
 };
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   OPEN: { label: "Active Investigation", class: "bg-primary-container/20 text-primary" },
   CLOSED: { label: "Closed", class: "bg-secondary-container/20 text-secondary" },
-  ARCHIVED: { label: "Archived", class: "bg-surface-container-high text-outline" },
+  ARCHIVED: { label: "Archived", class: "bg-surface-container-high text-on-surface-variant" },
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -81,11 +101,21 @@ export default function DashboardPage() {
       .catch(() => setLoading(false));
   }, []);
 
+  const activity = useQuery({
+    ...trpc.audit.list.queryOptions({ limit: 5, offset: 0 }),
+    retry: false,
+  });
+  const activityItems = activity.data?.items ?? [];
+
+  const maxSeverityCount = data
+    ? Math.max(1, ...SEVERITY_BARS.map((b) => data.severityDistribution[b.key]))
+    : 1;
+
   const stats = data
     ? [
         { label: "ACTIVE CASES", value: data.stats.activeCases.toLocaleString(), change: `+${Math.min(data.stats.activeCases, 10)}%`, changeClass: "text-secondary", sub: `${data.stats.activeCases} open investigations`, border: "border-primary" },
         { label: "PENDING ALERTS", value: data.stats.pendingAlerts.toLocaleString(), change: `+${data.stats.pendingAlerts}`, changeClass: "text-error", sub: "Requiring immediate review", border: "border-tertiary" },
-        { label: "OPEN EVIDENCE", value: data.stats.openEvidence.toLocaleString(), change: "Stable", changeClass: "text-outline", sub: "Digital/Physical assets", border: "border-secondary" },
+        { label: "OPEN EVIDENCE", value: data.stats.openEvidence.toLocaleString(), change: "Stable", changeClass: "text-on-surface-variant", sub: "Digital/Physical assets", border: "border-secondary" },
         { label: "CRITICAL THREATS", value: String(data.stats.criticalThreats).padStart(2, "0"), badge: data.stats.criticalThreats > 0 ? "Severe" : undefined, sub: "Level 5 incidents", border: "border-error" },
       ]
     : [];
@@ -98,28 +128,18 @@ export default function DashboardPage() {
           <p className="text-on-surface-variant mt-1">Real-time situational awareness for Precinct 07 operations.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="bg-surface-container-highest text-primary px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary-container/20 transition-all">
+          <Link href="/cases" className="bg-surface-container-highest text-primary px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary-container/20 transition-all">
             <span className="material-symbols-outlined text-[20px]">filter_list</span>
             <span>Adjust Filters</span>
-          </button>
-          <button className="bg-primary text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm hover:shadow-md transition-all">
+          </Link>
+          <Link href="/cases/new" className="bg-primary text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm hover:shadow-md transition-all">
             <span className="material-symbols-outlined text-[20px]">add</span>
             <span>New Investigation</span>
-          </button>
+          </Link>
         </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-surface-container-lowest rounded-xl p-6 border-l-4 border-outline-variant animate-pulse">
-              <div className="h-3 w-24 bg-surface-container-high rounded" />
-              <div className="h-8 w-20 bg-surface-container-high rounded mt-3" />
-              <div className="h-3 w-32 bg-surface-container-high rounded mt-3" />
-            </div>
-          ))}
-        </div>
-      ) : (
+      {!loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
           {stats.map((stat) => (
             <div key={stat.label} className={`bg-surface-container-lowest rounded-xl p-6 border-l-4 ${stat.border} shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all duration-200`}>
@@ -133,7 +153,7 @@ export default function DashboardPage() {
                   <span className="bg-error/10 text-error px-2 py-0.5 rounded text-[10px] font-bold uppercase">{stat.badge}</span>
                 )}
               </div>
-              <p className="text-body-sm text-outline mt-1">{stat.sub}</p>
+              <p className="text-body-sm text-on-surface-variant mt-1">{stat.sub}</p>
             </div>
           ))}
         </div>
@@ -143,43 +163,83 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 bg-surface-container-lowest rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all duration-200 flex flex-col h-[400px]">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h4 className="font-headline-md text-headline-md">Crime Statistics</h4>
-              <p className="text-body-sm text-outline">Incident distribution by category (Last 30 days)</p>
+              <h4 className="font-headline-md text-headline-md">Incident Severity</h4>
+              <p className="text-body-sm text-on-surface-variant">Recorded incidents grouped by severity level</p>
             </div>
-            <select className="bg-surface-container-low border-none rounded-lg text-body-sm px-3 py-1.5 focus:ring-2 focus:ring-primary">
-              <option>Monthly View</option>
-              <option>Weekly View</option>
-            </select>
           </div>
-          <div className="flex-1 flex items-end justify-between gap-4 pt-4 px-2">
-            {chartCategories.map((cat) => (
-              <div key={cat.label} className="flex flex-col items-center flex-1 gap-2 group">
-                <div
-                  className="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all"
-                  style={{ height: cat.outerH }}
-                >
-                  <div className="w-full bg-primary rounded-t-lg transition-all" style={{ height: cat.innerH }} />
+          {loading ? (
+            <div className="flex-1 flex items-end justify-between gap-4 pt-4 px-2 animate-pulse">
+              {SEVERITY_BARS.map((bar, i) => (
+                <div key={bar.key} className="flex flex-col items-center flex-1 gap-2 h-full justify-end">
+                  <div className="h-4 w-6 bg-surface-container-high rounded" />
+                  <div
+                    className="w-full bg-surface-container-high rounded-t-lg"
+                    style={{ height: `${25 + (i % 2) * 20}%` }}
+                  />
+                  <div className="h-2.5 w-10 bg-surface-container-high rounded" />
                 </div>
-                <span className="text-[10px] font-bold text-outline">{cat.label}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 flex items-end justify-between gap-4 pt-4 px-2">
+              {SEVERITY_BARS.map((bar) => {
+                const value = data?.severityDistribution[bar.key] ?? 0;
+                const pct = Math.max((value / maxSeverityCount) * 100, value > 0 ? 6 : 2);
+                return (
+                  <div key={bar.key} className="flex flex-col items-center flex-1 gap-2 group h-full justify-end">
+                    <span className="text-body-sm font-bold text-on-surface">{value}</span>
+                    <div
+                      className="w-full bg-primary-container/20 rounded-t-lg relative flex items-end justify-center group-hover:bg-primary-container/40 transition-all"
+                      style={{ height: "100%" }}
+                    >
+                      <div className="w-full bg-primary rounded-t-lg transition-all" style={{ height: `${pct}%` }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-on-surface-variant">{bar.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all duration-200 flex flex-col h-[400px]">
           <h4 className="font-headline-md text-headline-md mb-6">Recent Activity</h4>
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-            {timeline.map((item, i) => (
-              <div key={i} className="relative pl-8">
-                <div className={`absolute left-0 top-0 w-6 h-6 ${item.iconBg} rounded-full flex items-center justify-center`}>
-                  <span className={`material-symbols-outlined ${item.iconColor} text-[14px]`} style={item.fill ? { fontVariationSettings: "'FILL' 1" } : undefined}>{item.icon}</span>
-                </div>
-                {i < timeline.length - 1 && <div className="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-outline-variant" />}
-                <p className="text-body-sm font-bold">{item.title}</p>
-                <p className="text-[12px] text-outline">{item.desc}</p>
-                <span className="text-[10px] text-primary-fixed-dim font-bold mt-1">{item.time}</span>
+            {activity.isLoading && (
+              <div className="space-y-6 animate-pulse">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="relative pl-8">
+                    <div className="absolute left-0 top-0 w-6 h-6 bg-surface-container-high rounded-full" />
+                    {i < 3 && <div className="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-outline-variant" />}
+                    <div className="h-3 w-32 bg-surface-container-high rounded" />
+                    <div className="h-2.5 w-40 bg-surface-container-high rounded mt-2" />
+                    <div className="h-2 w-16 bg-surface-container-high rounded mt-2" />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {activity.isError && (
+              <p className="text-body-sm text-on-surface-variant">Recent activity requires elevated access.</p>
+            )}
+            {!activity.isLoading && !activity.isError && activityItems.length === 0 && (
+              <p className="text-body-sm text-on-surface-variant">No recent activity recorded.</p>
+            )}
+            {activityItems.map((item, i) => {
+              const cfg = activityIcon(item.eventType);
+              const target = item.targetEntityType ? item.targetEntityType.toLowerCase().replace(/_/g, " ") : undefined;
+              const desc = `${item.actorName ?? "System"}${target ? ` — ${target}` : ""}`;
+              return (
+                <div key={item.id} className="relative pl-8">
+                  <div className={`absolute left-0 top-0 w-6 h-6 ${cfg.iconBg} rounded-full flex items-center justify-center`}>
+                    <span className={`material-symbols-outlined ${cfg.iconColor} text-[14px]`} style={cfg.fill ? { fontVariationSettings: "'FILL' 1" } : undefined}>{cfg.icon}</span>
+                  </div>
+                  {i < activityItems.length - 1 && <div className="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-outline-variant" />}
+                  <p className="text-body-sm font-bold">{activityTitle(item.eventType)}</p>
+                  <p className="text-[12px] text-on-surface-variant">{desc}</p>
+                  <span className="text-[10px] text-primary-fixed-dim font-bold mt-1">{humanTime(item.createdAt)}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -203,13 +263,25 @@ export default function DashboardPage() {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {loading ? (
-                  <tr><td colSpan={5} className="px-6 py-12 text-center text-outline">Loading...</td></tr>
+                  [0, 1, 2, 3, 4].map((i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-6 py-4"><div className="h-3 w-16 bg-surface-container-high rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-40 bg-surface-container-high rounded" /></td>
+                      <td className="px-6 py-4"><div className="h-4 w-14 bg-surface-container-high rounded-full" /></td>
+                      <td className="px-6 py-4"><div className="h-4 w-24 bg-surface-container-high rounded-full" /></td>
+                      <td className="px-6 py-4"><div className="h-3 w-20 bg-surface-container-high rounded" /></td>
+                    </tr>
+                  ))
                 ) : data && data.recentCases.length > 0 ? (
                   data.recentCases.map((c) => {
-                    const pc = priorityConfig[c.priority] ?? { label: c.priority, class: "bg-surface-container-high text-outline" };
-                    const sc = statusConfig[c.status] ?? { label: c.status, class: "bg-surface-container-high text-outline" };
+                    const pc = priorityConfig[c.priority] ?? { label: c.priority, class: "bg-surface-container-high text-on-surface-variant" };
+                    const sc = statusConfig[c.status] ?? { label: c.status, class: "bg-surface-container-high text-on-surface-variant" };
                     return (
-                      <tr key={c.id} className="hover:bg-surface-container-low transition-colors cursor-pointer">
+                      <tr
+                        key={c.id}
+                        className="hover:bg-surface-container-low transition-colors cursor-pointer"
+                        onClick={() => router.push(`/docket/${c.id}`)}
+                      >
                         <td className="px-6 py-4 text-body-sm font-bold text-primary">{c.case_number}</td>
                         <td className="px-6 py-4 text-body-sm">{c.title}</td>
                         <td className="px-6 py-4">
@@ -218,12 +290,12 @@ export default function DashboardPage() {
                         <td className="px-6 py-4">
                           <span className={`${sc.class} px-2 py-0.5 rounded text-[10px] font-bold uppercase`}>{sc.label}</span>
                         </td>
-                        <td className="px-6 py-4 text-body-sm text-outline">{humanTime(c.updated_at)}</td>
+                        <td className="px-6 py-4 text-body-sm text-on-surface-variant">{humanTime(c.updated_at)}</td>
                       </tr>
                     );
                   })
                 ) : (
-                  <tr><td colSpan={5} className="px-6 py-12 text-center text-outline">No cases found</td></tr>
+                  <tr><td colSpan={5} className="px-6 py-12 text-center text-on-surface-variant">No cases found</td></tr>
                 )}
               </tbody>
             </table>
@@ -232,19 +304,20 @@ export default function DashboardPage() {
 
         <div className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] flex flex-col">
           <h4 className="font-headline-md text-headline-md mb-2">Quick Actions</h4>
-          <p className="text-body-sm text-outline mb-6">Immediate tactical triggers for verified personnel.</p>
+          <p className="text-body-sm text-on-surface-variant mb-6">Jump straight to the tools you use most.</p>
           <div className="space-y-3 flex-1">
             {quickActions.map((action) => (
-              <button
+              <Link
                 key={action.label}
+                href={action.href}
                 className="w-full flex items-center justify-between p-3 bg-surface-container-low rounded-xl hover:bg-primary-container/10 transition-all border border-transparent hover:border-primary-container group"
               >
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">{action.icon}</span>
                   <span className="font-medium text-body-sm">{action.label}</span>
                 </div>
-                <span className="material-symbols-outlined text-outline text-[18px]">chevron_right</span>
-              </button>
+                <span className="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_right</span>
+              </Link>
             ))}
           </div>
           <div className="mt-6 pt-6 border-t border-outline-variant">

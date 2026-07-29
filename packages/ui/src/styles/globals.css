@@ -7,24 +7,24 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f8f9ff;
-  --foreground: #0b1c30;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #00677e;
+  --background: #f2f6fa;
+  --foreground: #2a3547;
+  --card: #ffffff;
+  --card-foreground: #2a3547;
+  --popover: #ffffff;
+  --popover-foreground: #2a3547;
+  --primary: #5d87ff;
   --primary-foreground: #ffffff;
-  --secondary: #006d37;
+  --secondary: #49beff;
   --secondary-foreground: #ffffff;
-  --muted: #eff4ff;
-  --muted-foreground: #3c494e;
-  --accent: #00d4ff;
-  --accent-foreground: #00586b;
-  --destructive: #ba1a1a;
-  --border: #bbc9cf;
-  --input: #bbc9cf;
-  --ring: #00677e;
+  --muted: #f2f6fa;
+  --muted-foreground: #5a6a85;
+  --accent: #ecf2ff;
+  --accent-foreground: #4570ea;
+  --destructive: #fa896b;
+  --border: #dfe5ef;
+  --input: #dfe5ef;
+  --ring: #5d87ff;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
@@ -40,19 +40,19 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Sentinel360 prototype tokens - light */
-  --primary: #00677e;
+  /* Sentinel360 prototype tokens - light (Modernize blue palette) */
+  --primary: #5d87ff;
   --on-primary: #ffffff;
-  --primary-container: #00d4ff;
-  --on-primary-container: #00586b;
-  --primary-fixed: #b4ebff;
-  --on-primary-fixed: #001f27;
-  --primary-fixed-dim: #3cd7ff;
-  --on-primary-fixed-variant: #004e5f;
-  --secondary-fixed: #60ff99;
-  --on-secondary-fixed: #00210c;
-  --secondary-fixed-dim: #00e479;
-  --on-secondary-fixed-variant: #005228;
+  --primary-container: #ecf2ff;
+  --on-primary-container: #4570ea;
+  --primary-fixed: #ecf2ff;
+  --on-primary-fixed: #2a3547;
+  --primary-fixed-dim: #4570ea;
+  --on-primary-fixed-variant: #4570ea;
+  --secondary-fixed: #e8f7ff;
+  --on-secondary-fixed: #002b3d;
+  --secondary-fixed-dim: #49beff;
+  --on-secondary-fixed-variant: #23afdb;
   --tertiary: #825500;
   --on-tertiary: #ffffff;
   --tertiary-container: #ffb440;
@@ -61,26 +61,26 @@
   --on-tertiary-fixed: #291800;
   --tertiary-fixed-dim: #ffb952;
   --on-tertiary-fixed-variant: #633f00;
-  --error-container: #ffdad6;
-  --on-error-container: #93000a;
-  --surface: #f8f9ff;
-  --on-surface: #0b1c30;
-  --surface-dim: #cbdbf5;
-  --surface-bright: #f8f9ff;
+  --error-container: #fdede8;
+  --on-error-container: #f3704d;
+  --surface: #ffffff;
+  --on-surface: #2a3547;
+  --surface-dim: #dfe5ef;
+  --surface-bright: #ffffff;
   --surface-container-lowest: #ffffff;
-  --surface-container-low: #eff4ff;
-  --surface-container: #e5eeff;
-  --surface-container-high: #dce9ff;
-  --surface-container-highest: #d3e4fe;
-  --surface-variant: #d3e4fe;
-  --on-surface-variant: #3c494e;
-  --surface-tint: #00677e;
-  --on-background: #0b1c30;
-  --outline: #6c797f;
-  --outline-variant: #bbc9cf;
-  --inverse-surface: #213145;
-  --inverse-on-surface: #eaf1ff;
-  --inverse-primary: #3cd7ff;
+  --surface-container-low: #f2f6fa;
+  --surface-container: #eaeff4;
+  --surface-container-high: #dfe5ef;
+  --surface-container-highest: #d7deea;
+  --surface-variant: #eaeff4;
+  --on-surface-variant: #5a6a85;
+  --surface-tint: #5d87ff;
+  --on-background: #2a3547;
+  --outline: #7c8fac;
+  --outline-variant: #dfe5ef;
+  --inverse-surface: #2a3547;
+  --inverse-on-surface: #f2f6fa;
+  --inverse-primary: #4570ea;
 }
 
 .dark {
@@ -156,7 +156,7 @@
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", sans-serif;
+  --font-sans: var(--font-plus-jakarta), "Inter Variable", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -208,7 +208,7 @@
   --color-on-tertiary-fixed: var(--on-tertiary-fixed);
   --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
   --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
-  --color-error: #ba1a1a;
+  --color-error: #fa896b;
   --color-on-error: #ffffff;
   --color-error-container: var(--error-container);
   --color-on-error-container: var(--on-error-container);
@@ -232,14 +232,14 @@
   --color-inverse-primary: var(--inverse-primary);
 
   /* Font family tokens */
-  --font-body-lg: "Inter Variable", sans-serif;
-  --font-headline-lg: "Inter Variable", sans-serif;
-  --font-body-md: "Inter Variable", sans-serif;
-  --font-label-caps: "Inter Variable", sans-serif;
-  --font-headline-md: "Inter Variable", sans-serif;
-  --font-headline-xl: "Inter Variable", sans-serif;
-  --font-body-sm: "Inter Variable", sans-serif;
-  --font-headline-xl-mobile: "Inter Variable", sans-serif;
+  --font-body-lg: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-headline-lg: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-body-md: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-label-caps: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-headline-md: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-headline-xl: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-body-sm: var(--font-plus-jakarta), "Inter Variable", sans-serif;
+  --font-headline-xl-mobile: var(--font-plus-jakarta), "Inter Variable", sans-serif;
 
   /* Font size tokens */
   --text-headline-xl: 36px;
