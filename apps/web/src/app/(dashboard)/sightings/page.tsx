@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-// import { queryClient, trpc } from "@/lib/trpc/client";
+import { queryClient } from "@/lib/trpc/client";
 import { createClient } from "@/lib/supabase/client";
 
 const PAGE_SIZE = 12;
@@ -41,6 +41,7 @@ async function fetchSightings({
      .select(
       `
         sighting_id,
+        created_by,
         criminal_id,
         location,
         description,
@@ -49,7 +50,17 @@ async function fetchSightings({
         image,
         timestamp,
         created_at,
-        updated_at
+        updated_at,
+        moderation_status,
+        moderation_reason,
+        moderated_by,
+        moderated_at,
+        author:User!Sighting_created_by_fkey (
+          user_id,
+          name,
+          email,
+          avatar_url
+        )
       `,
       {
         count: "exact",
@@ -84,8 +95,15 @@ async function fetchSightings({
       throw new Error(error.message);
      }
 
+     const rows = (data ?? []) as SightingQueryRow[];
+
+     const items: Sighting[] = rows.map((row) => ({
+      ...row,
+      author: row.author?.[0] ?? null,
+     }))
+
      return {
-      items: (data ?? []) as Sighting[],
+      items,
       total: count ?? 0,
      };
 }
@@ -105,8 +123,30 @@ async function fetchSightings({
 //   REJECTED: "bg-error-container/20 text-error",
 // };
 
+type SightingAuthor = {
+  user_id: string;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+};
+
+type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+const MODERATION_STATUS_STYLES: Record<ModerationStatus, string> = {
+  PENDING: "bg-amber-100 text-amber-800 border-amber-200",
+  APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  REJECTED: "bg-red-100 text-red-800 border-red-200",
+};
+
+const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
 type Sighting = {
   sighting_id: string;
+  created_by: string | null;
   criminal_id: string | null;
   location: string | null;
   latitude: number | null;
@@ -116,14 +156,241 @@ type Sighting = {
   created_at: string;
   updated_at: string;
   description: string;
+
+  moderation_status: ModerationStatus;
+  moderation_reason: string | null;
+  moderated_by: string | null;
+  moderated_at: string | null;
+
+  author: SightingAuthor | null;
 };
+
+type SightingQueryRow = Omit<Sighting, "author"> & {
+  author: SightingAuthor[] | null;
+};
+
+function DetailSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return(
+    <section>
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+        {title}
+      </h4>
+
+      {children}
+    </section>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  mono = false,
+} : {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return(
+    <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+        {label}
+      </p>
+
+      <p className={`break-all text-sm text-on-surface ${
+        mono ? "font-mono" : ""
+      }`}>
+
+        {value}
+      </p>
+    </div>
+  );
+}
+
+type ModerateSightingInput = {
+  sightingId: string;
+  authorId: string | null;
+  decision: "APPROVED" | "REJECTED";
+  reason: string;
+  location: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+async function moderateSighting({
+  sightingId,
+  authorId,
+  decision,
+  reason,
+  location,
+  latitude,
+  longitude,
+}: ModerateSightingInput): Promise<void> {
+  const supabase = createClient();
+
+  const {
+    data: { user: adminUser },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    throw new Error(userError.message);
+  }
+
+  if (!adminUser) {
+    throw new Error(
+      "You must be logged in to moderate a sighting.",
+    );
+  }
+
+  const now = new Date().toISOString();
+  const cleanedReason = reason.trim();
+  const approved = decision === "APPROVED";
+
+  const { error: updateError } = await supabase
+    .from("Sighting")
+    .update({
+      moderation_status: decision,
+      moderation_reason: cleanedReason || null,
+      moderated_by: adminUser.id,
+      moderated_at: now,
+      updated_at: now,
+    })
+    .eq("sighting_id", sightingId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  const alertsToCreate = [
+    // Personal alert for the sighting author
+    ...(authorId
+      ? [
+        {
+          user_id: authorId,
+          created_by: adminUser.id,
+          sighting_id: sightingId,
+          audience: "PERSONAL",
+
+          alert_type: approved
+            ? "SIGHTING_APPROVED"
+            : "SIGHTING_REJECTED",
+
+          title: approved
+            ? "Your sighting was approved"
+            : "Your sighting was rejected",
+
+          message: approved
+            ? cleanedReason
+              ? `Your sighting was approved. Note: ${cleanedReason}`
+              : "Your submitted sighting was reviewed and approved."
+            : cleanedReason
+              ? `Your sighting was rejected. Reason: ${cleanedReason}`
+              : "Your submitted sighting was reviewed and could not be confirmed.",
+
+          location,
+          latitude:
+            latitude === null
+              ? null
+              : String(latitude),
+          longitude:
+            longitude === null
+              ? null
+              : String(longitude),
+
+          is_read: false,
+          created_at: now,
+          updated_at: now,
+        },
+      ]
+      : []),
+
+    // Community alert for all approved sightings
+    ...(approved
+      ? [
+        {
+          user_id: null,
+          created_by: adminUser.id,
+          sighting_id: sightingId,
+          audience: "COMMUNITY",
+          alert_type:
+            "COMMUNITY_SIGHTING_APPROVED",
+
+          title: "Community Sighting Confirmed",
+
+          message: cleanedReason
+            ? `A community sighting was confirmed. Note: ${cleanedReason}`
+            : "A community sighting was reviewed and confirmed.",
+
+          location,
+          latitude:
+            latitude === null
+              ? null
+              : String(latitude),
+          longitude:
+            longitude === null
+              ? null
+              : String(longitude),
+
+          is_read: false,
+          created_at: now,
+          updated_at: now,
+        },
+      ]
+      : []),
+  ];
+
+  if (alertsToCreate.length === 0) {
+    return;
+  }
+
+  console.log(
+    "Alerts being inserted:",
+    alertsToCreate,
+  );
+
+  const { data: insertedAlerts, error: alertError } =
+    await supabase
+      .from("Alert")
+      .insert(alertsToCreate)
+      .select();
+
+  console.log("Alert insertion result:", {
+    insertedAlerts,
+    alertError,
+  });
+
+  if (alertError) {
+    throw new Error(
+      `The sighting was moderated, but alerts could not be created: ${alertError.message}`,
+    );
+  }
+}
 
 export default function SightingsPage() {
   const [search, setSearch] = useState("");
   // const [status, setStatus] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Sighting | null>(null);
+  const [moderationReason, setModerationReason] = useState("");
   // const [notes, setNotes] = useState("");
+  const moderationMutation = useMutation({
+    mutationFn: moderateSighting,
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["sightings"],
+      });
+
+      setSelected(null);
+      setModerationReason("");
+    },
+  });
 
   const {
     data,
@@ -139,6 +406,8 @@ export default function SightingsPage() {
         page,
       }),
   });
+
+
 
   // const { data, isLoading, isError, error } = useQuery(trpc.sightings.list.queryOptions(input));
 
@@ -206,14 +475,25 @@ export default function SightingsPage() {
         {data?.items.map((item) => (
           <button
             key={item.sighting_id}
+            type="button"
             onClick={() => {
-              setSelected(item as Sighting);
+              setSelected(item);
+              setModerationReason(item.moderation_reason ?? "");
             }}
             className="w-full text-left bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant hover:shadow-md transition-all p-6 flex items-start justify-between gap-4"
           >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-label-caps font-mono text-on-surface-variant">{item.sighting_id.slice(0, 8).toUpperCase()}</span>
+
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${MODERATION_STATUS_STYLES[item.moderation_status]
+                    }`}
+                >
+                  {MODERATION_STATUS_LABELS[item.moderation_status]}
+                </span>
+
+
                 {item.image && (
                   <span className="material-symbols-outlined text-on-surface-variant text-sm">
                     photo_camera
@@ -221,7 +501,7 @@ export default function SightingsPage() {
                 )}
               </div>
 
-              <p className="text-on-surface text-body-md">{item.description || "No description given."}</p>
+              <p className="text-on-surface text-body-md line-clamp-2">{item.description || "No description given."}</p>
 
               <p className="text-on-surface text-body-md">{item.location ?? "No location given."}</p>
 
@@ -271,52 +551,193 @@ export default function SightingsPage() {
 
       {selected && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
-          <div className="bg-surface rounded-xl w-full max-w-lg shadow-2xl relative z-10 border border-outline-variant">
-            <div className="p-5 border-b border-outline-variant flex justify-between items-center">
-              {/* <h3 className="font-semibold text-on-surface">{selected.referenceCode}</h3> */}
-              <button onClick={() => setSelected(null)} className="p-1 hover:bg-surface-container rounded-lg transition-colors">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-on-surface text-body-md whitespace-pre-wrap">{selected.description}</p>
-              <div>
-                <label className="text-label-caps text-on-surface-variant uppercase block mb-1.5">
-                  Verification notes
-                </label>
-                <textarea
-                  // value={notes}
-                  // onChange={(e) => setNotes(e.target.value)}
-                  className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm bg-surface-container-low min-h-[80px]"
-                  placeholder="Optional notes for this decision..."
-                />
+            <button
+              type="button"
+              aria-label="Close Sighting Details"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSelected(null)}
+            /> 
+
+            <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant bg-surface shadow-2xl">
+
+              {/* Header */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant bg-surface p-5">
+                <div>
+                  <h3 className="font-semibold text-on-surface">
+                    Sighting Details
+                  </h3>
+
+                  <p className="mt-1 font-mono text-xs text-on-surface-variant">
+                    {selected.sighting_id}
+                  </p>
+                </div>
+
+                <button type="button" onClick={() => {setSelected(null); setModerationReason("")}} className="rounded-lg p-1.5 transition-colors hover:bg-surface-container">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
               </div>
+
+              {/* Sighting Details */}
+              {/* Description */}
+              <div className="space-y-6 p-6">
+                <DetailSection title="Description">
+                  <p className="whitespace-pre-wrap text-body-md text-on-surface">
+                    {selected.description || "No description given."}
+                  </p>
+                </DetailSection>
+
+                {/* Location */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailField label="Location" value={selected.location ?? "Not supplied"}/>
+
+                  <DetailField label="Submitted" value={new Date(selected.timestamp ?? selected.created_at,).toLocaleString()}/>
+
+                  <DetailField label="Criminal reference" value={selected.criminal_id ?? "Not linked"} mono={Boolean(selected.criminal_id)}/>
+                </div>
+
+                {/* Coordinates */}
+                <DetailSection title="Coordinates">
+                  {selected.latitude !== null && selected.longitude !== null ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-on-surface">
+                        Latitude: {selected.latitude}
+                      </p>
+
+                      <p className="text-sm text-on-surface">
+                        Longitude: {selected.longitude}
+                      </p>
+
+                      <a
+                        href={`https://www.google.com/maps?q=${selected.latitude}, ${selected.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          map
+                        </span>
+                        Open location in Google Maps
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-on-surface-variant">
+                      No coordinates given
+                    </p>
+                  )}
+                </DetailSection>
+
+                  {/* Submitted Image */}
+                <DetailSection title="Submitted image">
+                  {selected.image ? (
+                    <img
+                      src={selected.image}
+                      alt="Submitted sighting evidencec"
+                      className="max-h-[420px] w-full rounded-lg border-outline-variant object-contain"
+                    />
+                  ) : (
+                    <p className="text-sm text-on-surface-variant">
+                      No image given
+                    </p>
+                  )}
+                </DetailSection>
+
+                {/* Submitted By */}
+                <DetailField 
+                  label="Submitted by"
+                  value={
+                      selected.author
+                      ?  `${selected.author.name} (${selected.author.email})`
+                      : selected.created_by ?? "Unknown user"
+                  }
+                />
+
+                <DetailSection title="Moderation Status">
+                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                    MODERATION_STATUS_STYLES[selected.moderation_status]
+                  }`}>
+
+                    {MODERATION_STATUS_LABELS[selected.moderation_status]}
+                  </span>
+                </DetailSection>
+
+                <DetailSection title="Moderation Notes">
+                  <textarea 
+                    value={moderationReason}
+                    onChange={(e) => setModerationReason(e.target.value)}
+                    placeholder="Enter the reason for approving or rejecting this sighting..."
+                    className="w-full min-h-[100px] rounded-lg border border-outline-variant bg-surface-container-low px-3"
+                  >
+                  </textarea>
+                </DetailSection>
+              </div>
+
+              {/* Admin Rejection & Approval */}
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-outline-variant bg-surface p-5">
+
+                  {selected.moderation_status !== "PENDING" && (
+                    <p className="mr-auto text-sm text-on-surface-variant">
+                      This sighting has already been moderated.
+                    </p>
+                  )}
+
+                  {moderationMutation.isError && (
+                    <p className="text-sm text-error">
+                      Failed to update sighting: {moderationMutation.error.message}
+                    </p>
+                  )}
+
+                  {/* Reject Sighting Button */}
+                  <button 
+                  type="button" 
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-error transition-colors hover:bg-error-container/10"
+                  disabled={moderationMutation.isPending || selected.moderation_status !== "PENDING"}
+                  onClick={() => {
+                    if(!selected) return;
+
+                    moderationMutation.mutate({
+                      sightingId: selected.sighting_id,
+                      authorId: selected.created_by,
+                      decision: "REJECTED",
+                      reason: moderationReason,
+                      location: selected.location,
+                      latitude: selected.latitude,
+                      longitude: selected.longitude,
+                    });
+                  }}
+                  >
+                    {moderationMutation.isPending
+                      ? "Saving..."
+                      : "Reject Sighting"
+                    } 
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary/90"
+                    disabled={moderationMutation.isPending || selected.moderation_status !== "PENDING"}
+                    onClick={() => {
+                      if(!selected) return;
+
+                      moderationMutation.mutate({
+                        sightingId: selected.sighting_id,
+                        authorId: selected.created_by,
+                        decision: "APPROVED",
+                        reason: moderationReason,
+                        location: selected.location,
+                        latitude: selected.latitude,
+                        longitude: selected.longitude,
+                      });
+                    }}
+                  >
+                    {moderationMutation.isPending
+                      ? "Saving..."
+                      : "Approve Sighting"
+                    }
+                  </button>
+              </div>
+
             </div>
-            <div className="p-5 border-t border-outline-variant flex flex-wrap justify-end gap-2">
-              <button
-                // disabled={verify.isPending}
-                // onClick={() => verify.mutate({ id: selected.id, decision: "REJECTED", notes })}
-                className="px-4 py-2 text-sm font-medium text-error hover:bg-error-container/10 rounded-lg transition-colors disabled:opacity-50"
-              >
-                Reject
-              </button>
-              <button
-                // disabled={verify.isPending}
-                // onClick={() => verify.mutate({ id: selected.id, decision: "DUPLICATE", notes })}
-                className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors disabled:opacity-50"
-              >
-                Mark Duplicate
-              </button>
-              <button
-                // disabled={verify.isPending}
-                // onClick={() => verify.mutate({ id: selected.id, decision: "APPROVED", notes })}
-                className="px-5 py-2 text-sm font-medium bg-primary text-on-primary rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
-              >
-                {/* {verify.isPending ? "Saving..." : "Verify"} */}
-              </button>
-            </div>
-          </div>
+
         </div>
       )}
     </div>
