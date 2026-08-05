@@ -91,9 +91,8 @@ export const profilesRouter = router({
   }),
 
   // Public-safe wanted feed for any authenticated user (incl. community) —
-  // deliberately not gated by profiles:read. The raw `attributes` blob can
-  // hold arbitrary internal metadata, so only the two keys meant for public
-  // consumption (physicalDescription, charges) are ever surfaced here.
+  // deliberately not gated by profiles:read. Only active watchlisted profiles
+  // are returned; raw `attributes` is stripped to public-safe keys only.
   listPublicWanted: protectedProcedure.query(async () => {
     const rows = await db
       .select({
@@ -103,10 +102,16 @@ export const profilesRouter = router({
         primaryFaceImageUrl: entityProfile.primaryFaceImageUrl,
         watchlistStatus: entityProfile.watchlistStatus,
         lastSeenAt: entityProfile.lastSeenAt,
+        updatedAt: entityProfile.updatedAt,
         attributes: entityProfile.attributes,
       })
       .from(entityProfile)
-      .where(ne(entityProfile.watchlistStatus, "NONE"))
+      .where(
+        and(
+          ne(entityProfile.watchlistStatus, "NONE"),
+          eq(entityProfile.status, "ACTIVE"),
+        ),
+      )
       .orderBy(desc(entityProfile.updatedAt));
 
     return rows.map(({ attributes, ...rest }) => ({

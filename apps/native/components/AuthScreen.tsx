@@ -5,7 +5,8 @@ import { Pressable, StatusBar, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useToast } from "heroui-native";
 import { useForm } from "@tanstack/react-form";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/auth-client";
+import { queryClient } from "@/utils/trpc";
 import z from "zod";
 
 type AuthMode = "sign-in" | "sign-up";
@@ -16,10 +17,6 @@ const HERO_ACCENT = "#0e6d7a";
 const SHEET_BG = "#ffffff";
 const CTA_BG = "#0b2e4a";
 
-// Demo-only credentials (no backend)
-const DEMO_EMAIL = "demo@sentinel360.com";
-const DEMO_PASSWORD = "Password123!";
-
 const signInSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
   password: z.string().min(1, "Password is required").min(8, "Use at least 8 characters"),
@@ -28,8 +25,19 @@ const signInSchema = z.object({
 const signUpSchema = z.object({
   name: z.string().trim().min(1, "Name is required").min(2, "Name must be at least 2 characters"),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  phone: z.string().trim().max(20, "Phone number is too long"),
   password: z.string().min(1, "Password is required").min(8, "Use at least 8 characters"),
+  // POPIA s11: registration requires explicit, affirmative consent.
+  popiaConsent: z.literal(true, {
+    error: "You must accept the privacy policy to create an account",
+  }),
 });
+
+function splitName(fullName: string): { firstName: string; lastName: string | null } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { firstName: parts[0] ?? fullName, lastName: null };
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(" ") };
+}
 
 function getErrorMessage(error: unknown): string | null {
   if (!error) return null;
@@ -113,9 +121,9 @@ function FieldRow({
   value: string;
   onChangeText: (t: string) => void;
   secureTextEntry?: boolean;
-  keyboardType?: "default" | "email-address";
+  keyboardType?: "default" | "email-address" | "phone-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
-  textContentType?: "name" | "emailAddress" | "password" | "newPassword" | "none";
+  textContentType?: "name" | "emailAddress" | "password" | "newPassword" | "telephoneNumber" | "none";
   returnKeyType?: "next" | "go" | "done";
   inputRef?: React.RefObject<TextInput | null>;
   onSubmitEditing?: () => void;
@@ -163,6 +171,7 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
 
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -174,7 +183,9 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
       () => ({
         name: "",
         email: "",
+        phone: "",
         password: "",
+        popiaConsent: false as boolean,
       }),
       [],
     ),
@@ -207,16 +218,27 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
         }
 
         formApi.reset();
+        queryClient.clear();
         router.replace("/(drawer)/(tabs)");
         return;
       }
 
-      const { error } = await supabase.auth.signUp({
+      const fullName = value.name.trim();
+      const { firstName, lastName } = splitName(fullName);
+      const phone = value.phone.trim() || null;
+      const popiaConsentAt = new Date().toISOString();
+
+      // Supabase Auth owns credentials; public."user" is mirrored from metadata on first API access.
+      const { data, error } = await supabase.auth.signUp({
         email: value.email.trim().toLowerCase(),
         password: value.password,
         options: {
           data: {
-            name: value.name.trim(),
+            name: fullName,
+            first_name: firstName,
+            last_name: lastName,
+            phone_number: phone,
+            popiaConsentAt,
           },
         },
       });
@@ -226,6 +248,14 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
           variant: "danger",
           label: error.message,
         });
+        return;
+      }
+
+      // If email confirmation is disabled, Supabase returns a session immediately.
+      if (data.session) {
+        formApi.reset();
+        queryClient.clear();
+        router.replace("/(drawer)/(tabs)");
         return;
       }
 
@@ -330,10 +360,30 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                       textContentType="emailAddress"
                       inputRef={emailRef}
                       returnKeyType="next"
-                      onSubmitEditing={() => passwordRef.current?.focus()}
+                      onSubmitEditing={() =>
+                        mode === "sign-up" ? phoneRef.current?.focus() : passwordRef.current?.focus()
+                      }
                     />
                   )}
                 </form.Field>
+
+                {mode === "sign-up" && (
+                  <form.Field name="phone">
+                    {(field) => (
+                      <FieldRow
+                        icon="call-outline"
+                        placeholder="Phone (optional)"
+                        value={field.state.value}
+                        onChangeText={field.handleChange}
+                        keyboardType="phone-pad"
+                        textContentType="telephoneNumber"
+                        inputRef={phoneRef}
+                        returnKeyType="next"
+                        onSubmitEditing={() => passwordRef.current?.focus()}
+                      />
+                    )}
+                  </form.Field>
+                )}
 
                 <form.Field name="password">
                   {(field) => (
@@ -384,22 +434,59 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                   </View>
                 )}
 
-                <Pressable
-                  onPress={form.handleSubmit}
-                  disabled={isSubmitting}
-                  style={({ pressed }) => ({
-                    marginTop: 10,
-                    backgroundColor: CTA_BG,
-                    borderRadius: 14,
-                    paddingVertical: 14,
-                    alignItems: "center",
-                    opacity: isSubmitting ? 0.6 : pressed ? 0.92 : 1,
-                  })}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "900" }}>
-                    {mode === "sign-in" ? "Login" : "Register"}
-                  </Text>
-                </Pressable>
+                {mode === "sign-up" && (
+                  <form.Field name="popiaConsent">
+                    {(field) => (
+                      <Pressable
+                        onPress={() => field.handleChange(!field.state.value)}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          marginTop: 4,
+                          opacity: pressed ? 0.9 : 1,
+                        })}
+                      >
+                        <Ionicons
+                          name={field.state.value ? "checkbox-outline" : "square-outline"}
+                          size={20}
+                          color={HERO_ACCENT}
+                          style={{ marginTop: 1 }}
+                        />
+                        <Text style={{ flex: 1, color: "#64748b", fontWeight: "600", fontSize: 12, lineHeight: 18 }}>
+                          I consent to Sentinel360 processing my personal information in accordance
+                          with the Protection of Personal Information Act (POPIA).
+                        </Text>
+                      </Pressable>
+                    )}
+                  </form.Field>
+                )}
+
+                <form.Subscribe selector={(state) => state.values.popiaConsent}>
+                  {(popiaConsent) => (
+                    <Pressable
+                      onPress={form.handleSubmit}
+                      disabled={isSubmitting || (mode === "sign-up" && !popiaConsent)}
+                      style={({ pressed }) => ({
+                        marginTop: 10,
+                        backgroundColor: CTA_BG,
+                        borderRadius: 14,
+                        paddingVertical: 14,
+                        alignItems: "center",
+                        opacity:
+                          isSubmitting || (mode === "sign-up" && !popiaConsent)
+                            ? 0.6
+                            : pressed
+                              ? 0.92
+                              : 1,
+                      })}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "900" }}>
+                        {mode === "sign-in" ? "Login" : "Register"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </form.Subscribe>
 
                 <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center" }}>
                   <View style={{ flex: 1, height: 1, backgroundColor: "#e2e8f0" }} />

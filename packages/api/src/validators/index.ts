@@ -475,7 +475,7 @@ export const createAlertSchema = z.object({
   description: z.string().max(5000).optional(),
   alertType: z.string().min(2).max(50),
   severity: alertSeveritySchema.default("MEDIUM"),
-  targetRole: alertTargetRoleSchema.default("ALL"),
+  targetRole: alertTargetRoleSchema.default("COMMUNITY"),
   expiresAt: z.coerce.date().optional(),
   location: sightingLocationSchema.optional(),
 });

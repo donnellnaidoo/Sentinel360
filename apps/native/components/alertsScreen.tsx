@@ -1,110 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { supabase } from "@/lib/supabase";
 
-import { queryClient } from "@/utils/trpc";
+import { queryClient, trpc } from "@/utils/trpc";
 
 const SHEET_BG = "#ffffff";
 const BRAND_BLUE = "#1e3a8a";
 const CTA_BG = "#0b2e4a";
 
-export type AppAlert = {
-  alert_id: string;
-  user_id: string | null;
-  created_by: string | null;
-  alert_type:
-    | "SIGHTING_APPROVED"
-    | "SIGHTING_REJECTED"
-    | "COMMUNITY_SIGHTING_APPROVED";
-  audience: "PERSONAL" | "COMMUNITY";
-  title: string | null;
-  message: string;
-  location: string | null;
-  latitude: string | null;
-  longitude: string | null;
-  sighting_id: string | null;
-  incident_id: string | null;
-  report_id: string | null;
-  is_read: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-export async function fetchAlerts(): Promise<AppAlert[]> {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw new Error(userError.message);
-  }
-
-  if (!user) {
-    throw new Error("You must be logged in to view alerts.");
-  }
-
-  const { data, error } = await supabase
-    .from("Alert")
-    .select(`
-      alert_id,
-      user_id,
-      created_by,
-      alert_type,
-      audience,
-      title,
-      message,
-      location,
-      latitude,
-      longitude,
-      sighting_id,
-      incident_id,
-      report_id,
-      is_read,
-      created_at,
-      updated_at
-    `)
-    .or(`user_id.eq.${user.id},audience.eq.COMMUNITY`)
-    .order("created_at", {
-      ascending: false,
-    });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  console.log("Alert fetch result:", {
-    currentUserId: user.id,
-    currentUserEmail: user.email,
-    alertCount: data?.length ?? 0,
-    alerts: data,
-    error,
-  });
-
-  return (data ?? []) as AppAlert[];
-}
-
-export async function markAlertAsRead(
-  alertId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from("Alert")
-    .update({
-      is_read: true,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("alert_id", alertId);
-
-    if(error)
-    {
-      throw new Error(error.message);
-    }
-}
-
 function Header() {
+  const router = useRouter();
+
   return (
     <View
       style={{
@@ -136,8 +45,11 @@ function Header() {
         COMMUNITY SAFETY
       </Text>
 
-      <View
-        style={{
+      <Pressable
+        onPress={() => router.push("/(drawer)/(tabs)/profile")}
+        accessibilityRole="button"
+        accessibilityLabel="Open profile"
+        style={({ pressed }) => ({
           width: 40,
           height: 40,
           borderRadius: 12,
@@ -145,7 +57,8 @@ function Header() {
           backgroundColor: "#e2e8f0",
           alignItems: "center",
           justifyContent: "center",
-        }}
+          opacity: pressed ? 0.85 : 1,
+        })}
       >
         <Image
           source={{
@@ -153,7 +66,7 @@ function Header() {
           }}
           style={{ width: 40, height: 40 }}
         />
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -258,9 +171,9 @@ function AlertCard({
         <Text style={{ marginTop: 6, color: "#64748b", lineHeight: 18 }}>{body}</Text>
 
         <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 12 }}>
             <Ionicons name="location-outline" size={14} color="#94a3b8" />
-            <Text style={{ color: "#94a3b8", fontWeight: "700" }}>{location}</Text>
+            <Text style={{ color: "#94a3b8", fontWeight: "700", flexShrink: 1 }}>{location}</Text>
           </View>
           <Pressable
             onPress={onAction}
@@ -293,38 +206,22 @@ function MonitoringMapCard() {
       />
 
       <View style={{ flex: 1, padding: 14, justifyContent: "flex-end" }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <View
-            style={{
-              backgroundColor: "rgba(255,255,255,0.92)",
-              borderRadius: 12,
-              paddingHorizontal: 10,
-              paddingVertical: 8,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#b91c1c" }} />
-            <Text style={{ fontSize: 10, fontWeight: "900", color: "#0f172a" }}>
-              MONITORING ACTIVE PERIMETER
-            </Text>
-          </View>
-
-          <Pressable
-            onPress={() => {}}
-            style={({ pressed }) => ({
-              width: 36,
-              height: 36,
-              borderRadius: 999,
-              backgroundColor: "rgba(255,255,255,0.18)",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: pressed ? 0.9 : 1,
-            })}
-          >
-            <Ionicons name="settings-outline" size={16} color="#ffffff" />
-          </Pressable>
+        <View
+          style={{
+            backgroundColor: "rgba(255,255,255,0.92)",
+            borderRadius: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            alignSelf: "flex-start",
+          }}
+        >
+          <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#b91c1c" }} />
+          <Text style={{ fontSize: 10, fontWeight: "900", color: "#0f172a" }}>
+            MONITORING AUCKLAND PARK
+          </Text>
         </View>
       </View>
     </View>
@@ -351,120 +248,49 @@ function getRelativeTime(date: Date): string {
   return `${Math.floor(hr / 24)}d ago`;
 }
 
+function formatAlertLocation(location: unknown, fallback: string): string {
+  if (!location || typeof location !== "object") return fallback;
+  const loc = location as Record<string, unknown>;
+  if (typeof loc.address === "string" && loc.address.trim()) return loc.address.trim();
+  if (typeof loc.label === "string" && loc.label.trim()) return loc.label.trim();
+  if (typeof loc.name === "string" && loc.name.trim()) return loc.name.trim();
+  const lat = typeof loc.latitude === "number" ? loc.latitude : typeof loc.lat === "number" ? loc.lat : null;
+  const lng =
+    typeof loc.longitude === "number" ? loc.longitude : typeof loc.lng === "number" ? loc.lng : null;
+  if (lat != null && lng != null) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  return fallback;
+}
 
 export default function AlertsScreen() {
   const [search, setSearch] = useState("");
 
-  const [currentUserId, setCurrentUserId] =
-    useState<string | null>(null);
-
-  const [authLoading, setAuthLoading] =
-    useState(true);
-
-  const [authError, setAuthError] =
-    useState<Error | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadCurrentUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
-      if (!mounted) {
-        return;
-      }
-
-      if (error) {
-        setAuthError(new Error(error.message));
-        setCurrentUserId(null);
-      } else {
-        setAuthError(null);
-        setCurrentUserId(user?.id ?? null);
-      }
-
-      setAuthLoading(false);
-    };
-
-    void loadCurrentUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const nextUserId =
-          session?.user?.id ?? null;
-
-        setCurrentUserId(nextUserId);
-        setAuthError(null);
-        setAuthLoading(false);
-
-        queryClient.removeQueries({
-          queryKey: ["alerts"],
-        });
-
-        if (nextUserId) {
-          await queryClient.invalidateQueries({
-            queryKey: ["alerts", nextUserId],
-          });
-        }
-      },
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
   const {
     data: alerts = [],
-    isLoading: alertsLoading,
-    isError: alertsIsError,
-    error: alertsError,
-  } = useQuery({
-    queryKey: ["alerts", currentUserId],
-    queryFn: fetchAlerts,
-    enabled: Boolean(currentUserId),
-  });
+    isLoading,
+    isError,
+    error,
+  } = useQuery(trpc.alerts.listMine.queryOptions());
 
-  const isLoading =
-    authLoading || alertsLoading;
+  const acknowledge = useMutation(
+    trpc.alerts.acknowledge.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: trpc.alerts.listMine.queryKey() });
+      },
+    }),
+  );
 
-  const isError =
-    Boolean(authError) || alertsIsError;
-
-  const error =
-    authError ?? alertsError;
-
-  const acknowledge = useMutation({
-    mutationFn: markAlertAsRead,
-
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["alerts"],
-      });
-    },
-  });
-
-  const visible = alerts.filter((alert) => {
+  const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
-
-    if(!query)
-    {
-      return true;
-    }
-
-    return(
-      (alert.title ?? "").toLowerCase().includes(query) ||
-      alert.message.toLowerCase().includes(query) ||
-      (alert.location ?? "").toLowerCase().includes(query)
-    );
-  });
-
- 
+    if (!query) return alerts;
+    return alerts.filter((alert) => {
+      return (
+        alert.title.toLowerCase().includes(query) ||
+        alert.message.toLowerCase().includes(query) ||
+        alert.alertType.toLowerCase().includes(query) ||
+        alert.severity.toLowerCase().includes(query)
+      );
+    });
+  }, [alerts, search]);
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
@@ -476,7 +302,7 @@ export default function AlertsScreen() {
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={{ fontSize: 22, fontWeight: "900", color: "#0f172a" }}>Active Alerts</Text>
-          <Pill label={`${visible.length} NEARBY`} />
+          <Pill label={`${visible.length} ACTIVE`} />
         </View>
 
         <View
@@ -504,84 +330,36 @@ export default function AlertsScreen() {
         </View>
 
         {isError && (
-          <Text style={{color: "#b91c1c", fontWeight: "700"}}>
-            Failed to load alerts: {error?.message ?? "Unknown Error"}
+          <Text style={{ marginTop: 12, color: "#b91c1c", fontWeight: "700" }}>
+            Failed to load alerts: {error?.message ?? "Unknown error"}
           </Text>
         )}
 
         <View style={{ marginTop: 18, gap: 14 }}>
           {isLoading && <Text style={{ color: "#94a3b8" }}>Loading alerts...</Text>}
           {!isLoading && !isError && visible.length === 0 && (
-            <Text style={{ color: "#94a3b8" }}>No active alerts for your area right now.</Text>
+            <Text style={{ color: "#94a3b8" }}>No active alerts for Auckland Park right now.</Text>
           )}
           {visible.map((alert) => {
-            const community =
-              alert.alert_type === "COMMUNITY_SIGHTING_APPROVED";
-
-            const approved =
-              alert.alert_type === "SIGHTING_APPROVED" ||
-              community;
-
-            const isCommunity =
-              alert.audience === "COMMUNITY";
-
-            const acknowledged = alert.is_read;
+            const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.MEDIUM;
+            const acknowledged = Boolean(alert.acknowledgedAt);
 
             return (
               <AlertCard
-                key={alert.alert_id}
-                accent={approved ? "#15803d" : "#b91c1c"}
-                badge={
-                  community
-                    ? "COMMUNITY CONFIRMED"
-                    : approved
-                      ? "APPROVED"
-                      : "REJECTED"
-                }
-                badgeBg={approved ? "#dcfce7" : "#fee2e2"}
-                badgeFg={approved ? "#166534" : "#991b1b"}
-                iconName={
-                  community
-                    ? "people-circle"
-                    : approved
-                      ? "checkmark-circle"
-                      : "close-circle"
-                }
-                iconBg={approved ? "#dcfce7" : "#fee2e2"}
-                title={
-                  alert.title ??
-                  (community
-                    ? "Community Sighting Confirmed"
-                    : approved
-                      ? "Sighting Confirmed"
-                      : "Sighting Not Confirmed")
-                }
-                time={getRelativeTime(
-                  new Date(alert.created_at),
-                )}
-                body={alert.message}
-                location={
-                  alert.location ??
-                  alert.alert_type.replace(/_/g, " ")
-                }
-                action={
-                  isCommunity
-                    ? "COMMUNITY UPDATE"
-                    : acknowledged
-                      ? "READ"
-                      : "MARK AS READ"
-                }
-                actionDisabled={
-                  isCommunity ||
-                  acknowledged ||
-                  acknowledge.isPending
-                }
-                onAction={
-                  isCommunity
-                    ? undefined
-                    : () =>
-                      acknowledge.mutate(alert.alert_id)
-                }
+                key={alert.id}
+                accent={style.accent}
+                badge={alert.severity}
+                badgeBg={style.badgeBg}
+                badgeFg={style.badgeFg}
+                iconName={style.icon}
+                iconBg={style.badgeBg}
+                title={alert.title}
+                time={getRelativeTime(new Date(alert.createdAt))}
+                body={alert.description ?? alert.message}
+                location={formatAlertLocation(alert.location, alert.alertType.replace(/_/g, " "))}
+                action={acknowledged ? "ACKNOWLEDGED" : "ACKNOWLEDGE"}
+                actionDisabled={acknowledged || acknowledge.isPending}
+                onAction={() => acknowledge.mutate({ alertId: alert.id })}
               />
             );
           })}
@@ -594,4 +372,3 @@ export default function AlertsScreen() {
     </SafeAreaView>
   );
 }
-

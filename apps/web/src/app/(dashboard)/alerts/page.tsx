@@ -40,7 +40,7 @@ export default function AlertsPage() {
     description: "",
     alertType: ALERT_TYPES[0] as string,
     severity: "MEDIUM",
-    targetRole: "ALL" as string,
+    targetRole: "COMMUNITY" as string,
   });
 
   const { data, isLoading, isError, error } = useQuery(
@@ -64,7 +64,7 @@ export default function AlertsPage() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: trpc.alerts.list.queryKey() });
         setShowCreate(false);
-        setForm({ title: "", description: "", alertType: ALERT_TYPES[0], severity: "MEDIUM", targetRole: "ALL" });
+        setForm({ title: "", description: "", alertType: ALERT_TYPES[0], severity: "MEDIUM", targetRole: "COMMUNITY" });
       },
     }),
   );

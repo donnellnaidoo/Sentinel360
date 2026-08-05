@@ -3,7 +3,7 @@ import { alert, alertAcknowledgment, notification } from "@Sentinel360/db/schema
 import { user } from "@Sentinel360/db/schema/auth";
 import { role, userRole } from "@Sentinel360/db/schema/rbac";
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, getTableColumns, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gt, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { protectedProcedure, requirePermission, router } from "../index";
 import { acknowledgeAlertSchema, alertListSchema, createAlertSchema } from "../validators";
@@ -56,13 +56,14 @@ function withPublicShape(row: typeof alert.$inferSelect) {
 }
 
 export const alertsRouter = router({
-  // Any authenticated user's alert inbox — sourced from the notification
-  // fan-out rows created for them at alert-creation time, not gated by
-  // alerts:read (that permission is for the full admin view, see `list`).
+  // Community inbox = personal notification fan-out PLUS active COMMUNITY/ALL
+  // broadcasts (so mobile users see admin-created alerts even if they joined
+  // after the fan-out ran, or if role assignment lagged behind signup).
   listMine: protectedProcedure.query(async ({ ctx }) => {
     const now = new Date();
+    const userId = ctx.session.user.id;
 
-    const rows = await db
+    const personalRows = await db
       .select({
         ...getTableColumns(alert),
         acknowledgedAt: alertAcknowledgment.acknowledgedAt,
@@ -73,18 +74,50 @@ export const alertsRouter = router({
         alertAcknowledgment,
         and(
           eq(alertAcknowledgment.alertId, alert.id),
-          eq(alertAcknowledgment.userId, ctx.session.user.id),
+          eq(alertAcknowledgment.userId, userId),
         ),
       )
       .where(
         and(
-          eq(notification.recipientUserId, ctx.session.user.id),
+          eq(notification.recipientUserId, userId),
           or(isNull(alert.expiresAt), gt(alert.expiresAt, now)),
         ),
       )
       .orderBy(desc(alert.createdAt));
 
-    return rows.map((r) => ({ ...withPublicShape(r), acknowledgedAt: r.acknowledgedAt }));
+    const broadcastRows = await db
+      .select({
+        ...getTableColumns(alert),
+        acknowledgedAt: alertAcknowledgment.acknowledgedAt,
+      })
+      .from(alert)
+      .leftJoin(
+        alertAcknowledgment,
+        and(
+          eq(alertAcknowledgment.alertId, alert.id),
+          eq(alertAcknowledgment.userId, userId),
+        ),
+      )
+      .where(
+        and(
+          eq(alert.status, "ACTIVE"),
+          or(isNull(alert.expiresAt), gt(alert.expiresAt, now)),
+          sql`(${alert.metadata}->>'targetRole') IN ('COMMUNITY', 'ALL')`,
+        ),
+      )
+      .orderBy(desc(alert.createdAt));
+
+    const byId = new Map<string, (typeof personalRows)[number]>();
+    for (const row of [...personalRows, ...broadcastRows]) {
+      const existing = byId.get(row.id);
+      if (!existing || (!existing.acknowledgedAt && row.acknowledgedAt)) {
+        byId.set(row.id, row);
+      }
+    }
+
+    return [...byId.values()]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((r) => ({ ...withPublicShape(r), acknowledgedAt: r.acknowledgedAt }));
   }),
 
   list: requirePermission("alerts:read")
@@ -132,7 +165,7 @@ export const alertsRouter = router({
 
       const recipientIds = await resolveTargetUserIds(input.targetRole);
       if (recipientIds.length > 0) {
-        const now = new Date();
+        const deliveredAt = new Date();
         await db.insert(notification).values(
           recipientIds.map((recipientUserId) => ({
             alertId: created.id,
@@ -141,8 +174,8 @@ export const alertsRouter = router({
             title: created.title,
             body: created.message,
             deliveryStatus: "DELIVERED",
-            sentAt: now,
-            deliveredAt: now,
+            sentAt: deliveredAt,
+            deliveredAt,
           })),
         );
       }

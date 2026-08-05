@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -10,6 +11,8 @@ const BRAND_BLUE = "#1e3a8a";
 const CTA_BG = "#0b2e4a";
 
 function Header() {
+  const router = useRouter();
+
   return (
     <View
       style={{
@@ -41,14 +44,18 @@ function Header() {
         Community Safety
       </Text>
 
-      <View
-        style={{
+      <Pressable
+        onPress={() => router.push("/(drawer)/(tabs)/profile")}
+        accessibilityRole="button"
+        accessibilityLabel="Open profile"
+        style={({ pressed }) => ({
           width: 40,
           height: 40,
           borderRadius: 999,
           overflow: "hidden",
           backgroundColor: "#e2e8f0",
-        }}
+          opacity: pressed ? 0.85 : 1,
+        })}
       >
         <Image
           source={{
@@ -56,7 +63,7 @@ function Header() {
           }}
           style={{ width: 40, height: 40 }}
         />
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -81,7 +88,7 @@ function MetaRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: s
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
       <Ionicons name={icon} size={14} color="#64748b" />
-      <Text style={{ color: "#64748b", fontWeight: "600" }}>{text}</Text>
+      <Text style={{ color: "#64748b", fontWeight: "600", flexShrink: 1 }}>{text}</Text>
     </View>
   );
 }
@@ -92,20 +99,22 @@ function WantedCard({
   topTagFg,
   name,
   subtitle,
+  lastSeen,
+  updated,
   primaryCta,
-  secondaryCta,
+  onPrimaryPress,
   imageUri,
-  dark,
 }: {
   topTag: string;
   topTagBg: string;
   topTagFg: string;
   name: string;
   subtitle: string;
+  lastSeen: string;
+  updated: string;
   primaryCta?: string;
-  secondaryCta?: string;
+  onPrimaryPress?: () => void;
   imageUri: string;
-  dark?: boolean;
 }) {
   return (
     <View
@@ -132,39 +141,23 @@ function WantedCard({
         <Text style={{ marginTop: 4, color: "#64748b", fontWeight: "600" }}>{subtitle}</Text>
 
         <View style={{ marginTop: 12, gap: 8 }}>
-          <MetaRow icon="location-outline" text="Last seen: East Waterfront District" />
-          <MetaRow icon="calendar-outline" text="Updated: Yesterday" />
+          <MetaRow icon="location-outline" text={lastSeen} />
+          <MetaRow icon="calendar-outline" text={updated} />
         </View>
 
         {!!primaryCta && (
           <Pressable
-            onPress={() => {}}
+            onPress={onPrimaryPress}
             style={({ pressed }) => ({
               marginTop: 14,
-              backgroundColor: dark ? CTA_BG : "#e5e7eb",
+              backgroundColor: "#e5e7eb",
               paddingVertical: 12,
               borderRadius: 12,
               alignItems: "center",
               opacity: pressed ? 0.92 : 1,
             })}
           >
-            <Text style={{ fontWeight: "900", color: dark ? "#ffffff" : "#0f172a" }}>{primaryCta}</Text>
-          </Pressable>
-        )}
-
-        {!!secondaryCta && (
-          <Pressable
-            onPress={() => {}}
-            style={({ pressed }) => ({
-              marginTop: 10,
-              backgroundColor: CTA_BG,
-              paddingVertical: 12,
-              borderRadius: 12,
-              alignItems: "center",
-              opacity: pressed ? 0.92 : 1,
-            })}
-          >
-            <Text style={{ fontWeight: "900", color: "#ffffff" }}>{secondaryCta}</Text>
+            <Text style={{ fontWeight: "900", color: "#0f172a" }}>{primaryCta}</Text>
           </Pressable>
         )}
       </View>
@@ -172,7 +165,7 @@ function WantedCard({
   );
 }
 
-function SafetyTipCard() {
+function SafetyTipCard({ onPress }: { onPress: () => void }) {
   return (
     <View
       style={{
@@ -192,7 +185,7 @@ function SafetyTipCard() {
       </Text>
 
       <Pressable
-        onPress={() => {}}
+        onPress={onPress}
         style={({ pressed }) => ({
           marginTop: 14,
           backgroundColor: "#ffffff",
@@ -215,10 +208,39 @@ const WATCHLIST_TAG: Record<string, { label: string; bg: string; fg: string }> =
   LOW: { label: "ADVISORY", bg: "#e2e8f0", fg: "#475569" },
 };
 
-const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=900&q=70";
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=900&q=70";
+
+function getRelativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
+function formatEntityType(entityType: string): string {
+  return entityType
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export default function WantedScreen() {
-  const { data: wanted, isLoading } = useQuery(trpc.profiles.listPublicWanted.queryOptions());
+  const router = useRouter();
+  const {
+    data: wanted,
+    isLoading,
+    isError,
+    error,
+  } = useQuery(trpc.profiles.listPublicWanted.queryOptions());
+
+  function goToReport() {
+    router.push("/(drawer)/(tabs)/report");
+  }
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
@@ -234,17 +256,35 @@ export default function WantedScreen() {
           Wanted Persons
         </Text>
         <Text style={{ marginTop: 8, color: "#64748b", lineHeight: 18 }}>
-          Official public safety repository for individuals with outstanding warrants or active investigations.
-          Help secure your neighborhood through informed vigilance.
+          Official public safety repository for individuals with outstanding warrants or active investigations
+          in Auckland Park. Help secure your neighbourhood through informed vigilance.
         </Text>
 
         <View style={{ marginTop: 18, gap: 16 }}>
           {isLoading && <Text style={{ color: "#94a3b8" }}>Loading wanted persons...</Text>}
-          {!isLoading && (wanted ?? []).length === 0 && (
+          {isError && (
+            <Text style={{ color: "#b91c1c", fontWeight: "700" }}>
+              Failed to load wanted persons: {error?.message ?? "Unknown error"}
+            </Text>
+          )}
+          {!isLoading && !isError && (wanted ?? []).length === 0 && (
             <Text style={{ color: "#94a3b8" }}>No active watchlist entries right now.</Text>
           )}
           {wanted?.map((entity) => {
             const tag = WATCHLIST_TAG[entity.watchlistStatus] ?? WATCHLIST_TAG.MEDIUM;
+            const charges =
+              entity.charges && entity.charges.length > 0 ? entity.charges.join(" · ") : null;
+            const subtitle =
+              charges ??
+              entity.physicalDescription ??
+              formatEntityType(entity.entityType);
+            const lastSeen = entity.lastSeenAt
+              ? `Last seen: ${getRelativeTime(new Date(entity.lastSeenAt))}`
+              : "Last seen: Auckland Park area";
+            const updated = entity.updatedAt
+              ? `Updated: ${getRelativeTime(new Date(entity.updatedAt))}`
+              : "Updated: recently";
+
             return (
               <WantedCard
                 key={entity.id}
@@ -252,17 +292,19 @@ export default function WantedScreen() {
                 topTagBg={tag.bg}
                 topTagFg={tag.fg}
                 name={entity.displayName ?? "Unidentified subject"}
-                subtitle={entity.entityType}
+                subtitle={subtitle}
+                lastSeen={lastSeen}
+                updated={updated}
                 imageUri={entity.primaryFaceImageUrl ?? FALLBACK_IMAGE}
                 primaryCta="Provide Anonymous Tip"
+                onPrimaryPress={goToReport}
               />
             );
           })}
 
-          <SafetyTipCard />
+          <SafetyTipCard onPress={goToReport} />
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-

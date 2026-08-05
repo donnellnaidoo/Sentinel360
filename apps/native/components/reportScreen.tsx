@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, Platform, ScrollView, Text, TextInput, View, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,6 +29,7 @@ function generateReferenceCode() {
 }
 
 export default function ReportScreen() {
+  const router = useRouter();
   const [description, setDescription] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -348,14 +350,18 @@ export default function ReportScreen() {
           Community Safety
         </Text>
 
-        <View
-          style={{
+        <Pressable
+          onPress={() => router.push("/(drawer)/(tabs)/profile")}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+          style={({ pressed }) => ({
             width: 40,
             height: 40,
             borderRadius: 999,
             overflow: "hidden",
             backgroundColor: "#e2e8f0",
-          }}
+            opacity: pressed ? 0.85 : 1,
+          })}
         >
           <Image
             source={{
@@ -363,7 +369,7 @@ export default function ReportScreen() {
             }}
             style={{ width: 40, height: 40 }}
           />
-        </View>
+        </Pressable>
       </View>
 
       <KeyboardAwareScrollView
@@ -487,7 +493,7 @@ export default function ReportScreen() {
             <TextInput
               value={locationAddress}
               onChangeText={setLocationAddress}
-              placeholder="Where did this happen? (e.g. Oakwood Heights, Block C-12)"
+              placeholder="Where did this happen? (e.g. Kingsway, Auckland Park)"
               placeholderTextColor="#94a3b8"
               style={{ flex: 1, color: "#0f172a", fontWeight: "900", paddingVertical: 0 }}
             />

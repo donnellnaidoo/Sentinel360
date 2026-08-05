@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker } from "react-native-maps";
 import CommunityMap from "./communityMap";
 import { useRouter } from "expo-router";
 
@@ -84,7 +83,7 @@ function CommunityItem({
         </View>
         <Text style={{ marginTop: 6, color: "#0f172a", fontWeight: "800" }}>{title}</Text>
         <Text style={{ marginTop: 2, color: "#94a3b8", fontSize: 12 }}>
-          Installation of smart LED lights begins this Monday...
+          Updates for Auckland Park residents and nearby streets...
         </Text>
       </View>
     </View>
@@ -190,9 +189,9 @@ export default function HomeScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.push("/(drawer)/(tabs)/profile")}
+          onPress={() => {}}
           accessibilityRole="button"
-          accessibilityLabel="Open profile"
+          accessibilityLabel="Open menu"
           style={({ pressed }) => ({
             width: 40,
             height: 40,
@@ -211,14 +210,18 @@ export default function HomeScreen() {
           Community Safety
         </Text>
 
-        <View
-          style={{
+        <Pressable
+          onPress={() => router.push("/(drawer)/(tabs)/profile")}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+          style={({ pressed }) => ({
             width: 40,
             height: 40,
             borderRadius: 999,
             overflow: "hidden",
             backgroundColor: "#e2e8f0",
-          }}
+            opacity: pressed ? 0.85 : 1,
+          })}
         >
           <Image
             source={{
@@ -226,7 +229,7 @@ export default function HomeScreen() {
             }}
             style={{ width: 40, height: 40 }}
           />
-        </View>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -249,7 +252,7 @@ export default function HomeScreen() {
             CURRENT REGION
           </Text>
           <Text style={{ marginTop: 8, fontSize: 30, fontWeight: "900", color: "#fff" }}>
-            Oakwood{"\n"}District
+            Auckland{"\n"}Park
           </Text>
           <View style={{ marginTop: 12 }}>
             <Pill label="Status: Safe" />
@@ -269,23 +272,7 @@ export default function HomeScreen() {
             overflow: "hidden",
           }}
         >
-          <CommunityMap height={150}/>
-            <MapView
-              style={{ height: 150 }}
-              initialRegion={{
-                latitude: 37.78825,
-                longitude: -122.4324,
-                latitudeDelta: 0.012,
-                longitudeDelta: 0.012,
-              }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              pitchEnabled={false}
-              rotateEnabled={false}
-            >
-              <Marker coordinate={{ latitude: 37.78825, longitude: -122.4324 }} />
-              <Marker coordinate={{ latitude: 37.7905, longitude: -122.421 }} />
-            </MapView>
+          <CommunityMap height={150} />
           <Pressable
             style={({ pressed }) => ({
               paddingHorizontal: 14,
@@ -307,7 +294,7 @@ export default function HomeScreen() {
             <View>
               <Text style={{ fontSize: 18, fontWeight: "900", color: HERO_BG }}>Community Updates</Text>
               <Text style={{ marginTop: 4, fontSize: 12, color: "#94a3b8" }}>
-                Verified announcements from your neighbors
+                Verified announcements from Auckland Park
               </Text>
             </View>
             <Pressable style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
@@ -320,12 +307,12 @@ export default function HomeScreen() {
           <View style={{ marginTop: 14, gap: 12 }}>
             <CommunityItem
               tag={{ label: "CIVIC", bg: "#dbeafe", fg: "#1d4ed8" }}
-              title="New Street Lighting Phase 1"
+              title="Kingsway Street Lighting Upgrade"
               time="2h ago"
             />
             <CommunityItem
               tag={{ label: "EVENT", bg: "#fef3c7", fg: "#92400e" }}
-              title="Neighborhood Watch Meet"
+              title="Auckland Park Neighbourhood Watch"
               time="5h ago"
             />
           </View>
@@ -358,7 +345,9 @@ export default function HomeScreen() {
       </ScrollView>
 
       <Pressable
-        onPress={() => {}}
+        onPress={() => router.push("/(drawer)/(tabs)/report")}
+        accessibilityRole="button"
+        accessibilityLabel="Panic — report a sighting"
         style={({ pressed }) => ({
           position: "absolute",
           right: 18,
@@ -366,7 +355,7 @@ export default function HomeScreen() {
           width: 56,
           height: 56,
           borderRadius: 18,
-          backgroundColor: CTA_BG,
+          backgroundColor: "#dc2626",
           alignItems: "center",
           justifyContent: "center",
           shadowColor: "#000",
@@ -377,7 +366,7 @@ export default function HomeScreen() {
           opacity: pressed ? 0.92 : 1,
         })}
       >
-        <Ionicons name="add" size={26} color="#fff" />
+        <Ionicons name="warning" size={26} color="#fff" />
       </Pressable>
     </SafeAreaView>
   );

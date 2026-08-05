@@ -1,11 +1,2 @@
-import "react-native-url-polyfill/auto";
-
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(
-    supabaseUrl,
-    supabaseAnonKey,
-);
+/** Prefer `@/lib/auth-client` — this re-export keeps SecureStore session persistence. */
+export { supabase } from "@/lib/auth-client";

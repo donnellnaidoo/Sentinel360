@@ -1,26 +1,28 @@
 export type MapMarker = {
-    latitude: number;
-    longitude: number;
+  latitude: number;
+  longitude: number;
 };
 
-const DEFAULT_CENTER = { latitude: 37.78825, longitude: -122.4324 };
-const DEFAULT_ZOOM = 14;
+/** Auckland Park, Johannesburg */
+const DEFAULT_CENTER = { latitude: -26.1886, longitude: 28.0067 };
+const DEFAULT_ZOOM = 15;
 
 const DEFAULT_MARKERS: MapMarker[] = [
-    { latitude: 37.78825, longitude: -122.4324 },
-    { latitude: 37.7905, longitude: -122.421 },
+  { latitude: -26.1886, longitude: 28.0067 },
+  { latitude: -26.1868, longitude: 28.0092 },
+  { latitude: -26.1904, longitude: 28.0041 },
 ];
 
 /** Leaflet + OpenStreetMap tiles (free, no API key). */
 export function buildCommunityMapHtml(
-    markers: MapMarker[] = DEFAULT_MARKERS,
-    center: MapMarker = DEFAULT_CENTER,
-    zoom = DEFAULT_ZOOM,
+  markers: MapMarker[] = DEFAULT_MARKERS,
+  center: MapMarker = DEFAULT_CENTER,
+  zoom = DEFAULT_ZOOM,
 ) {
-    const markersJson = JSON.stringify(markers);
-    const centerJson = JSON.stringify([center.latitude, center.longitude]);
+  const markersJson = JSON.stringify(markers);
+  const centerJson = JSON.stringify([center.latitude, center.longitude]);
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -62,6 +64,8 @@ export function buildCommunityMapHtml(
           weight: 2,
         }).addTo(map);
       });
+
+      setTimeout(function () { map.invalidateSize(); }, 100);
     </script>
   </body>
 </html>`;

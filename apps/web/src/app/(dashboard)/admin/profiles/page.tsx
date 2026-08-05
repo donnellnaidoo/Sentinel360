@@ -69,6 +69,9 @@ export default function AdminProfilesPage() {
     physicalDescription: "",
     charges: "",
     notes: "",
+    publishToMobile: true,
+    watchlistPriority: PRIORITY_LEVELS[2] as string,
+    watchlistReason: "Published to community wanted feed",
   });
   const [addPhoto, setAddPhoto] = useState<File | null>(null);
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
@@ -88,13 +91,44 @@ export default function AdminProfilesPage() {
     queryClient.invalidateQueries({ queryKey: trpc.profiles.listWatchlist.queryKey() });
   };
 
-  const createProfile = useMutation(
-    trpc.profiles.create.mutationOptions({
+  const resetAddForm = () => {
+    setAddForm({
+      entityType: ENTITY_TYPES[0],
+      displayName: "",
+      physicalDescription: "",
+      charges: "",
+      notes: "",
+      publishToMobile: true,
+      watchlistPriority: PRIORITY_LEVELS[2],
+      watchlistReason: "Published to community wanted feed",
+    });
+    setAddPhoto(null);
+  };
+
+  const addToWatchlist = useMutation(
+    trpc.profiles.addToWatchlist.mutationOptions({
       onSuccess: () => {
         invalidate();
+        setSelected(null);
+        setWatchlistForm({ priorityLevel: PRIORITY_LEVELS[1], reason: "" });
+      },
+    }),
+  );
+
+  const createProfile = useMutation(
+    trpc.profiles.create.mutationOptions({
+      onSuccess: async (created) => {
+        if (addForm.publishToMobile && created?.id) {
+          await addToWatchlist.mutateAsync({
+            entityProfileId: created.id,
+            priorityLevel: addForm.watchlistPriority as never,
+            reason: addForm.watchlistReason.trim() || "Published to community wanted feed",
+          });
+        } else {
+          invalidate();
+        }
         setShowAddModal(false);
-        setAddForm({ entityType: ENTITY_TYPES[0], displayName: "", physicalDescription: "", charges: "", notes: "" });
-        setAddPhoto(null);
+        resetAddForm();
       },
     }),
   );
@@ -105,16 +139,6 @@ export default function AdminProfilesPage() {
         invalidate();
         setSelected(null);
         setEditPhoto(null);
-      },
-    }),
-  );
-
-  const addToWatchlist = useMutation(
-    trpc.profiles.addToWatchlist.mutationOptions({
-      onSuccess: () => {
-        invalidate();
-        setSelected(null);
-        setWatchlistForm({ priorityLevel: PRIORITY_LEVELS[1], reason: "" });
       },
     }),
   );
@@ -306,6 +330,46 @@ export default function AdminProfilesPage() {
                     className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                  <label className="flex items-start gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={addForm.publishToMobile}
+                      onChange={(e) => setAddForm((f) => ({ ...f, publishToMobile: e.target.checked }))}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-medium">Publish to mobile Wanted feed</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        Adds this profile to the public watchlist so community app users can see it.
+                      </span>
+                    </span>
+                  </label>
+                  {addForm.publishToMobile && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Priority</label>
+                        <select
+                          value={addForm.watchlistPriority}
+                          onChange={(e) => setAddForm((f) => ({ ...f, watchlistPriority: e.target.value }))}
+                          className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                          {PRIORITY_LEVELS.map((level) => (
+                            <option key={level} value={level}>{level}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reason</label>
+                        <input
+                          value={addForm.watchlistReason}
+                          onChange={(e) => setAddForm((f) => ({ ...f, watchlistReason: e.target.value }))}
+                          className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="p-6 border-t border-border flex justify-end gap-3 bg-muted/30">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-5 py-2 text-sm font-medium text-muted-foreground hover:bg-muted rounded-lg transition-colors">
@@ -313,10 +377,10 @@ export default function AdminProfilesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createProfile.isPending}
+                  disabled={createProfile.isPending || addToWatchlist.isPending}
                   className="px-5 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
                 >
-                  {createProfile.isPending ? "Creating..." : "Create Profile"}
+                  {createProfile.isPending || addToWatchlist.isPending ? "Creating..." : "Create Profile"}
                 </button>
               </div>
             </form>
