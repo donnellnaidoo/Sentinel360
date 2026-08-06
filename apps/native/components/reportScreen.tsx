@@ -51,7 +51,7 @@ export default function ReportScreen() {
   );
 
   const trimmedDescription = description.trim();
-  const canSubmit = trimmedDescription.length > 0 && !submitSighting.isPending;
+  const canSubmit = trimmedDescription.length >= MIN_DESCRIPTION_LENGTH && !isSubmitting;
 
   async function ensureLibraryPermission() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -189,11 +189,33 @@ export default function ReportScreen() {
 
       const ref = generateReferenceCode();
 
-      const { error: insertError } = await supabase.from("Sighting").insert({
-        description: trimmedDescription,
+      const { error: insertedError, error: insertError } = await supabase.from("community_sighting").insert({
+        
         reference_code: ref,
-        created_by: user.id,
-      });
+        reporter_user_id: isAnonymous ? null : user.id,
+
+        sighting_type: "COMMUNITY_REPORT",
+        title: null,
+        description: trimmedDescription,
+
+        location: {
+          address: locationAddress.trim() || null,
+        },
+
+        media_ids: [],
+
+        status: "SUBMITTED",
+        severity: null,
+        visibility: "PRIVATE",
+
+        moderation_status: "PENDING",
+        moderation_reason: null,
+
+        reported_at: new Date().toISOString(),
+        is_anonymous: isAnonymous,
+      })
+      .select("id, reference_code")
+      .single();
 
       if (insertError) {
         throw insertError;

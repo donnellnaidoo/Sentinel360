@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { Image, Pressable, ScrollView, Text, TextInput, View, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { queryClient, trpc } from "@/utils/trpc";
@@ -269,12 +269,28 @@ export default function AlertsScreen() {
     isLoading,
     isError,
     error,
-  } = useQuery(trpc.alerts.listMine.queryOptions());
+    refetch,
+    isRefetching,
+  } = useQuery({...trpc.alerts.listMine.queryOptions(), refetchOnMount: "always", refetchOnReconnect: true,});
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   const acknowledge = useMutation(
     trpc.alerts.acknowledge.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: trpc.alerts.listMine.queryKey() });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: trpc.alerts.listMine.queryKey(),
+          }),
+
+          queryClient.invalidateQueries({
+            queryKey: trpc.alerts.unreadCount.queryKey(),
+          }),
+        ]);
       },
     }),
   );
@@ -284,10 +300,12 @@ export default function AlertsScreen() {
     if (!query) return alerts;
     return alerts.filter((alert) => {
       return (
-        alert.title.toLowerCase().includes(query) ||
-        alert.message.toLowerCase().includes(query) ||
-        alert.alertType.toLowerCase().includes(query) ||
-        alert.severity.toLowerCase().includes(query)
+        (alert.title ?? "").toLowerCase().includes(query) ||
+        (alert.description ?? alert.message ?? "")
+          .toLowerCase()
+          .includes(query) ||
+        (alert.alertType ?? "").toLowerCase().includes(query) ||
+        (alert.severity ?? "").toLowerCase().includes(query)
       );
     });
   }, [alerts, search]);
@@ -299,6 +317,12 @@ export default function AlertsScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void refetch()} 
+          />
+        }
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={{ fontSize: 22, fontWeight: "900", color: "#0f172a" }}>Active Alerts</Text>

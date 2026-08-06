@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import { queryClient } from "@/lib/trpc/client";
+import { queryClient, trpc } from "@/lib/trpc/client";
 import { createClient } from "@/lib/supabase/client";
+
 
 const PAGE_SIZE = 12;
 
@@ -17,7 +18,7 @@ async function fetchSightings({
   search,
   page,
 }: FetchSightingsInput): Promise<{
-  items: Sighting[];
+  items: CommunitySighting[];
   total: number;
 }> {
   const supabase = createClient();
@@ -37,30 +38,36 @@ async function fetchSightings({
   });
 
   let query = supabase
-     .from("Sighting")
+     .from("community_sighting")
      .select(
       `
-        sighting_id,
-        created_by,
-        criminal_id,
-        location,
-        description,
-        latitude,
-        longitude,
-        image,
-        timestamp,
-        created_at,
-        updated_at,
-        moderation_status,
-        moderation_reason,
-        moderated_by,
-        moderated_at,
-        author:User!Sighting_created_by_fkey (
-          user_id,
-          name,
-          email,
-          avatar_url
-        )
+      id,
+      reference_code,
+      reporter_user_id,
+      sighting_type,
+      title,
+      description,
+      location,
+      occurred_at,
+      media_ids,
+      status,
+      severity,
+      visibility,
+      operator_notes,
+      linked_incident_id,
+      moderation_status,
+      moderation_reason,
+      reported_at,
+      is_anonymous,
+      created_at,
+      updated_at,
+
+      author:user!community_sighting_reporter_user_id_fkey (
+        id,
+        name,
+        email,
+        image
+      )
       `,
       {
         count: "exact",
@@ -75,7 +82,11 @@ async function fetchSightings({
 
      if(filteredSearch){
       query = query.or(
-        `description.ilike.%${filteredSearch}%,location.ilike.%${filteredSearch}%`,
+        [
+          `description.ilike.%${filteredSearch}%`,
+          `reference_code.ilike.%${filteredSearch}%`,
+          `title.ilike.%${filteredSearch}%`,
+        ].join(","),
       );
      }
 
@@ -95,12 +106,21 @@ async function fetchSightings({
       throw new Error(error.message);
      }
 
-     const rows = (data ?? []) as SightingQueryRow[];
+     const rows = (data ?? []) as unknown as CommunitySightingQueryRow[];
 
-     const items: Sighting[] = rows.map((row) => ({
+     const items: CommunitySighting[] = rows.map((row) => ({
       ...row,
-      author: row.author?.[0] ?? null,
-     }))
+
+      media_ids: Array.isArray(row.media_ids)
+      ? row.media_ids.filter(
+        (item): item is string => typeof item === "string",
+      )
+      :[],
+
+      author: Array.isArray(row.author)
+      ? row.author[0] ?? null
+      : row.author,
+     }));
 
      return {
       items,
@@ -124,10 +144,17 @@ async function fetchSightings({
 // };
 
 type SightingAuthor = {
-  user_id: string;
+  id: string;
   name: string;
   email: string;
-  avatar_url: string | null;
+  image: string | null;
+};
+
+type SightingLocation = {
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  [key: string]: unknown;
 };
 
 type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -144,29 +171,33 @@ const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
   REJECTED: "Rejected",
 };
 
-type Sighting = {
-  sighting_id: string;
-  created_by: string | null;
-  criminal_id: string | null;
-  location: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  image: string | null;
-  timestamp: string | null;
-  created_at: string;
-  updated_at: string;
+type CommunitySighting = {
+  id: string;
+  reference_code: string;
+  reporter_user_id: string | null;
+  sighting_type: string;
+  title: string | null;
   description: string;
-
+  location: SightingLocation;
+  occurred_at: string | null;
+  media_ids: string[];
+  status: string;
+  severity: string | null;
+  visibility: string;
+  operator_notes: string | null;
+  linked_incident_id: string | null;
   moderation_status: ModerationStatus;
   moderation_reason: string | null;
-  moderated_by: string | null;
-  moderated_at: string | null;
-
+  reported_at: string | null;
+  is_anonymous: boolean;
+  created_at: string;
+  updated_at: string;
   author: SightingAuthor | null;
 };
 
-type SightingQueryRow = Omit<Sighting, "author"> & {
-  author: SightingAuthor[] | null;
+type CommunitySightingQueryRow = Omit<CommunitySighting, "author" | "media_ids"> & {
+  media_ids: unknown;
+  author: SightingAuthor | SightingAuthor[] | null;
 };
 
 function DetailSection({
@@ -217,9 +248,7 @@ type ModerateSightingInput = {
   authorId: string | null;
   decision: "APPROVED" | "REJECTED";
   reason: string;
-  location: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  location: SightingLocation;
 };
 
 async function moderateSighting({
@@ -228,8 +257,6 @@ async function moderateSighting({
   decision,
   reason,
   location,
-  latitude,
-  longitude,
 }: ModerateSightingInput): Promise<void> {
   const supabase = createClient();
 
@@ -253,138 +280,158 @@ async function moderateSighting({
   const approved = decision === "APPROVED";
 
   const { error: updateError } = await supabase
-    .from("Sighting")
+    .from("community_sighting")
     .update({
       moderation_status: decision,
       moderation_reason: cleanedReason || null,
-      moderated_by: adminUser.id,
-      moderated_at: now,
+      status: approved ? "APPROVED" : "REJECTED",
+      visibility: approved ? "COMMUNITY" : "PRIVATE",
+      operator_notes: cleanedReason || null,
       updated_at: now,
     })
-    .eq("sighting_id", sightingId);
+    .eq("id", sightingId);
 
   if (updateError) {
     throw new Error(updateError.message);
   }
 
-  const alertsToCreate = [
-    // Personal alert for the sighting author
-    ...(authorId
-      ? [
-        {
-          user_id: authorId,
-          created_by: adminUser.id,
-          sighting_id: sightingId,
-          audience: "PERSONAL",
+//   const alertsToCreate = [
+//     // Personal alert for the sighting author
+//     ...(authorId
+//       ? [
+//         {
+//           user_id: authorId,
+//           created_by: adminUser.id,
+//           sighting_id: sightingId,
+//           audience: "PERSONAL",
 
-          alert_type: approved
-            ? "SIGHTING_APPROVED"
-            : "SIGHTING_REJECTED",
+//           alert_type: approved
+//             ? "SIGHTING_APPROVED"
+//             : "SIGHTING_REJECTED",
 
-          title: approved
-            ? "Your sighting was approved"
-            : "Your sighting was rejected",
+//           title: approved
+//             ? "Your sighting was approved"
+//             : "Your sighting was rejected",
 
-          message: approved
-            ? cleanedReason
-              ? `Your sighting was approved. Note: ${cleanedReason}`
-              : "Your submitted sighting was reviewed and approved."
-            : cleanedReason
-              ? `Your sighting was rejected. Reason: ${cleanedReason}`
-              : "Your submitted sighting was reviewed and could not be confirmed.",
+//           message: approved
+//             ? cleanedReason
+//               ? `Your sighting was approved. Note: ${cleanedReason}`
+//               : "Your submitted sighting was reviewed and approved."
+//             : cleanedReason
+//               ? `Your sighting was rejected. Reason: ${cleanedReason}`
+//               : "Your submitted sighting was reviewed and could not be confirmed.",
 
-          location,
-          latitude:
-            latitude === null
-              ? null
-              : String(latitude),
-          longitude:
-            longitude === null
-              ? null
-              : String(longitude),
+//           location,
+//           latitude:
+//             latitude === null
+//               ? null
+//               : String(latitude),
+//           longitude:
+//             longitude === null
+//               ? null
+//               : String(longitude),
 
-          is_read: false,
-          created_at: now,
-          updated_at: now,
-        },
-      ]
-      : []),
+//           is_read: false,
+//           created_at: now,
+//           updated_at: now,
+//         },
+//       ]
+//       : []),
 
-    // Community alert for all approved sightings
-    ...(approved
-      ? [
-        {
-          user_id: null,
-          created_by: adminUser.id,
-          sighting_id: sightingId,
-          audience: "COMMUNITY",
-          alert_type:
-            "COMMUNITY_SIGHTING_APPROVED",
+//     // Community alert for all approved sightings
+//     ...(approved
+//       ? [
+//         {
+//           user_id: null,
+//           created_by: adminUser.id,
+//           sighting_id: sightingId,
+//           audience: "COMMUNITY",
+//           alert_type:
+//             "COMMUNITY_SIGHTING_APPROVED",
 
-          title: "Community Sighting Confirmed",
+//           title: "Community Sighting Confirmed",
 
-          message: cleanedReason
-            ? `A community sighting was confirmed. Note: ${cleanedReason}`
-            : "A community sighting was reviewed and confirmed.",
+//           message: cleanedReason
+//             ? `A community sighting was confirmed. Note: ${cleanedReason}`
+//             : "A community sighting was reviewed and confirmed.",
 
-          location,
-          latitude:
-            latitude === null
-              ? null
-              : String(latitude),
-          longitude:
-            longitude === null
-              ? null
-              : String(longitude),
+//           location,
+//           latitude:
+//             latitude === null
+//               ? null
+//               : String(latitude),
+//           longitude:
+//             longitude === null
+//               ? null
+//               : String(longitude),
 
-          is_read: false,
-          created_at: now,
-          updated_at: now,
-        },
-      ]
-      : []),
-  ];
+//           is_read: false,
+//           created_at: now,
+//           updated_at: now,
+//         },
+//       ]
+//       : []),
+//   ];
 
-  if (alertsToCreate.length === 0) {
-    return;
-  }
+//   if (alertsToCreate.length === 0) {
+//     return;
+//   }
 
-  console.log(
-    "Alerts being inserted:",
-    alertsToCreate,
-  );
+//   console.log(
+//     "Alerts being inserted:",
+//     alertsToCreate,
+//   );
 
-  const { data: insertedAlerts, error: alertError } =
-    await supabase
-      .from("Alert")
-      .insert(alertsToCreate)
-      .select();
+//   const { data: insertedAlerts, error: alertError } =
+//     await supabase
+//       .from("Alert")
+//       .insert(alertsToCreate)
+//       .select();
 
-  console.log("Alert insertion result:", {
-    insertedAlerts,
-    alertError,
-  });
+//   console.log("Alert insertion result:", {
+//     insertedAlerts,
+//     alertError,
+//   });
 
-  if (alertError) {
-    throw new Error(
-      `The sighting was moderated, but alerts could not be created: ${alertError.message}`,
-    );
-  }
+//   if (alertError) {
+//     throw new Error(
+//       `The sighting was moderated, but alerts could not be created: ${alertError.message}`,
+//     );
+//   }
 }
 
 export default function SightingsPage() {
   const [search, setSearch] = useState("");
   // const [status, setStatus] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(0);
-  const [selected, setSelected] = useState<Sighting | null>(null);
+  const [selected, setSelected] = useState<CommunitySighting | null>(null);
   const [moderationReason, setModerationReason] = useState("");
   // const [notes, setNotes] = useState("");
+
+  const createModerationAlerts = useMutation(
+    trpc.alerts.createForSightingModeration.mutationOptions(),
+  );
+
   const moderationMutation = useMutation({
-    mutationFn: moderateSighting,
+    mutationFn: async (input: ModerateSightingInput) => {
+      await moderateSighting(input);
+
+      await createModerationAlerts.mutateAsync({
+        sightingId: input.sightingId,
+        authorUserId: input.authorId,
+        decision: input.decision,
+        reason: input.reason.trim() || undefined,
+        location: input.location,
+      });
+    },
 
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["sightings"],
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: trpc.alerts.list.queryKey(),
       });
 
       setSelected(null);
@@ -422,6 +469,43 @@ export default function SightingsPage() {
   // );
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+
+  function getLocationAddress(
+    location: SightingLocation | null,
+  ): string {
+    if(!location)
+    {
+      return "No location supplied";
+    }
+
+    if(
+      typeof location.address === "string" &&
+      location.address.trim()
+    )
+    {
+      return location.address;
+    }
+
+    return "No location supplied";
+  }
+
+  function getLatitude(
+    location: SightingLocation | null,
+  ): number | null {
+    return typeof location?.latitude === "number"
+    ? location.latitude
+    : null;
+  }
+
+  function getLongitude(
+    location: SightingLocation | null,
+  ): number | null {
+    return typeof location?.longitude === "number"
+    ? location.longitude
+    : null;
+  }
+
+  
 
   return (
     <div className="max-w-container-max mx-auto">
@@ -474,7 +558,7 @@ export default function SightingsPage() {
       <div className="space-y-4">
         {data?.items.map((item) => (
           <button
-            key={item.sighting_id}
+            key={item.id}
             type="button"
             onClick={() => {
               setSelected(item);
@@ -484,7 +568,7 @@ export default function SightingsPage() {
           >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-label-caps font-mono text-on-surface-variant">{item.sighting_id.slice(0, 8).toUpperCase()}</span>
+                <span className="text-label-caps font-mono text-on-surface-variant">{item.reference_code}</span>
 
                 <span
                   className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${MODERATION_STATUS_STYLES[item.moderation_status]
@@ -494,7 +578,7 @@ export default function SightingsPage() {
                 </span>
 
 
-                {item.image && (
+                {item.media_ids.length > 0 && (
                   <span className="material-symbols-outlined text-on-surface-variant text-sm">
                     photo_camera
                   </span>
@@ -503,18 +587,18 @@ export default function SightingsPage() {
 
               <p className="text-on-surface text-body-md line-clamp-2">{item.description || "No description given."}</p>
 
-              <p className="text-on-surface text-body-md">{item.location ?? "No location given."}</p>
+              <p className="text-on-surface text-body-md">{getLocationAddress(item.location)}</p>
 
-              {item.latitude !== null && item.longitude !== null && (
+              {getLatitude(item.location) !== null && getLongitude(item.location) !== null && (
                 <p className="mt-1 text-sm text-on-surface-variant">
-                  Coordinates: {item.latitude}, {item.longitude}
+                  Coordinates: {getLatitude(item.location)}, {getLongitude(item.location)}
                 </p>
               )}
             </div>
 
             <span className="text-body-sm text-on-surface-variant whitespace-nowrap">
               {new Date(
-                item.timestamp ?? item.created_at, 
+                item.reported_at ?? item.occurred_at ?? item.created_at, 
                 ).toLocaleDateString()}
             </span>
           </button>
@@ -568,7 +652,7 @@ export default function SightingsPage() {
                   </h3>
 
                   <p className="mt-1 font-mono text-xs text-on-surface-variant">
-                    {selected.sighting_id}
+                    {selected.reference_code}
                   </p>
                 </div>
 
@@ -588,27 +672,31 @@ export default function SightingsPage() {
 
                 {/* Location */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailField label="Location" value={selected.location ?? "Not supplied"}/>
+                  <DetailField label="Location" value={getLocationAddress(selected.location) ?? "Not supplied"}/>
 
-                  <DetailField label="Submitted" value={new Date(selected.timestamp ?? selected.created_at,).toLocaleString()}/>
+                  <DetailField label="Submitted" value={new Date(selected.reported_at ?? selected.occurred_at ?? selected.created_at,).toLocaleString()}/>
 
-                  <DetailField label="Criminal reference" value={selected.criminal_id ?? "Not linked"} mono={Boolean(selected.criminal_id)}/>
+                  <DetailField label="Sighting Type" value={selected.sighting_type}/>
+
+                  <DetailField label="Visibility" value={selected.visibility}/>
+
+                  <DetailField label="Anonymous" value={selected.is_anonymous ? "Yes" : "No"}/>
                 </div>
 
                 {/* Coordinates */}
                 <DetailSection title="Coordinates">
-                  {selected.latitude !== null && selected.longitude !== null ? (
+                  {getLatitude(selected.location) !== null && getLongitude(selected.location) !== null ? (
                     <div className="space-y-2">
                       <p className="text-sm text-on-surface">
-                        Latitude: {selected.latitude}
+                      Latitude: {getLatitude(selected.location)}
                       </p>
 
                       <p className="text-sm text-on-surface">
-                        Longitude: {selected.longitude}
+                      Longitude: {getLongitude(selected.location)}
                       </p>
 
                       <a
-                        href={`https://www.google.com/maps?q=${selected.latitude}, ${selected.longitude}`}
+                      href={`https://www.google.com/maps?q=${getLatitude(selected.location) }, ${getLongitude(selected.location) }`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
@@ -627,16 +715,20 @@ export default function SightingsPage() {
                 </DetailSection>
 
                   {/* Submitted Image */}
-                <DetailSection title="Submitted image">
-                  {selected.image ? (
-                    <img
-                      src={selected.image}
-                      alt="Submitted sighting evidencec"
-                      className="max-h-[420px] w-full rounded-lg border-outline-variant object-contain"
-                    />
+                <DetailSection title="Submitted images">
+                  {selected.media_ids.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {selected.media_ids.map((mediaPath) => (
+                        <div key={mediaPath} className="rounded-lg border border-outline-variant p-3">
+                          <p className="break-all text-sm text-on-surface-variant">
+                            {mediaPath}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <p className="text-sm text-on-surface-variant">
-                      No image given
+                      No images supplied
                     </p>
                   )}
                 </DetailSection>
@@ -645,9 +737,11 @@ export default function SightingsPage() {
                 <DetailField 
                   label="Submitted by"
                   value={
-                      selected.author
-                      ?  `${selected.author.name} (${selected.author.email})`
-                      : selected.created_by ?? "Unknown user"
+                      selected.is_anonymous
+                      ? "Anonymous community member"
+                      : selected.author
+                        ? `${selected.author.name} (${selected.author.email})`
+                        : selected.reporter_user_id ?? "Unknown user"
                   }
                 />
 
@@ -682,7 +776,8 @@ export default function SightingsPage() {
 
                   {moderationMutation.isError && (
                     <p className="text-sm text-error">
-                      Failed to update sighting: {moderationMutation.error.message}
+                      Failed to moderate sighting: {" "}
+                      {moderationMutation.error.message}
                     </p>
                   )}
 
@@ -695,13 +790,11 @@ export default function SightingsPage() {
                     if(!selected) return;
 
                     moderationMutation.mutate({
-                      sightingId: selected.sighting_id,
-                      authorId: selected.created_by,
+                      sightingId: selected.id,
+                      authorId: selected.reporter_user_id,
                       decision: "REJECTED",
                       reason: moderationReason,
                       location: selected.location,
-                      latitude: selected.latitude,
-                      longitude: selected.longitude,
                     });
                   }}
                   >
@@ -711,6 +804,7 @@ export default function SightingsPage() {
                     } 
                   </button>
 
+                  {/* Approve Sighting Button */}
                   <button 
                     type="button" 
                     className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary/90"
@@ -719,13 +813,11 @@ export default function SightingsPage() {
                       if(!selected) return;
 
                       moderationMutation.mutate({
-                        sightingId: selected.sighting_id,
-                        authorId: selected.created_by,
+                        sightingId: selected.id,
+                        authorId: selected.reporter_user_id,
                         decision: "APPROVED",
                         reason: moderationReason,
                         location: selected.location,
-                        latitude: selected.latitude,
-                        longitude: selected.longitude,
                       });
                     }}
                   >
