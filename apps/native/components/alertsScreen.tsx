@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, Text, TextInput, View, RefreshControl } from "react-native";
+import { Image, Modal, Pressable, ScrollView, Text, TextInput, View, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { queryClient, trpc } from "@/utils/trpc";
@@ -117,6 +117,7 @@ function AlertCard({
   action,
   onAction,
   actionDisabled,
+  onPress,
 }: {
   accent: string;
   badge: string;
@@ -131,9 +132,10 @@ function AlertCard({
   action: string;
   onAction?: () => void;
   actionDisabled?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <View
+    <Pressable
       style={{
         backgroundColor: "#ffffff",
         borderRadius: 16,
@@ -145,6 +147,8 @@ function AlertCard({
         elevation: 3,
         flexDirection: "row",
       }}
+      onPress={onPress}
+      disabled={!onPress}
     >
       <View style={{ width: 4, backgroundColor: accent }} />
       <View style={{ flex: 1, padding: 14 }}>
@@ -176,7 +180,7 @@ function AlertCard({
             <Text style={{ color: "#94a3b8", fontWeight: "700", flexShrink: 1 }}>{location}</Text>
           </View>
           <Pressable
-            onPress={onAction}
+            onPress={(event) => {event.stopPropagation(); onAction?.();}}
             disabled={actionDisabled}
             style={({ pressed }) => ({ opacity: actionDisabled ? 0.5 : pressed ? 0.85 : 1 })}
           >
@@ -184,7 +188,7 @@ function AlertCard({
           </Pressable>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -261,8 +265,50 @@ function formatAlertLocation(location: unknown, fallback: string): string {
   return fallback;
 }
 
+function formatSightingLocation(location: unknown): string {
+  if(!location || typeof location !== "object")
+  {
+    return "Location unavailable";
+  }
+
+  const loc = location as Record<string, unknown>;
+
+  if(typeof loc.address === "string" && loc.address.trim())
+  {
+    return loc.address.trim();
+  }
+
+  if(typeof loc.label === "string" && loc.label.trim())
+  {
+    return loc.label.trim();
+  }
+
+  if (typeof loc.name === "string" && loc.name.trim()) {
+    return loc.name.trim();
+  }
+
+  return "Location unavailable";
+} 
+
+function formatDateTime(value: string | Date | null | undefined): string {
+  if(!value)
+  {
+    return "Not specified";
+  }
+
+  const date = new Date(value);
+
+  if(Number.isNaN(date.getTime()))
+  {
+    return "Not specified";
+  }
+
+  return date.toLocaleString();
+}
+
 export default function AlertsScreen() {
   const [search, setSearch] = useState("");
+  const [selectedSightingId, setSelectedSightingId] = useState<string | null>(null);
 
   const {
     data: alerts = [],
@@ -272,6 +318,15 @@ export default function AlertsScreen() {
     refetch,
     isRefetching,
   } = useQuery({...trpc.alerts.listMine.queryOptions(), refetchOnMount: "always", refetchOnReconnect: true,});
+
+  const sightingQuery = useQuery({
+    ...trpc.sightings.getPublicById.queryOptions({
+      id: selectedSightingId ?? "",
+    }),
+    enabled: Boolean(selectedSightingId),
+  });
+
+  console.log("Selected sighting:", sightingQuery.data,);
 
   useFocusEffect(
     useCallback(() => {
@@ -367,6 +422,7 @@ export default function AlertsScreen() {
           {visible.map((alert) => {
             const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.MEDIUM;
             const acknowledged = Boolean(alert.acknowledgedAt);
+            const isSightingAlert = alert.sourceEntityType === "COMMUNITY_SIGHTING" && Boolean(alert.sourceEntityId);
 
             return (
               <AlertCard
@@ -384,6 +440,7 @@ export default function AlertsScreen() {
                 action={acknowledged ? "ACKNOWLEDGED" : "ACKNOWLEDGE"}
                 actionDisabled={acknowledged || acknowledge.isPending}
                 onAction={() => acknowledge.mutate({ alertId: alert.id })}
+                onPress={isSightingAlert ? () => setSelectedSightingId(alert.sourceEntityId!) : undefined}
               />
             );
           })}
@@ -392,6 +449,378 @@ export default function AlertsScreen() {
         <View style={{ marginTop: 18 }}>
           <MonitoringMapCard />
         </View>
+
+        <Modal
+          visible={Boolean(selectedSightingId)}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSelectedSightingId(null)}
+        >
+
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(15, 23, 42, 0.55)",
+              justifyContent: "flex-end",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: "#ffffff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                maxHeight: "88%",
+                paddingTop: 18,
+              }}
+            >
+
+              <View
+                style={{
+                  paddingHorizontal: 18,
+                  paddingBottom: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#e2e8f0",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontWeight: "900",
+                      color: "#0f172a",
+                    }}
+                  >
+                    Sighting Details
+                  </Text>
+
+                  {sightingQuery.data?.referenceCode && (
+                    <Text
+                      style={{
+                        marginTop: 4,
+                        color: "#64748b",
+                        fontWeight: "700",
+                      }}
+                    >
+                      {sightingQuery.data.referenceCode}
+                    </Text>
+                  )}
+                </View>
+
+                <Pressable
+                  onPress={() => setSelectedSightingId(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close sighting details"
+                  style={({ pressed }) => ({
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "#f1f5f9",
+                    opacity: pressed ? 0.75 : 1,
+                  })}
+                >
+
+                  <Ionicons
+                    name="close"
+                    size={22}
+                    color="#0f172a"
+                  />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                contentContainerStyle={{
+                  padding: 18,
+                  paddingBottom: 36,
+                }}
+                showsVerticalScrollIndicator={false}
+              >
+                {/* Load Query or Loading Query */}
+                {sightingQuery.isLoading && (
+                  <Text
+                    style={{
+                      color: "#64748b",
+                      fontWeight: "700",
+                    }}
+                  >
+                    Loading sighting details...
+                  </Text>
+                )}
+
+                {/* Error check */}
+                {sightingQuery.isError && (
+                  <View
+                    style={{
+                      padding: 14,
+                      borderRadius: 12,
+                      backgroundColor: "#fee2e2",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#991b1b",
+                        fontWeight: "800",
+                      }}
+                    >
+                      Failed to load sighting: {" "}
+                      {sightingQuery.error?.message ?? "Unknown error"}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Sighting Data */}
+                {sightingQuery.data && (
+                  <>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 16,
+                      }}
+                    >
+
+                      <View
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 999,
+                          backgroundColor: "#dcfce7",
+                        }}
+                      >
+
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "900",
+                            color: "#166534",
+                          }}
+                        >
+                          APPROVED
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={{
+                          color: "#64747b",
+                          fontWeight: "700",
+                        }}
+                      >
+                        {sightingQuery.data.sightingType}
+                      </Text>
+                    </View>
+
+                    {sightingQuery.data.media?.length > 0 && (
+                      <View
+                        style={{
+                          marginBottom: 18,
+                          borderRadius: 16,
+                          overflow: "hidden",
+                          backgroundColor: "#e2e8f0",
+                        }}
+                      >
+
+                        <Image
+                          source={{
+                            uri:
+                              sightingQuery.data.media[0]
+                              ?.storageUrl,
+                          }}
+                          style={{
+                            width: "100%",
+                            height: 220,
+                          }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    )}
+
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: "#64748b",
+                        fontWeight: "800",
+                      }}
+                    >
+                      DESCRIPTION
+                    </Text>
+
+                    <Text
+                      style={{
+                        marginTop: 6,
+                        fontSize: 16,
+                        lineHeight: 23,
+                        color: "#0f172a",
+                      }}
+                    >
+                      {sightingQuery.data.description}
+                    </Text>
+
+                    <View
+                      style={{
+                        marginTop: 20,
+                        gap: 14,
+                      }}
+                    >
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 10,
+                        }}
+                      >
+
+                        <Ionicons
+                          name="location-outline"
+                          size={20}
+                          color={BRAND_BLUE}
+                        />
+
+                        <View
+                          style={{ flex: 1 }}
+                        >
+
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              fontWeight: "800",
+                            }}
+                          >
+                            LOCATION
+                          </Text>
+
+                          <Text
+                            style={{
+                              marginTop: 3,
+                              color: "#0f172a",
+                              fontWeight: "700",
+                            }}
+                          >
+                            {formatSightingLocation(sightingQuery.data.location,)}
+                          </Text>
+                        </View>
+                      </View>
+
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 10,
+                        }}
+                      >
+
+                        <Ionicons
+                          name="time-outline"
+                          size={20}
+                          color={BRAND_BLUE}
+                        />
+
+                        <View
+                          style={{
+                            flex: 1,
+                          }}
+                        >
+
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              fontWeight: "800",
+                            }}
+                          >
+                            OBSERVED
+                          </Text>
+
+
+                          <Text
+                            style={{
+                              marginTop: 3,
+                              color: "#0f172a",
+                              fontWeight: "700",
+                            }}
+                          >
+                            {formatDateTime(
+                              sightingQuery.data.occurredAt ??
+                              sightingQuery.data.reportedAt ?? 
+                              sightingQuery.data.createdAt,
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    
+                    {/* Moderation Reason */}
+                    {sightingQuery.data.moderationReason && (
+                      <View
+                        style={{
+                          marginTop: 20,
+                          padding: 14,
+                          borderRadius: 14,
+                          backgroundColor: "#f8fafc",
+                          borderWidth: 1,
+                          borderColor: "#e2e8f0",
+                        }}
+                      >
+
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "900",
+                            color: "#64748b",
+                          }}
+                        >
+                          MODERATOR NOTE
+                        </Text>
+
+                        <Text
+                          style={{
+                            marginTop: 6,
+                            color: "#334155",
+                            lineHeight: 20,
+                          }}
+                        >
+                          {
+                            sightingQuery.data.moderationReason
+                          }
+                        </Text>
+                      </View>
+                    )}
+
+                    <Pressable
+                      onPress={() => setSelectedSightingId(null)}
+                      style={({ pressed }) => ({
+                        marginTop: 24,
+                        backgroundColor: CTA_BG,
+                        borderRadius: 14,
+                        alignItems: "center",
+                        opacity: pressed ? 0.85 : 1,
+                      })}
+                    >
+
+                      <Text
+                        style={{
+                          color: "#ffffff",
+                          fontWeight: "900",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        CLOSE
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
       </ScrollView>
     </SafeAreaView>
   );

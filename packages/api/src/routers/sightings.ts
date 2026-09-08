@@ -2,7 +2,7 @@ import { db } from "@Sentinel360/db";
 import { mediaAsset } from "@Sentinel360/db/schema/evidence";
 import { communitySighting } from "@Sentinel360/db/schema/sightings";
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 
 import { protectedProcedure, requirePermission, router } from "../index";
 import {
@@ -153,6 +153,58 @@ export const sightingsRouter = router({
     return getSightingOrThrow(input.id);
   }),
 
+  getPublicById: protectedProcedure
+    .input(idSchema)
+    .query(async ({ input }) => {
+      const [found] = await db
+      .select()
+      .from(communitySighting)
+      .where(
+        and(
+          eq(communitySighting.id, input.id),
+          eq(communitySighting.visibility, "COMMUNITY"),
+          eq(communitySighting.moderationStatus, "APPROVED"),
+        ),
+      )
+      .limit(1);
+
+      if(!found) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Approved sighting not found",
+        });
+      }
+
+      const mediaIds = Array.isArray(found.mediaIds)
+        ? found.mediaIds.filter(
+          (id): id is string =>
+            typeof id === "string",
+        )
+        : [];
+
+      
+      
+      const media = mediaIds.length > 0 ? await db
+      .select({
+        id: mediaAsset.id,
+        type: mediaAsset.type,
+        title: mediaAsset.title,
+        originalFilename:
+          mediaAsset.originalFilename,
+        mimeType: mediaAsset.mimeType,
+        storageUrl: mediaAsset.storageUrl,
+        status: mediaAsset.status,
+      })
+      .from(mediaAsset)
+      .where(inArray(mediaAsset.id, mediaIds))
+      : [];
+
+      return {
+        ...found,
+        media,
+      };
+    }),
+
   verify: requirePermission("sightings:moderate")
     .input(verifySightingSchema)
     .mutation(async ({ ctx, input }) => {
@@ -163,7 +215,7 @@ export const sightingsRouter = router({
         .set({
           moderationStatus: input.decision,
           moderationReason: input.notes,
-          visibility: input.decision === "APPROVED" ? "PUBLIC" : "PRIVATE",
+          visibility: input.decision === "APPROVED" ? "COMMUNITY" : "PRIVATE",
           status: "RESOLVED",
           updatedAt: new Date(),
         })
