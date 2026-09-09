@@ -189,7 +189,7 @@ export default function ReportScreen() {
 
       const ref = generateReferenceCode();
 
-      const { error: insertedError, error: insertError } = await supabase.from("community_sighting").insert({
+      const { error: insertError } = await supabase.from("community_sighting").insert({
         
         reference_code: ref,
         reporter_user_id: isAnonymous ? null : user.id,
@@ -214,11 +214,19 @@ export default function ReportScreen() {
         reported_at: new Date().toISOString(),
         is_anonymous: isAnonymous,
       })
-      .select("id, reference_code")
-      .single();
 
       if (insertError) {
-        throw insertError;
+        console.error("Sighting submission failed:", {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        });
+        throw new Error(
+          `${insertError.message}${
+            insertError.details ? ` - ${insertError.details}` : ""
+          }`,
+        );
       }
 
       setReferenceCode(ref);
