@@ -15,6 +15,7 @@ import { recordAuditEvent } from "../services/audit-log";
 import { sha256Hex } from "../services/chain-of-custody";
 import { uploadEvidenceFile } from "../services/evidence-storage";
 import { insertSightingWithGeneratedNumber } from "../services/sighting-number";
+import { getEvidenceSignedUrl } from "../services/evidence-storage";
 
 function pushIf<T>(arr: T[], item: T | undefined): void {
   if (item !== undefined) {
@@ -258,9 +259,34 @@ export const sightingsRouter = router({
       .where(inArray(mediaAsset.id, mediaIds))
       : [];
 
+      const mediaWithSignedUrls = await Promise.all(
+        media.map(async (item) => ({
+          id: item.id,
+          type: item.type,
+          title: item.title,
+          originalFileName: item.originalFilename,
+          mimeType: item.mimeType,
+          status: item.status,
+
+          signedUrl: await getEvidenceSignedUrl(
+            item.storageUrl,
+            300,
+          ),
+        })),
+      );
+
+      console.log(
+        "Signed sighting media:",
+        mediaWithSignedUrls.map((item) => ({
+          id: item.id,
+          mimeType: item.mimeType,
+          hasSignedUrl: Boolean(item.signedUrl),
+        })),
+      );
+
       return {
         ...found,
-        media,
+        media: mediaWithSignedUrls,
       };
     }),
 

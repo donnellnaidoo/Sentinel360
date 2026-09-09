@@ -309,6 +309,7 @@ function formatDateTime(value: string | Date | null | undefined): string {
 export default function AlertsScreen() {
   const [search, setSearch] = useState("");
   const [selectedSightingId, setSelectedSightingId] = useState<string | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const {
     data: alerts = [],
@@ -619,24 +620,40 @@ export default function AlertsScreen() {
                       <View
                         style={{
                           marginBottom: 18,
-                          borderRadius: 16,
-                          overflow: "hidden",
-                          backgroundColor: "#e2e8f0",
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          justifyContent: "space-between",
+                          gap: 10,
                         }}
                       >
 
-                        <Image
-                          source={{
-                            uri:
-                              sightingQuery.data.media[0]
-                              ?.storageUrl,
-                          }}
-                          style={{
-                            width: "100%",
-                            height: 220,
-                          }}
-                          resizeMode="cover"
-                        />
+                        {sightingQuery.data.media.map((item) => (
+                          <View
+                            key={item.id}
+                            style={{
+                              width: "48%",
+                              borderRadius: 16,
+                              overflow: "hidden",
+                              backgroundColor: "#e2e8f0",
+                            }}
+                          >
+
+                            <Pressable onPress={() => setSelectedImageUrl(item.signedUrl)}>
+                              <Image
+                                source={{
+                                  uri: item.signedUrl,
+                                }}
+                                style={{
+                                  width: "100%",
+                                  height: 150,
+                                }}
+                                resizeMode="cover"
+                              />
+                            </Pressable>
+
+                            
+                            </View>
+                        ))}
                       </View>
                     )}
 
@@ -819,6 +836,36 @@ export default function AlertsScreen() {
               </ScrollView>
             </View>
           </View>
+        </Modal>
+
+
+        <Modal
+          visible={Boolean(selectedImageUrl)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSelectedImageUrl(null)}
+        >
+          <Pressable
+            onPress={() => setSelectedImageUrl(null)}
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0, 0, 0, 0.9)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 20,
+            }}
+          >
+            {selectedImageUrl && (
+              <Image
+                source={{ uri: selectedImageUrl}}
+                style={{
+                  width: "100%",
+                  height: "80%",
+                }}
+                resizeMode="contain"
+              />
+            )}
+          </Pressable>
         </Modal>
 
       </ScrollView>
