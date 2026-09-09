@@ -13,7 +13,7 @@ import {
 } from "../validators";
 import { recordAuditEvent } from "../services/audit-log";
 import { sha256Hex } from "../services/chain-of-custody";
-import { uploadEvidenceFile } from "../services/evidence-storage";
+import { uploadEvidenceFile, deleteEvidenceFile } from "../services/evidence-storage";
 import { insertSightingWithGeneratedNumber } from "../services/sighting-number";
 import { getEvidenceSignedUrl } from "../services/evidence-storage";
 
@@ -75,7 +75,7 @@ export const sightingsRouter = router({
       let createdMedia;
 
       try {
-        [createdMedia] = await db
+        const [createdMedia] = await db
           .insert(mediaAsset)
           .values({
             type: "PHOTO",
@@ -91,20 +91,33 @@ export const sightingsRouter = router({
             createdByUserId: input.isAnonymous ? null : ctx.session.user.id,
           })
           .returning();
+
+        if (createdMedia) {
+          mediaIds.push(createdMedia.id);
+        }
+
+        console.log("Created media asset:", {
+          id: createdMedia?.id,
+          storagePath,
+        });
+
       } catch (error) {
         console.error("MEDIA ASSET INSERT FAILED:", error);
 
-        if (error && typeof error === "object" && "cause" in error) {
-          console.error(
-            "MEDIA ASSET DATABASE CAUSE:",
-            (error as { cause?: unknown }).cause,
-          );
-        }
+        await deleteEvidenceFile(storagePath);
 
+        // if (error && typeof error === "object" && "cause" in error) {
+        //   console.error(
+        //     "MEDIA ASSET DATABASE CAUSE:",
+        //     (error as { cause?: unknown }).cause,
+        //   );
+        // }
+
+        
         throw error;
       }
 
-      // const [createdMedia] = await db
+      // [createdMedia] = await db
       //   .insert(mediaAsset)
       //   .values({
       //     type: "PHOTO",
@@ -121,15 +134,11 @@ export const sightingsRouter = router({
       //   })
       //   .returning();
 
-        console.log("Created media asset:", {
-          id: createdMedia?.id,
-          storagePath,
-        });
+      
 
-        if(createdMedia)
-        {
-          mediaIds.push(createdMedia.id);
-        }
+        
+
+        
     }
 
     console.log("Final mediaIds before sighting insert:", mediaIds);

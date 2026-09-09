@@ -84,6 +84,26 @@ async function ensureBucketExists(): Promise<void> {
   // bucketEnsured = true;
 }
 
+//Delete/Cleanup helper
+
+export async function deleteEvidenceFile(
+  storagePath: string,
+): Promise<void> {
+  const { error } = await supabaseAdmin.storage
+    .from(EVIDENCE_BUCKET)
+    .remove([storagePath]);
+
+  if (error)
+  {
+    console.error(
+      "Failed to clean up evidence file:",
+      storagePath,
+      error,
+    );
+  }
+}
+
+
 export async function uploadEvidenceFile(
   fileBytes: Buffer,
   originalFilename: string,
