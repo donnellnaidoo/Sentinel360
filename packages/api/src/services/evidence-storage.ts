@@ -6,24 +6,82 @@ import { TRPCError } from "@trpc/server";
 const EVIDENCE_BUCKET = "evidence";
 let bucketEnsured = false;
 
+const EVIDENCE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+const MAX_EVIDENCE_FILE_SIZE = 10 * 1024 * 1024; //10 MB
+
 // Evidence must never be world-readable — every read goes through
 // getEvidenceDownloadUrl() so it's logged as a chain-of-custody ACCESSED
 // event and the URL expires quickly.
 async function ensureBucketExists(): Promise<void> {
   if (bucketEnsured) return;
-  const { data: buckets } = await supabaseAdmin.storage.listBuckets();
-  if (!buckets?.some((b) => b.name === EVIDENCE_BUCKET)) {
-    const { error } = await supabaseAdmin.storage.createBucket(EVIDENCE_BUCKET, {
-      public: false,
+  const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
+
+  if(listError)
+  {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Failed to inspect evidence storage bucket: ${listError.message}`,
     });
-    if (error && !error.message.includes("already exists")) {
+  }
+
+  const bucketExists = buckets?.some((bucket) => bucket.name === EVIDENCE_BUCKET,);
+
+  if(!bucketExists)
+  {
+    const { error } = await supabaseAdmin.storage.createBucket(
+      EVIDENCE_BUCKET,
+      {
+        public: false,
+        fileSizeLimit: MAX_EVIDENCE_FILE_SIZE,
+        allowedMimeTypes: EVIDENCE_MIME_TYPES,
+      },
+    );
+
+    if(error && !error.message.includes("already exists"))
+    {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: `Failed to provision evidence storage bucket: ${error.message}`,
+        message: `Failed to retrieve evidence storage bucket: ${error.message}`,
+      });
+    }
+  } else{
+    const { error } = await supabaseAdmin.storage.updateBucket(
+      EVIDENCE_BUCKET,
+      {
+        public: false,
+        fileSizeLimit: MAX_EVIDENCE_FILE_SIZE,
+        allowedMimeTypes: EVIDENCE_MIME_TYPES,
+      },
+    );
+
+    if(error)
+    {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Failed to secure evidence storage bucket: ${error.message}`,
       });
     }
   }
+
   bucketEnsured = true;
+
+  // if (!buckets?.some((b) => b.name === EVIDENCE_BUCKET)) {
+  //   const { error } = await supabaseAdmin.storage.createBucket(EVIDENCE_BUCKET, {
+  //     public: false,
+  //   });
+  //   if (error && !error.message.includes("already exists")) {
+  //     throw new TRPCError({
+  //       code: "INTERNAL_SERVER_ERROR",
+  //       message: `Failed to provision evidence storage bucket: ${error.message}`,
+  //     });
+  //   }
+  // }
+  // bucketEnsured = true;
 }
 
 export async function uploadEvidenceFile(
@@ -39,6 +97,31 @@ export async function uploadEvidenceFile(
   const { error } = await supabaseAdmin.storage
     .from(EVIDENCE_BUCKET)
     .upload(storagePath, fileBytes, { contentType: mimeType, upsert: false });
+
+
+  if(!EVIDENCE_MIME_TYPES.includes(mimeType))
+  {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Unsupported evidence file type.",
+    });
+  }
+
+  if(fileBytes.length > MAX_EVIDENCE_FILE_SIZE)
+  {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Evidence image exceeds the 10 MB limit.",
+    });
+  }
+
+  if(fileBytes.length === 0)
+  {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Evidence file is empty.",
+    });
+  }
 
   if (error) {
     throw new TRPCError({

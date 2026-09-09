@@ -8,9 +8,10 @@ import * as ImagePicker from "expo-image-picker";
 import { useToast } from "heroui-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { supabase } from "@/lib/supabase";
+import { File } from "expo-file-system";
 
 import { trpc } from "@/utils/trpc";
+
 
 const SHEET_BG = "#ffffff";
 const BRAND_BLUE = "#1e3a8a";
@@ -21,6 +22,9 @@ const MIN_DESCRIPTION_LENGTH = 10;
 type ReportPhoto = {
   id: string;
   uri: string;
+  fileName: string;
+  mimeType: string;
+  fileSize?: number;
 };
 
 function generateReferenceCode() {
@@ -46,6 +50,7 @@ export default function ReportScreen() {
       onSuccess: () => {
         setDescription("");
         setLocationAddress("");
+        setPhotos([]);
       },
     }),
   );
@@ -92,6 +97,9 @@ export default function ReportScreen() {
     const nextPhotos = assets.slice(0, remaining).map((asset, index) => ({
       id: `${asset.assetId ?? asset.uri}-${Date.now()}-${index}`,
       uri: asset.uri,
+      fileName: asset.fileName ?? `sighting-${Date.now()}-${index}.jpg`,
+      mimeType: asset.mimeType ?? "image/jpeg",
+      fileSize: asset.fileSize ?? undefined,
     }));
 
     setPhotos((current) => [...current, ...nextPhotos]);
@@ -167,6 +175,11 @@ export default function ReportScreen() {
     setPhotos((current) => current.filter((photo) => photo.id !== id));
   }
 
+  async function photoToBase64(photo: ReportPhoto): Promise<string> {
+    const file = new File(photo.uri);
+    return await file.base64();
+  }
+
   async function handleSubmit() {
     setError(null);
 
@@ -178,67 +191,49 @@ export default function ReportScreen() {
     setIsSubmitting(true);
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        throw new Error("You must be logged in to submit a report.");
-      }
+      const preparedPhotos = await Promise.all(
+        photos.map(async (photo) => ({
+          base64: await photoToBase64(photo),
+          mimeType: photo.mimeType,
+          originalFilename: photo.fileName,
+          fileSize: photo.fileSize,
+        })),
+      );
 
-      const ref = generateReferenceCode();
+      console.log("Prepared photos:", {
+        count: preparedPhotos.length,
+        photos: preparedPhotos.map((photo) => ({
+          mimeType: photo.mimeType,
+          originalFilename: photo.originalFilename,
+          fileSize: photo.fileSize,
+          base64Length: photo.base64.length,
+        })),
+      });
 
-      const { error: insertError } = await supabase.from("community_sighting").insert({
-        
-        reference_code: ref,
-        reporter_user_id: isAnonymous ? null : user.id,
-
-        sighting_type: "COMMUNITY_REPORT",
-        title: null,
+      const created = await submitSighting.mutateAsync({
+        sightingType: "COMMUNITY_REPORT",
         description: trimmedDescription,
 
-        location: {
-          address: locationAddress.trim() || null,
-        },
+        location: locationAddress.trim() ? { address: locationAddress.trim(), } : undefined,
 
-        media_ids: [],
+        isAnonymous,
 
-        status: "SUBMITTED",
-        severity: null,
-        visibility: "PRIVATE",
+        photos: preparedPhotos,
+      });
 
-        moderation_status: "PENDING",
-        moderation_reason: null,
-
-        reported_at: new Date().toISOString(),
-        is_anonymous: isAnonymous,
-      })
-
-      if (insertError) {
-        console.error("Sighting submission failed:", {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code,
-        });
-        throw new Error(
-          `${insertError.message}${
-            insertError.details ? ` - ${insertError.details}` : ""
-          }`,
-        );
-      }
-
-      setReferenceCode(ref);
+      setReferenceCode(created.referenceCode);
       setIsSubmitted(true);
 
       toast.show({
         variant: "success",
-        label: "Your report has been submitted.",
+        label: "Your report has been submitted",
       });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Something went wrong. Please try again.";
+
+        console.error("Sighting submission failed:", error);
 
       setError(message);
       toast.show({

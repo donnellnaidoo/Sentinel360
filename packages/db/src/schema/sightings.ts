@@ -22,7 +22,7 @@ export const communitySighting = pgTable("community_sighting", {
   mediaIds: jsonb("media_ids").default([]).notNull(),
   status: text("status").default("SUBMITTED").notNull(),
   severity: text("severity"),
-  visibility: text("visibility").default("PUBLIC").notNull(),
+  visibility: text("visibility").default("PRIVATE").notNull(),
   operatorNotes: text("operator_notes"),
   linkedIncidentId: uuid("linked_incident_id").references(() => incident.id, {
     onDelete: "set null",

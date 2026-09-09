@@ -30,7 +30,7 @@ export const mediaAsset = pgTable(
     originalFilename: text("original_filename").notNull(),
     mimeType: text("mime_type").notNull(),
     fileSize: bigint("file_size", { mode: "number" }).notNull(),
-    fileHash: text("file_hash").notNull().unique(),
+    fileHash: text("file_hash").notNull(),
     storageUrl: text("storage_url").notNull(),
     storageTier: text("storage_tier").default("HOT").notNull(),
     duration: integer("duration"),

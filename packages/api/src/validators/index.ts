@@ -439,10 +439,17 @@ export const submitSightingSchema = z.object({
   isAnonymous: z.boolean().default(false),
   // Photo is optional for this MVP pass (no camera/gallery picker wired on
   // native yet) — the documented "at least one media" rule is relaxed.
-  photoBase64: z.string().min(1).optional(),
-  mimeType: z.string().min(1).max(200).optional(),
-  originalFilename: z.string().min(1).max(500).optional(),
-  fileSize: z.number().int().positive().optional(),
+  photos: z
+    .array(
+      z.object({
+        base64: z.string().min(1),
+        mimeType: z.string().min(1).max(200),
+        originalFilename: z.string().min(1).max(500),
+        fileSize: z.number().int().positive().optional(),
+      }),
+    )
+    .max(4)
+    .default([]),
 });
 
 export const sightingListSchema = z.object({

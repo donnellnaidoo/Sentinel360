@@ -45,34 +45,93 @@ export const sightingsRouter = router({
   // this is a self-service report, not an internal-operations action, so it
   // isn't gated by a sightings:* permission (matches users.me/updateMe).
   submit: protectedProcedure.input(submitSightingSchema).mutation(async ({ ctx, input }) => {
+    console.log("!!! NEW MULTI-PHOTO SIGHTINGS ROUTER IS RUNNING !!!");
+    console.log("SERVER submit photos:", {
+      count: input.photos.length,
+      photos: input.photos.map((photo) => ({
+        mimeType: photo.mimeType,
+        originalFilename: photo.originalFilename,
+        fileSize: photo.fileSize,
+        base64Length: photo.base64.length,
+      })),
+    });
+
     const mediaIds: string[] = [];
 
-    if (input.photoBase64 && input.mimeType && input.originalFilename) {
-      const fileBytes = Buffer.from(input.photoBase64, "base64");
+    console.log("Starting evidence upload loop");
+
+    for(const photo of input.photos)
+    {
+      const fileBytes = Buffer.from(photo.base64, "base64");
       const fileHash = sha256Hex(fileBytes);
+
       const { storagePath } = await uploadEvidenceFile(
         fileBytes,
-        input.originalFilename,
-        input.mimeType,
+        photo.originalFilename,
+        photo.mimeType,
       );
 
-      const [createdMedia] = await db
-        .insert(mediaAsset)
-        .values({
-          type: "PHOTO",
-          title: `Sighting photo — ${input.originalFilename}`,
-          source: "SIGHTING",
-          originalFilename: input.originalFilename,
-          mimeType: input.mimeType,
-          fileSize: input.fileSize ?? fileBytes.length,
-          fileHash,
-          storageUrl: storagePath,
-          status: "READY",
-          createdByUserId: ctx.session.user.id,
-        })
-        .returning();
-      if (createdMedia) mediaIds.push(createdMedia.id);
+      let createdMedia;
+
+      try {
+        [createdMedia] = await db
+          .insert(mediaAsset)
+          .values({
+            type: "PHOTO",
+            title: `Sighting photo - ${photo.originalFilename}`,
+            source: "SIGHTING",
+            originalFilename: photo.originalFilename,
+            mimeType: photo.mimeType,
+            fileSize: photo.fileSize ?? fileBytes.length,
+            fileHash,
+            storageUrl: storagePath,
+            status: "READY",
+
+            createdByUserId: input.isAnonymous ? null : ctx.session.user.id,
+          })
+          .returning();
+      } catch (error) {
+        console.error("MEDIA ASSET INSERT FAILED:", error);
+
+        if (error && typeof error === "object" && "cause" in error) {
+          console.error(
+            "MEDIA ASSET DATABASE CAUSE:",
+            (error as { cause?: unknown }).cause,
+          );
+        }
+
+        throw error;
+      }
+
+      // const [createdMedia] = await db
+      //   .insert(mediaAsset)
+      //   .values({
+      //     type: "PHOTO",
+      //     title: `Sighting photo - ${photo.originalFilename}`,
+      //     source: "SIGHTING",
+      //     originalFilename: photo.originalFilename,
+      //     mimeType: photo.mimeType,
+      //     fileSize: photo.fileSize ?? fileBytes.length,
+      //     fileHash,
+      //     storageUrl: storagePath,
+      //     status: "READY",
+
+      //     createdByUserId: input.isAnonymous ? null : ctx.session.user.id,
+      //   })
+      //   .returning();
+
+        console.log("Created media asset:", {
+          id: createdMedia?.id,
+          storagePath,
+        });
+
+        if(createdMedia)
+        {
+          mediaIds.push(createdMedia.id);
+        }
     }
+
+    console.log("Final mediaIds before sighting insert:", mediaIds);
 
     const created = await insertSightingWithGeneratedNumber({
       reporterUserId: input.isAnonymous ? null : ctx.session.user.id,
