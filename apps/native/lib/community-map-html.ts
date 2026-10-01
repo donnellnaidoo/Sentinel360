@@ -18,9 +18,15 @@ export function buildCommunityMapHtml(
   markers: MapMarker[] = DEFAULT_MARKERS,
   center: MapMarker = DEFAULT_CENTER,
   zoom = DEFAULT_ZOOM,
+  dark = false,
 ) {
   const markersJson = JSON.stringify(markers);
   const centerJson = JSON.stringify([center.latitude, center.longitude]);
+  const bg = dark ? "#1e293b" : "#e2e8f0";
+  const marker = dark ? "#93c5fd" : "#1e3a8a";
+  const tiles = dark
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return `<!DOCTYPE html>
 <html>
@@ -30,7 +36,7 @@ export function buildCommunityMapHtml(
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <style>
-      html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #e2e8f0; }
+      html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: ${bg}; }
       .leaflet-control-attribution { font-size: 9px; }
     </style>
   </head>
@@ -50,7 +56,7 @@ export function buildCommunityMapHtml(
         tap: false,
       }).setView(center, ${zoom});
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      L.tileLayer("${tiles}", {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
@@ -58,8 +64,8 @@ export function buildCommunityMapHtml(
       markers.forEach(function (m) {
         L.circleMarker([m.latitude, m.longitude], {
           radius: 7,
-          color: "#1e3a8a",
-          fillColor: "#1e3a8a",
+          color: "${marker}",
+          fillColor: "${marker}",
           fillOpacity: 0.9,
           weight: 2,
         }).addTo(map);

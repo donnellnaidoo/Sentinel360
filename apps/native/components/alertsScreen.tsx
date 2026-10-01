@@ -1,18 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, TextInput, View, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AccountAvatarButton } from "@/lib/account-profile";
+import { useAppTheme } from "@/contexts/app-theme-context";
 import { queryClient, trpc } from "@/utils/trpc";
 
-const SHEET_BG = "#ffffff";
-const BRAND_BLUE = "#1e3a8a";
 const CTA_BG = "#0b2e4a";
 
 function Header() {
-  const router = useRouter();
+  const { colors } = useAppTheme();
 
   return (
     <View
@@ -22,9 +22,9 @@ function Header() {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: SHEET_BG,
+        backgroundColor: colors.sheetBg,
         borderBottomWidth: 1,
-        borderBottomColor: "rgba(15, 23, 42, 0.06)",
+        borderBottomColor: colors.border,
       }}
     >
       <Pressable
@@ -38,35 +38,14 @@ function Header() {
           opacity: pressed ? 0.85 : 1,
         })}
       >
-        <Ionicons name="menu" size={22} color={BRAND_BLUE} />
+        <Ionicons name="menu" size={22} color={colors.brand} />
       </Pressable>
 
-      <Text style={{ flex: 1, marginLeft: 10, fontSize: 14, fontWeight: "900", color: BRAND_BLUE }}>
+      <Text style={{ flex: 1, marginLeft: 10, fontSize: 14, fontWeight: "900", color: colors.brand }}>
         COMMUNITY SAFETY
       </Text>
 
-      <Pressable
-        onPress={() => router.push("/(drawer)/(tabs)/profile")}
-        accessibilityRole="button"
-        accessibilityLabel="Open profile"
-        style={({ pressed }) => ({
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          overflow: "hidden",
-          backgroundColor: "#e2e8f0",
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <Image
-          source={{
-            uri: "https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=128&h=128&q=60",
-          }}
-          style={{ width: 40, height: 40 }}
-        />
-      </Pressable>
+      <AccountAvatarButton radius={12} />
     </View>
   );
 }
@@ -134,10 +113,11 @@ function AlertCard({
   actionDisabled?: boolean;
   onPress?: () => void;
 }) {
+  const { colors } = useAppTheme();
   return (
     <Pressable
       style={{
-        backgroundColor: "#ffffff",
+        backgroundColor: colors.surface,
         borderRadius: 16,
         overflow: "hidden",
         shadowColor: "#000",
@@ -164,27 +144,27 @@ function AlertCard({
                 justifyContent: "center",
               }}
             >
-              <Ionicons name={iconName} size={16} color="#0f172a" />
+              <Ionicons name={iconName} size={16} color={colors.text} />
             </View>
             <Tag label={badge} bg={badgeBg} fg={badgeFg} />
           </View>
-          <Text style={{ fontSize: 11, color: "#94a3b8", fontWeight: "800" }}>{time}</Text>
+          <Text style={{ fontSize: 11, color: colors.textSubtle, fontWeight: "800" }}>{time}</Text>
         </View>
 
-        <Text style={{ marginTop: 10, fontSize: 16, fontWeight: "900", color: "#0f172a" }}>{title}</Text>
-        <Text style={{ marginTop: 6, color: "#64748b", lineHeight: 18 }}>{body}</Text>
+        <Text style={{ marginTop: 10, fontSize: 16, fontWeight: "900", color: colors.text }}>{title}</Text>
+        <Text style={{ marginTop: 6, color: colors.textMuted, lineHeight: 18 }}>{body}</Text>
 
         <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 12 }}>
-            <Ionicons name="location-outline" size={14} color="#94a3b8" />
-            <Text style={{ color: "#94a3b8", fontWeight: "700", flexShrink: 1 }}>{location}</Text>
+            <Ionicons name="location-outline" size={14} color={colors.textSubtle} />
+            <Text style={{ color: colors.textSubtle, fontWeight: "700", flexShrink: 1 }}>{location}</Text>
           </View>
           <Pressable
             onPress={(event) => {event.stopPropagation(); onAction?.();}}
             disabled={actionDisabled}
             style={({ pressed }) => ({ opacity: actionDisabled ? 0.5 : pressed ? 0.85 : 1 })}
           >
-            <Text style={{ color: BRAND_BLUE, fontWeight: "900", letterSpacing: 0.6 }}>{action}</Text>
+            <Text style={{ color: colors.brand, fontWeight: "900", letterSpacing: 0.6 }}>{action}</Text>
           </Pressable>
         </View>
       </View>
@@ -193,6 +173,7 @@ function AlertCard({
 }
 
 function MonitoringMapCard() {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
@@ -212,7 +193,7 @@ function MonitoringMapCard() {
       <View style={{ flex: 1, padding: 14, justifyContent: "flex-end" }}>
         <View
           style={{
-            backgroundColor: "rgba(255,255,255,0.92)",
+            backgroundColor: colors.surface,
             borderRadius: 12,
             paddingHorizontal: 10,
             paddingVertical: 8,
@@ -223,7 +204,7 @@ function MonitoringMapCard() {
           }}
         >
           <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#b91c1c" }} />
-          <Text style={{ fontSize: 10, fontWeight: "900", color: "#0f172a" }}>
+          <Text style={{ fontSize: 10, fontWeight: "900", color: colors.text }}>
             MONITORING AUCKLAND PARK
           </Text>
         </View>
@@ -307,6 +288,7 @@ function formatDateTime(value: string | Date | null | undefined): string {
 }
 
 export default function AlertsScreen() {
+  const { colors } = useAppTheme();
   const [search, setSearch] = useState("");
   const [selectedSightingId, setSelectedSightingId] = useState<string | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
@@ -367,7 +349,7 @@ export default function AlertsScreen() {
   }, [alerts, search]);
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
       <Header />
 
       <ScrollView
@@ -381,7 +363,7 @@ export default function AlertsScreen() {
         }
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 22, fontWeight: "900", color: "#0f172a" }}>Active Alerts</Text>
+          <Text style={{ fontSize: 22, fontWeight: "900", color: colors.text }}>Active Alerts</Text>
           <Pill label={`${visible.length} ACTIVE`} />
         </View>
 
@@ -389,9 +371,9 @@ export default function AlertsScreen() {
           style={{
             marginTop: 12,
             borderRadius: 12,
-            backgroundColor: "#f1f5f9",
+            backgroundColor: colors.fieldBg,
             borderWidth: 1,
-            borderColor: "rgba(15, 23, 42, 0.06)",
+            borderColor: colors.border,
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 12,
@@ -399,13 +381,13 @@ export default function AlertsScreen() {
             gap: 10,
           }}
         >
-          <Ionicons name="search-outline" size={18} color="#94a3b8" />
+          <Ionicons name="search-outline" size={18} color={colors.textSubtle} />
           <TextInput
             value={search}
             onChangeText={setSearch}
             placeholder="Filter by title or description..."
-            placeholderTextColor="#94a3b8"
-            style={{ flex: 1, color: "#0f172a", fontWeight: "700", paddingVertical: 0 }}
+            placeholderTextColor={colors.textSubtle}
+            style={{ flex: 1, color: colors.text, fontWeight: "700", paddingVertical: 0 }}
           />
         </View>
 
@@ -416,9 +398,9 @@ export default function AlertsScreen() {
         )}
 
         <View style={{ marginTop: 18, gap: 14 }}>
-          {isLoading && <Text style={{ color: "#94a3b8" }}>Loading alerts...</Text>}
+          {isLoading && <Text style={{ color: colors.textSubtle }}>Loading alerts...</Text>}
           {!isLoading && !isError && visible.length === 0 && (
-            <Text style={{ color: "#94a3b8" }}>No active alerts for Auckland Park right now.</Text>
+            <Text style={{ color: colors.textSubtle }}>No active alerts for Auckland Park right now.</Text>
           )}
           {visible.map((alert) => {
             const style = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.MEDIUM;
@@ -467,7 +449,7 @@ export default function AlertsScreen() {
           >
             <View
               style={{
-                backgroundColor: "#ffffff",
+                backgroundColor: colors.sheetBg,
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 maxHeight: "88%",
@@ -480,7 +462,7 @@ export default function AlertsScreen() {
                   paddingHorizontal: 18,
                   paddingBottom: 14,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#e2e8f0",
+                  borderBottomColor: colors.border,
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -492,7 +474,7 @@ export default function AlertsScreen() {
                     style={{
                       fontSize: 20,
                       fontWeight: "900",
-                      color: "#0f172a",
+                      color: colors.text,
                     }}
                   >
                     Sighting Details
@@ -502,7 +484,7 @@ export default function AlertsScreen() {
                     <Text
                       style={{
                         marginTop: 4,
-                        color: "#64748b",
+                        color: colors.textMuted,
                         fontWeight: "700",
                       }}
                     >
@@ -521,7 +503,7 @@ export default function AlertsScreen() {
                     borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: "#f1f5f9",
+                    backgroundColor: colors.fieldBg,
                     opacity: pressed ? 0.75 : 1,
                   })}
                 >
@@ -529,7 +511,7 @@ export default function AlertsScreen() {
                   <Ionicons
                     name="close"
                     size={22}
-                    color="#0f172a"
+                    color={colors.text}
                   />
                 </Pressable>
               </View>
@@ -545,7 +527,7 @@ export default function AlertsScreen() {
                 {sightingQuery.isLoading && (
                   <Text
                     style={{
-                      color: "#64748b",
+                      color: colors.textMuted,
                       fontWeight: "700",
                     }}
                   >
@@ -608,7 +590,7 @@ export default function AlertsScreen() {
 
                       <Text
                         style={{
-                          color: "#64747b",
+                          color: colors.textMuted,
                           fontWeight: "700",
                         }}
                       >
@@ -634,7 +616,7 @@ export default function AlertsScreen() {
                               width: "48%",
                               borderRadius: 16,
                               overflow: "hidden",
-                              backgroundColor: "#e2e8f0",
+                              backgroundColor: colors.chip,
                             }}
                           >
 
@@ -660,7 +642,7 @@ export default function AlertsScreen() {
                     <Text
                       style={{
                         fontSize: 13,
-                        color: "#64748b",
+                        color: colors.textMuted,
                         fontWeight: "800",
                       }}
                     >
@@ -672,7 +654,7 @@ export default function AlertsScreen() {
                         marginTop: 6,
                         fontSize: 16,
                         lineHeight: 23,
-                        color: "#0f172a",
+                        color: colors.text,
                       }}
                     >
                       {sightingQuery.data.description}
@@ -695,7 +677,7 @@ export default function AlertsScreen() {
                         <Ionicons
                           name="location-outline"
                           size={20}
-                          color={BRAND_BLUE}
+                          color={colors.brand}
                         />
 
                         <View
@@ -705,7 +687,7 @@ export default function AlertsScreen() {
                           <Text
                             style={{
                               fontSize: 12,
-                              color: "#64748b",
+                              color: colors.textMuted,
                               fontWeight: "800",
                             }}
                           >
@@ -715,7 +697,7 @@ export default function AlertsScreen() {
                           <Text
                             style={{
                               marginTop: 3,
-                              color: "#0f172a",
+                              color: colors.text,
                               fontWeight: "700",
                             }}
                           >
@@ -735,7 +717,7 @@ export default function AlertsScreen() {
                         <Ionicons
                           name="time-outline"
                           size={20}
-                          color={BRAND_BLUE}
+                          color={colors.brand}
                         />
 
                         <View
@@ -747,7 +729,7 @@ export default function AlertsScreen() {
                           <Text
                             style={{
                               fontSize: 12,
-                              color: "#64748b",
+                              color: colors.textMuted,
                               fontWeight: "800",
                             }}
                           >
@@ -758,7 +740,7 @@ export default function AlertsScreen() {
                           <Text
                             style={{
                               marginTop: 3,
-                              color: "#0f172a",
+                              color: colors.text,
                               fontWeight: "700",
                             }}
                           >
@@ -780,9 +762,9 @@ export default function AlertsScreen() {
                           marginTop: 20,
                           padding: 14,
                           borderRadius: 14,
-                          backgroundColor: "#f8fafc",
+                          backgroundColor: colors.surfaceMuted,
                           borderWidth: 1,
-                          borderColor: "#e2e8f0",
+                          borderColor: colors.border,
                         }}
                       >
 
@@ -790,7 +772,7 @@ export default function AlertsScreen() {
                           style={{
                             fontSize: 12,
                             fontWeight: "900",
-                            color: "#64748b",
+                            color: colors.textMuted,
                           }}
                         >
                           MODERATOR NOTE
@@ -799,7 +781,7 @@ export default function AlertsScreen() {
                         <Text
                           style={{
                             marginTop: 6,
-                            color: "#334155",
+                            color: colors.text,
                             lineHeight: 20,
                           }}
                         >

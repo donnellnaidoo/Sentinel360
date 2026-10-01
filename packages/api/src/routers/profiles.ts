@@ -33,6 +33,47 @@ function readPublicAttributes(attributes: unknown): {
   };
 }
 
+function readPublicPlateNumbers(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const plates = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return plates.length > 0 ? plates : undefined;
+}
+
+const publicWantedSelect = {
+  id: entityProfile.id,
+  entityType: entityProfile.entityType,
+  displayName: entityProfile.displayName,
+  primaryFaceImageUrl: entityProfile.primaryFaceImageUrl,
+  watchlistStatus: entityProfile.watchlistStatus,
+  firstSeenAt: entityProfile.firstSeenAt,
+  lastSeenAt: entityProfile.lastSeenAt,
+  updatedAt: entityProfile.updatedAt,
+  knownPlateNumbers: entityProfile.knownPlateNumbers,
+  attributes: entityProfile.attributes,
+} as const;
+
+function toPublicWanted(row: {
+  id: string;
+  entityType: string;
+  displayName: string | null;
+  primaryFaceImageUrl: string | null;
+  watchlistStatus: string;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
+  updatedAt: Date;
+  knownPlateNumbers: unknown;
+  attributes: unknown;
+}, watchlist?: { reason: string; priorityLevel: string } | null) {
+  const { attributes, knownPlateNumbers, ...rest } = row;
+  return {
+    ...rest,
+    ...readPublicAttributes(attributes),
+    knownPlateNumbers: readPublicPlateNumbers(knownPlateNumbers),
+    watchlistReason: watchlist?.reason,
+    priorityLevel: watchlist?.priorityLevel,
+  };
+}
+
 async function getProfileOrThrow(id: string) {
   const [found] = await db
     .select()
@@ -95,16 +136,7 @@ export const profilesRouter = router({
   // are returned; raw `attributes` is stripped to public-safe keys only.
   listPublicWanted: protectedProcedure.query(async () => {
     const rows = await db
-      .select({
-        id: entityProfile.id,
-        entityType: entityProfile.entityType,
-        displayName: entityProfile.displayName,
-        primaryFaceImageUrl: entityProfile.primaryFaceImageUrl,
-        watchlistStatus: entityProfile.watchlistStatus,
-        lastSeenAt: entityProfile.lastSeenAt,
-        updatedAt: entityProfile.updatedAt,
-        attributes: entityProfile.attributes,
-      })
+      .select(publicWantedSelect)
       .from(entityProfile)
       .where(
         and(
@@ -114,10 +146,42 @@ export const profilesRouter = router({
       )
       .orderBy(desc(entityProfile.updatedAt));
 
-    return rows.map(({ attributes, ...rest }) => ({
-      ...rest,
-      ...readPublicAttributes(attributes),
-    }));
+    return rows.map((row) => toPublicWanted(row));
+  }),
+
+  getPublicWantedById: protectedProcedure.input(idSchema).query(async ({ input }) => {
+    const [found] = await db
+      .select(publicWantedSelect)
+      .from(entityProfile)
+      .where(
+        and(
+          eq(entityProfile.id, input.id),
+          ne(entityProfile.watchlistStatus, "NONE"),
+          eq(entityProfile.status, "ACTIVE"),
+        ),
+      )
+      .limit(1);
+
+    if (!found) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Wanted person not found",
+      });
+    }
+
+    const [watchlist] = await db
+      .select({
+        reason: watchlistEntry.reason,
+        priorityLevel: watchlistEntry.priorityLevel,
+      })
+      .from(watchlistEntry)
+      .where(
+        and(eq(watchlistEntry.entityProfileId, found.id), eq(watchlistEntry.status, "ACTIVE")),
+      )
+      .orderBy(desc(watchlistEntry.updatedAt))
+      .limit(1);
+
+    return toPublicWanted(found, watchlist ?? null);
   }),
 
   // Only the manually-entered fields are writable here. primaryFaceEmbedding,

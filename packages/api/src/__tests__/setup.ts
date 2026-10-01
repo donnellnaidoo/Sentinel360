@@ -5,13 +5,17 @@ vi.mock("@Sentinel360/auth", () => {
     supabaseAdmin: {
       auth: {
         getUser: vi.fn(),
+        signInWithPassword: vi.fn(),
         admin: {
           createUser: vi.fn(),
           updateUserById: vi.fn(),
+          generateLink: vi.fn(),
+          signOut: vi.fn(),
         },
       },
     },
     recordAuditEvent: vi.fn(),
+    sendPasswordResetCode: vi.fn(),
     AuditEvents: {},
   };
 });

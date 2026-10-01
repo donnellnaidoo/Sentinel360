@@ -8,7 +8,22 @@
     },
     "name": "Sentinel360",
     "slug": "Sentinel360",
-    "plugins": ["expo-font"],
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Sentinel360 uses your location to show your area and attach it to reports."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sentinel360 uses your photos so you can set a profile picture and attach evidence to reports.",
+          "cameraPermission": "Sentinel360 uses your camera so you can take a profile picture and capture report evidence."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

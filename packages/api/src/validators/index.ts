@@ -30,8 +30,35 @@ export const resetPasswordSchema = z.object({
 
 export const forgotPasswordSchema = emailSchema;
 
+export const resetCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "Enter the 6-digit code");
+
+export const verifyResetCodeSchema = z.object({
+  email: z.string().email(),
+  code: resetCodeSchema,
+});
+
+export const resetPasswordByCodeSchema = z.object({
+  email: z.string().email(),
+  code: resetCodeSchema,
+  password: passwordSchema,
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: passwordSchema,
+});
+
 export const verifyEmailSchema = z.object({
   token: z.string().min(1),
+});
+
+export const avatarPhotoSchema = z.object({
+  fileBase64: z.string().min(1).max(7_500_000),
+  originalFilename: z.string().min(1).max(300),
+  mimeType: z.enum(["image/jpeg", "image/jpg", "image/png", "image/webp"]),
 });
 
 export const updateProfileSchema = z.object({
@@ -40,6 +67,7 @@ export const updateProfileSchema = z.object({
   lastName: z.string().min(1).max(100).optional(),
   phoneNumber: z.string().max(20).optional(),
   image: z.string().url().optional(),
+  photo: avatarPhotoSchema.optional(),
 });
 
 export const idSchema = z.object({

@@ -1,6 +1,7 @@
 import { publicProcedure, router } from "../index";
 import { alertsRouter } from "./alerts";
 import { auditRouter } from "./audit";
+import { authRouter } from "./auth";
 import { casesRouter } from "./cases";
 import { evidenceRouter } from "./evidence";
 import { organizationsRouter } from "./organizations";
@@ -15,6 +16,7 @@ export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
     return "OK";
   }),
+  auth: authRouter,
   users: usersRouter,
   roles: rolesRouter,
   organizations: organizationsRouter,

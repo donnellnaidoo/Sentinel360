@@ -12,6 +12,8 @@ import { z } from "zod";
 
 const app = new Hono();
 
+// tRPC is mounted at /trpc. Workspace package changes may require a server restart.
+
 app.use(logger());
 app.use(
   "/*",

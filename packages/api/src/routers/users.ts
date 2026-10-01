@@ -4,15 +4,49 @@ import { user } from "@Sentinel360/db/schema/auth";
 import { role, userRole } from "@Sentinel360/db/schema/rbac";
 import { TRPCError } from "@trpc/server";
 import { and, asc, count, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import type { z } from "zod";
 
 import { adminProcedure, protectedProcedure, router, superAdminProcedure } from "../index";
+import { uploadProfilePhoto } from "../services/entity-photo-storage";
 import {
+  avatarPhotoSchema,
   createUserSchema,
   idSchema,
   updateProfileSchema,
   updateUserSchema,
   userListSchema,
 } from "../validators";
+
+const AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+function decodeAvatarPhoto(photo: z.infer<typeof avatarPhotoSchema>) {
+  const mimeType = photo.mimeType === "image/jpg" ? "image/jpeg" : photo.mimeType;
+  if (!AVATAR_MIME_TYPES.has(mimeType)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Profile photos must be JPEG, PNG, or WebP.",
+    });
+  }
+
+  const raw = photo.fileBase64.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").replace(/\s/g, "");
+  const fileBytes = Buffer.from(raw, "base64");
+  if (fileBytes.length === 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Profile photo is empty." });
+  }
+  if (fileBytes.length > MAX_AVATAR_BYTES) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Profile photo must be 5 MB or smaller.",
+    });
+  }
+
+  const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+  const safeName =
+    photo.originalFilename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || `avatar.${extension}`;
+
+  return { fileBytes, mimeType, safeName };
+}
 
 function pushIf<T>(arr: T[], item: T | undefined): void {
   if (item !== undefined) {
@@ -37,11 +71,41 @@ export const usersRouter = router({
 
   updateMe: protectedProcedure.input(updateProfileSchema).mutation(async ({ ctx, input }) => {
     const userId = ctx.session.user.id;
+    const { photo, image: imageInput, ...fields } = input;
+
+    let image = imageInput;
+    if (photo) {
+      const decoded = decodeAvatarPhoto(photo);
+      const uploaded = await uploadProfilePhoto(decoded.fileBytes, decoded.safeName, decoded.mimeType);
+      image = uploaded.publicUrl;
+    }
+
     const [updated] = await db
       .update(user)
-      .set({ ...input, updatedAt: new Date() })
-      .where(eq(user.id, userId))
+      .set({
+        ...fields,
+        ...(image !== undefined ? { image } : {}),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(user.id, userId), isNull(user.deletedAt)))
       .returning();
+
+    if (!updated) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+    }
+
+    if (fields.name !== undefined || image !== undefined) {
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          ...(fields.name !== undefined ? { name: fields.name } : {}),
+          ...(image !== undefined ? { avatar_url: image, image } : {}),
+        },
+      });
+      if (error) {
+        console.error("Failed to sync profile metadata:", error.message);
+      }
+    }
+
     return updated;
   }),
 

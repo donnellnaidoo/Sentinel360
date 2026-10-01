@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAppTheme } from "@/contexts/app-theme-context";
+
 const { width, height } = Dimensions.get("window");
 
 type OnboardingItem = {
@@ -23,10 +25,10 @@ type OnboardingItem = {
 
 const HERO_BG = "#0b1f22";
 const HERO_ACCENT = "#0e6d7a";
-const SHEET_BG = "#ffffff";
 const CTA_BG = "#0b2e4a";
 
 const OnboardingScreen = () => {
+  const { colors } = useAppTheme();
   const onboardingData: OnboardingItem[] = useMemo(
     () => [
       {
@@ -107,7 +109,7 @@ const OnboardingScreen = () => {
               <View
                 style={{
                   width: Math.min(260, width - 64),
-                  backgroundColor: "rgba(255,255,255,0.92)",
+                  backgroundColor: colors.surface,
                   borderRadius: 12,
                   paddingVertical: 10,
                   paddingHorizontal: 12,
@@ -134,10 +136,10 @@ const OnboardingScreen = () => {
                   </View>
 
                   <View className="flex-1">
-                    <Text className="text-[11px] font-semibold" style={{ color: "#111827" }}>
+                    <Text className="text-[11px] font-semibold" style={{ color: colors.text }}>
                       NEW ALERT
                     </Text>
-                    <Text className="text-[12px] font-semibold" style={{ color: "#111827" }}>
+                    <Text className="text-[12px] font-semibold" style={{ color: colors.text }}>
                       Main St. Secure
                     </Text>
                   </View>
@@ -149,7 +151,7 @@ const OnboardingScreen = () => {
           {/* Bottom sheet */}
           <View
             style={{
-              backgroundColor: SHEET_BG,
+              backgroundColor: colors.sheetBg,
               borderTopLeftRadius: 32,
               borderTopRightRadius: 32,
               paddingHorizontal: 28,
@@ -173,11 +175,11 @@ const OnboardingScreen = () => {
               </Text>
             </View>
 
-            <Text className="text-[30px] font-semibold leading-9" style={{ color: "#0f172a" }}>
+            <Text className="text-[30px] font-semibold leading-9" style={{ color: colors.text }}>
               {item.title}
             </Text>
 
-            <Text className="mt-3 text-[13px] leading-5" style={{ color: "#6b7280" }}>
+            <Text className="mt-3 text-[13px] leading-5" style={{ color: colors.textMuted }}>
               {item.description}
             </Text>
 
@@ -193,7 +195,7 @@ const OnboardingScreen = () => {
                       marginRight: 8,
                       width: index === currentIndex ? 22 : 6,
                       backgroundColor:
-                        index === currentIndex ? "#0b1f22" : "rgba(15, 23, 42, 0.20)",
+                        index === currentIndex ? colors.heroBg : colors.border,
                     }}
                   />
                 ))}

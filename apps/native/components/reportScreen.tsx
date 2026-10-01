@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, Platform, ScrollView, Text, TextInput, View, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -10,11 +10,11 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { File } from "expo-file-system";
 
+import { AccountAvatarButton } from "@/lib/account-profile";
 import { trpc } from "@/utils/trpc";
+import { useAppTheme } from "@/contexts/app-theme-context";
+import { useUserLocation } from "@/contexts/user-location-context";
 
-
-const SHEET_BG = "#ffffff";
-const BRAND_BLUE = "#1e3a8a";
 const CTA_BG = "#0b2e4a";
 const MAX_PHOTOS = 4;
 const MIN_DESCRIPTION_LENGTH = 10;
@@ -34,6 +34,9 @@ function generateReferenceCode() {
 
 export default function ReportScreen() {
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const { status: locationStatus, place, message: locationMessage, refresh: refreshLocation } = useUserLocation();
+  const locationEdited = useRef(false);
   const [description, setDescription] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -55,8 +58,21 @@ export default function ReportScreen() {
     }),
   );
 
+  useEffect(() => {
+    if (!place || locationEdited.current) return;
+    setLocationAddress(place.address);
+  }, [place]);
+
   const trimmedDescription = description.trim();
   const canSubmit = trimmedDescription.length >= MIN_DESCRIPTION_LENGTH && !isSubmitting;
+
+  async function applyCurrentLocation() {
+    locationEdited.current = false;
+    const nextPlace = await refreshLocation();
+    if (nextPlace) {
+      setLocationAddress(nextPlace.address);
+    }
+  }
 
   async function ensureLibraryPermission() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -211,11 +227,20 @@ export default function ReportScreen() {
         })),
       });
 
+      const trimmedAddress = locationAddress.trim();
+      const location =
+        trimmedAddress || place
+          ? {
+              ...(trimmedAddress ? { address: trimmedAddress } : {}),
+              ...(place ? { latitude: place.latitude, longitude: place.longitude } : {}),
+            }
+          : undefined;
+
       const created = await submitSighting.mutateAsync({
         sightingType: "COMMUNITY_REPORT",
         description: trimmedDescription,
 
-        location: locationAddress.trim() ? { address: locationAddress.trim(), } : undefined,
+        location,
 
         isAnonymous,
 
@@ -251,23 +276,25 @@ export default function ReportScreen() {
     setReferenceCode("");
     setError(null);
     setIsSubmitted(false);
+    locationEdited.current = false;
+    setLocationAddress(place?.address ?? "");
   }
 
   if (isSubmitted) {
     return (
-      <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
+      <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
         <View
           style={{
             height: 56,
             paddingHorizontal: 18,
             flexDirection: "row",
             alignItems: "center",
-            backgroundColor: SHEET_BG,
+            backgroundColor: colors.sheetBg,
             borderBottomWidth: 1,
-            borderBottomColor: "rgba(15, 23, 42, 0.06)",
+            borderBottomColor: colors.border,
           }}
         >
-          <Text style={{ fontSize: 20, fontWeight: "900", color: BRAND_BLUE }}>Community Safety</Text>
+          <Text style={{ fontSize: 20, fontWeight: "900", color: colors.brand }}>Community Safety</Text>
         </View>
 
         <View style={{ flex: 1, paddingHorizontal: 18, justifyContent: "center", paddingBottom: 40 }}>
@@ -294,10 +321,10 @@ export default function ReportScreen() {
               <Ionicons name="checkmark" size={34} color="#ffffff" />
             </View>
 
-            <Text style={{ marginTop: 18, fontSize: 24, fontWeight: "900", color: "#0f172a", textAlign: "center" }}>
+            <Text style={{ marginTop: 18, fontSize: 24, fontWeight: "900", color: colors.text, textAlign: "center" }}>
               Report Submitted
             </Text>
-            <Text style={{ marginTop: 10, color: "#64748b", textAlign: "center", lineHeight: 20, fontWeight: "600" }}>
+            <Text style={{ marginTop: 10, color: colors.textMuted, textAlign: "center", lineHeight: 20, fontWeight: "600" }}>
               Your sighting report has been received and will be reviewed by community safety. Thank you for helping
               keep the neighborhood safe.
             </Text>
@@ -305,7 +332,7 @@ export default function ReportScreen() {
             <View
               style={{
                 marginTop: 18,
-                backgroundColor: "#ffffff",
+                backgroundColor: colors.surface,
                 borderRadius: 12,
                 paddingVertical: 12,
                 paddingHorizontal: 16,
@@ -313,12 +340,12 @@ export default function ReportScreen() {
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontSize: 11, fontWeight: "800", color: "#94a3b8" }}>REFERENCE CODE</Text>
-              <Text style={{ marginTop: 4, fontSize: 18, fontWeight: "900", color: BRAND_BLUE }}>{referenceCode}</Text>
+              <Text style={{ fontSize: 11, fontWeight: "800", color: colors.textSubtle }}>REFERENCE CODE</Text>
+              <Text style={{ marginTop: 4, fontSize: 18, fontWeight: "900", color: colors.brand }}>{referenceCode}</Text>
             </View>
 
             {photos.length > 0 && (
-              <Text style={{ marginTop: 12, fontSize: 12, color: "#64748b", fontWeight: "700" }}>
+              <Text style={{ marginTop: 12, fontSize: 12, color: colors.textMuted, fontWeight: "700" }}>
                 {photos.length} photo{photos.length === 1 ? "" : "s"} attached
               </Text>
             )}
@@ -343,7 +370,7 @@ export default function ReportScreen() {
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
       {/* Header (same style as Home) */}
       <View
         style={{
@@ -352,9 +379,9 @@ export default function ReportScreen() {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          backgroundColor: SHEET_BG,
+          backgroundColor: colors.sheetBg,
           borderBottomWidth: 1,
-          borderBottomColor: "rgba(15, 23, 42, 0.06)",
+          borderBottomColor: colors.border,
         }}
       >
         <Pressable
@@ -368,33 +395,14 @@ export default function ReportScreen() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Ionicons name="menu" size={22} color={BRAND_BLUE} />
+          <Ionicons name="menu" size={22} color={colors.brand} />
         </Pressable>
 
-        <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: BRAND_BLUE }}>
+        <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: colors.brand }}>
           Community Safety
         </Text>
 
-        <Pressable
-          onPress={() => router.push("/(drawer)/(tabs)/profile")}
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-          style={({ pressed }) => ({
-            width: 40,
-            height: 40,
-            borderRadius: 999,
-            overflow: "hidden",
-            backgroundColor: "#e2e8f0",
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=128&h=128&q=60",
-            }}
-            style={{ width: 40, height: 40 }}
-          />
-        </Pressable>
+        <AccountAvatarButton />
       </View>
 
       <KeyboardAwareScrollView
@@ -404,8 +412,8 @@ export default function ReportScreen() {
         bottomOffset={insets.bottom + 90}
         extraKeyboardSpace={20}
       >
-        <Text style={{ fontSize: 26, fontWeight: "900", color: "#0f172a" }}>Report Sighting</Text>
-        <Text style={{ marginTop: 6, color: "#64748b", lineHeight: 18 }}>
+        <Text style={{ fontSize: 26, fontWeight: "900", color: colors.text }}>Report Sighting</Text>
+        <Text style={{ marginTop: 6, color: colors.textMuted, lineHeight: 18 }}>
           Your immediate report helps keep the community safe. All fields are confidential.
         </Text>
 
@@ -416,9 +424,9 @@ export default function ReportScreen() {
             marginTop: 18,
             borderRadius: 16,
             borderWidth: 1,
-            borderColor: "rgba(15, 23, 42, 0.15)",
+            borderColor: colors.border,
             borderStyle: "dashed",
-            backgroundColor: "#ffffff",
+            backgroundColor: colors.surface,
             paddingVertical: photos.length > 0 ? 16 : 26,
             alignItems: "center",
             justifyContent: "center",
@@ -437,16 +445,16 @@ export default function ReportScreen() {
                   justifyContent: "center",
                 }}
               >
-                <Ionicons name="camera-outline" size={22} color={BRAND_BLUE} />
+                <Ionicons name="camera-outline" size={22} color={colors.brand} />
               </View>
-              <Text style={{ marginTop: 12, fontWeight: "900", color: "#0f172a" }}>Upload Evidence</Text>
-              <Text style={{ marginTop: 4, fontSize: 12, color: "#94a3b8" }}>
+              <Text style={{ marginTop: 12, fontWeight: "900", color: colors.text }}>Upload Evidence</Text>
+              <Text style={{ marginTop: 4, fontSize: 12, color: colors.textSubtle }}>
                 Tap to capture or select from gallery
               </Text>
             </>
           ) : (
             <View style={{ width: "100%", paddingHorizontal: 4 }}>
-              <Text style={{ fontWeight: "900", color: "#0f172a", marginBottom: 10 }}>
+              <Text style={{ fontWeight: "900", color: colors.text, marginBottom: 10 }}>
                 Attached Evidence ({photos.length}/{MAX_PHOTOS})
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
@@ -454,7 +462,7 @@ export default function ReportScreen() {
                   <View key={photo.id} style={{ position: "relative" }}>
                     <Image
                       source={{ uri: photo.uri }}
-                      style={{ width: 72, height: 72, borderRadius: 12, backgroundColor: "#e2e8f0" }}
+                      style={{ width: 72, height: 72, borderRadius: 12, backgroundColor: colors.chip }}
                     />
                     <Pressable
                       onPress={() => removePhoto(photo.id)}
@@ -483,14 +491,14 @@ export default function ReportScreen() {
                       height: 72,
                       borderRadius: 12,
                       borderWidth: 1,
-                      borderColor: "rgba(15, 23, 42, 0.15)",
+                      borderColor: colors.border,
                       borderStyle: "dashed",
                       alignItems: "center",
                       justifyContent: "center",
                       opacity: pressed ? 0.9 : 1,
                     })}
                   >
-                    <Ionicons name="add" size={22} color={BRAND_BLUE} />
+                    <Ionicons name="add" size={22} color={colors.brand} />
                   </Pressable>
                 )}
               </View>
@@ -500,41 +508,63 @@ export default function ReportScreen() {
 
         {/* Location */}
         <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12, fontWeight: "900", color: "#0f172a" }}>Location</Text>
+          <Text style={{ fontSize: 12, fontWeight: "900", color: colors.text }}>Location</Text>
           <View
             style={{
               marginTop: 10,
               borderRadius: 14,
-              backgroundColor: "#f8fafc",
+              backgroundColor: colors.surfaceMuted,
               borderWidth: 1,
-              borderColor: "rgba(15, 23, 42, 0.08)",
+              borderColor: colors.border,
               padding: 12,
               flexDirection: "row",
               alignItems: "center",
               gap: 10,
             }}
           >
-            <Ionicons name="location-sharp" size={16} color={BRAND_BLUE} />
+            <Ionicons name="location-sharp" size={16} color={colors.brand} />
             <TextInput
               value={locationAddress}
-              onChangeText={setLocationAddress}
+              onChangeText={(text) => {
+                locationEdited.current = true;
+                setLocationAddress(text);
+              }}
               placeholder="Where did this happen? (e.g. Kingsway, Auckland Park)"
-              placeholderTextColor="#94a3b8"
-              style={{ flex: 1, color: "#0f172a", fontWeight: "900", paddingVertical: 0 }}
+              placeholderTextColor={colors.textSubtle}
+              editable={!isSubmitting}
+              style={{ flex: 1, color: colors.text, fontWeight: "900", paddingVertical: 0 }}
             />
           </View>
+          <Pressable
+            onPress={() => void applyCurrentLocation()}
+            disabled={isSubmitting || locationStatus === "loading"}
+            style={({ pressed }) => ({
+              marginTop: 8,
+              alignSelf: "flex-start",
+              opacity: pressed || locationStatus === "loading" ? 0.7 : 1,
+            })}
+          >
+            <Text style={{ color: colors.brand, fontWeight: "800", fontSize: 12 }}>
+              {locationStatus === "loading" ? "Finding your location…" : "Use current location"}
+            </Text>
+          </Pressable>
+          {locationStatus === "denied" || locationStatus === "unavailable" ? (
+            <Text style={{ marginTop: 6, color: colors.textSubtle, fontSize: 12, fontWeight: "600" }}>
+              {locationMessage ?? "You can still type an address."}
+            </Text>
+          ) : null}
         </View>
 
         {/* Sighting description */}
         <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12, fontWeight: "900", color: "#0f172a" }}>Sighting Description</Text>
+          <Text style={{ fontSize: 12, fontWeight: "900", color: colors.text }}>Sighting Description</Text>
           <View
             style={{
               marginTop: 10,
               borderRadius: 14,
-              backgroundColor: "#f8fafc",
+              backgroundColor: colors.surfaceMuted,
               borderWidth: 1,
-              borderColor: error ? "rgba(153, 27, 27, 0.35)" : "rgba(15, 23, 42, 0.08)",
+              borderColor: error ? "rgba(153, 27, 27, 0.35)" : colors.border,
               padding: 12,
               minHeight: 120,
             }}
@@ -546,11 +576,11 @@ export default function ReportScreen() {
                 if (error) setError(null);
               }}
               placeholder="Provide details about the individual, clothing, or behavior observed..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textSubtle}
               multiline
               editable={!isSubmitting}
               style={{
-                color: "#0f172a",
+                color: colors.text,
                 fontWeight: "600",
                 lineHeight: 18,
                 paddingVertical: 0,
@@ -562,7 +592,7 @@ export default function ReportScreen() {
           {!!error && (
             <Text style={{ marginTop: 8, color: "#991b1b", fontWeight: "700", fontSize: 12 }}>{error}</Text>
           )}
-          <Text style={{ marginTop: 8, fontSize: 11, color: "#94a3b8", fontWeight: "700" }}>
+          <Text style={{ marginTop: 8, fontSize: 11, color: colors.textSubtle, fontWeight: "700" }}>
             {trimmedDescription.length}/{MIN_DESCRIPTION_LENGTH} minimum characters
           </Text>
         </View>
@@ -578,8 +608,8 @@ export default function ReportScreen() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Ionicons name={isAnonymous ? "checkbox" : "square-outline"} size={20} color={BRAND_BLUE} />
-          <Text style={{ color: "#0f172a", fontWeight: "700" }}>Submit anonymously</Text>
+          <Ionicons name={isAnonymous ? "checkbox" : "square-outline"} size={20} color={colors.brand} />
+          <Text style={{ color: colors.text, fontWeight: "700" }}>Submit anonymously</Text>
         </Pressable>
 
         {submitSighting.isSuccess && (
@@ -606,7 +636,7 @@ export default function ReportScreen() {
         //   }
         //   style={({ pressed }) => ({
         //     marginTop: 18,
-        //     backgroundColor: BRAND_BLUE,
+        //     backgroundColor: colors.brand,
         //     borderRadius: 14,
         //     paddingVertical: 16,
         //     alignItems: "center",

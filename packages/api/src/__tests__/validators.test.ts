@@ -5,10 +5,13 @@ import {
   createOrganizationSchema,
   createRoleSchema,
   createUserSchema,
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordByCodeSchema,
   resetPasswordSchema,
+  verifyResetCodeSchema,
   updateOrganizationSchema,
   updateProfileSchema,
   userListSchema,
@@ -103,6 +106,29 @@ describe("updateProfileSchema", () => {
   it("should reject invalid image url", () => {
     expect(() => updateProfileSchema.parse({ image: "not-a-url" })).toThrow();
   });
+
+  it("should accept a profile photo upload", () => {
+    const result = updateProfileSchema.parse({
+      photo: {
+        fileBase64: "aGVsbG8=",
+        originalFilename: "avatar.jpg",
+        mimeType: "image/jpeg",
+      },
+    });
+    expect(result.photo?.mimeType).toBe("image/jpeg");
+  });
+
+  it("should reject an unsupported profile photo type", () => {
+    expect(() =>
+      updateProfileSchema.parse({
+        photo: {
+          fileBase64: "aGVsbG8=",
+          originalFilename: "avatar.gif",
+          mimeType: "image/gif",
+        },
+      }),
+    ).toThrow();
+  });
 });
 
 describe("resetPasswordSchema", () => {
@@ -124,6 +150,44 @@ describe("forgotPasswordSchema", () => {
 
   it("should reject invalid email", () => {
     expect(() => forgotPasswordSchema.parse({ email: "" })).toThrow();
+  });
+});
+
+describe("verifyResetCodeSchema", () => {
+  it("should accept a 6-digit code", () => {
+    const result = verifyResetCodeSchema.parse({ email: "test@example.com", code: "123456" });
+    expect(result.code).toBe("123456");
+  });
+
+  it("should reject a short code", () => {
+    expect(() => verifyResetCodeSchema.parse({ email: "test@example.com", code: "123" })).toThrow();
+  });
+});
+
+describe("resetPasswordByCodeSchema", () => {
+  it("should accept email, code, and password", () => {
+    const result = resetPasswordByCodeSchema.parse({
+      email: "test@example.com",
+      code: "654321",
+      password: "newSecurePass1",
+    });
+    expect(result.code).toBe("654321");
+  });
+});
+
+describe("changePasswordSchema", () => {
+  it("should accept current and new password", () => {
+    const result = changePasswordSchema.parse({
+      currentPassword: "oldPass12",
+      newPassword: "newSecurePass1",
+    });
+    expect(result.newPassword).toBe("newSecurePass1");
+  });
+
+  it("should reject a short new password", () => {
+    expect(() =>
+      changePasswordSchema.parse({ currentPassword: "oldPass12", newPassword: "short" }),
+    ).toThrow();
   });
 });
 

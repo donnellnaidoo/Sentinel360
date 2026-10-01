@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useToast } from "heroui-native";
 import { useForm } from "@tanstack/react-form";
 import { supabase } from "@/lib/auth-client";
+import { useAppTheme } from "@/contexts/app-theme-context";
 import { queryClient } from "@/utils/trpc";
 import z from "zod";
 
@@ -14,7 +15,6 @@ type AuthMode = "sign-in" | "sign-up";
 // Palette aligned with onboarding (`components/OnBoarding.tsx`)
 const HERO_BG = "#0b1f22";
 const HERO_ACCENT = "#0e6d7a";
-const SHEET_BG = "#ffffff";
 const CTA_BG = "#0b2e4a";
 
 const signInSchema = z.object({
@@ -66,11 +66,12 @@ function SegmentedTab({
   mode: AuthMode;
   onModeChange: (next: AuthMode) => void;
 }) {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
         flexDirection: "row",
-        backgroundColor: "#eef2f7",
+        backgroundColor: colors.fieldBg,
         borderRadius: 14,
         padding: 4,
         marginTop: 18,
@@ -93,7 +94,7 @@ function SegmentedTab({
               opacity: pressed ? 0.92 : 1,
             })}
           >
-            <Text style={{ color: active ? "#fff" : "#64748b", fontWeight: "700" }}>
+            <Text style={{ color: active ? "#fff" : colors.textMuted, fontWeight: "700" }}>
               {key === "sign-in" ? "Login" : "Register"}
             </Text>
           </Pressable>
@@ -128,24 +129,25 @@ function FieldRow({
   inputRef?: React.RefObject<TextInput | null>;
   onSubmitEditing?: () => void;
 }) {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#f1f5f9",
+        backgroundColor: colors.fieldBg,
         borderRadius: 14,
         paddingHorizontal: 14,
         paddingVertical: 12,
       }}
     >
-      <Ionicons name={icon} size={18} color="#94a3b8" />
+      <Ionicons name={icon} size={18} color={colors.iconMuted} />
       <TextInput
         ref={inputRef as never}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.textSubtle}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
@@ -155,7 +157,7 @@ function FieldRow({
         style={{
           flex: 1,
           marginLeft: 10,
-          color: "#0f172a",
+          color: colors.text,
           fontWeight: "600",
           paddingVertical: 0,
         }}
@@ -166,6 +168,7 @@ function FieldRow({
 
 export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
   const { toast } = useToast();
+  const { colors } = useAppTheme();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -275,8 +278,8 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: SHEET_BG }}>
-      <StatusBar barStyle="dark-content" backgroundColor={SHEET_BG} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.sheetBg }}>
+      <StatusBar barStyle={colors.statusBar} backgroundColor={colors.sheetBg} />
 
       <View style={{ flex: 1, paddingHorizontal: 18, paddingTop: 14 }}>
         <View style={{ alignItems: "center", paddingTop: 6, paddingBottom: 10 }}>
@@ -293,17 +296,17 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
             <Text style={{ color: HERO_ACCENT, fontWeight: "900", fontSize: 18 }}>S</Text>
           </View>
 
-          <Text style={{ marginTop: 12, fontSize: 28, fontWeight: "800", color: HERO_BG }}>
+          <Text style={{ marginTop: 12, fontSize: 28, fontWeight: "800", color: colors.text }}>
             {mode === "sign-in" ? "Login" : "Register"}
           </Text>
-          <Text style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>
+          <Text style={{ marginTop: 4, fontSize: 13, color: colors.textMuted }}>
             {mode === "sign-in" ? "Welcome back" : "Create your account to continue"}
           </Text>
         </View>
 
         <View
           style={{
-            backgroundColor: "#fff",
+            backgroundColor: colors.surface,
             borderRadius: 18,
             paddingHorizontal: 16,
             paddingVertical: 16,
@@ -423,12 +426,12 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                         size={18}
                         color={HERO_ACCENT}
                       />
-                      <Text style={{ marginLeft: 8, color: "#64748b", fontWeight: "600" }}>
+                      <Text style={{ marginLeft: 8, color: colors.textMuted, fontWeight: "600" }}>
                         Remember me
                       </Text>
                     </Pressable>
 
-                    <Pressable onPress={() => toast.show({ variant: "default", label: "Coming soon" })}>
+                    <Pressable onPress={() => router.push("/forgot-password")}>
                       <Text style={{ color: HERO_ACCENT, fontWeight: "800" }}>Forgot password?</Text>
                     </Pressable>
                   </View>
@@ -453,7 +456,7 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                           color={HERO_ACCENT}
                           style={{ marginTop: 1 }}
                         />
-                        <Text style={{ flex: 1, color: "#64748b", fontWeight: "600", fontSize: 12, lineHeight: 18 }}>
+                        <Text style={{ flex: 1, color: colors.textMuted, fontWeight: "600", fontSize: 12, lineHeight: 18 }}>
                           I consent to Sentinel360 processing my personal information in accordance
                           with the Protection of Personal Information Act (POPIA).
                         </Text>
@@ -489,9 +492,9 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                 </form.Subscribe>
 
                 <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center" }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: "#e2e8f0" }} />
-                  <Text style={{ marginHorizontal: 10, color: "#94a3b8", fontWeight: "700" }}>Or</Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: "#e2e8f0" }} />
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  <Text style={{ marginHorizontal: 10, color: colors.textSubtle, fontWeight: "700" }}>Or</Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
                 </View>
 
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
@@ -513,16 +516,16 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                     onPress={() => toast.show({ variant: "default", label: "Google coming soon" })}
                     style={({ pressed }) => ({
                       flex: 1,
-                      backgroundColor: "#f8fafc",
+                      backgroundColor: colors.surfaceMuted,
                       borderWidth: 1,
-                      borderColor: "#e2e8f0",
+                      borderColor: colors.border,
                       paddingVertical: 12,
                       borderRadius: 14,
                       alignItems: "center",
                       opacity: pressed ? 0.9 : 1,
                     })}
                   >
-                    <Text style={{ color: HERO_BG, fontWeight: "900" }}>Google</Text>
+                    <Text style={{ color: colors.text, fontWeight: "900" }}>Google</Text>
                   </Pressable>
                 </View>
               </View>
@@ -533,14 +536,14 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
         <View style={{ marginTop: 16 }}>
           {mode === "sign-in" ? (
             <Link href="/sign-up" asChild>
-              <Text style={{ textAlign: "center", color: "#0f172a", fontWeight: "700" }}>
-                Don&apos;t have an account? <Text style={{ color: HERO_ACCENT }}>Register</Text>
+              <Text style={{ textAlign: "center", color: colors.text, fontWeight: "700" }}>
+                Don&apos;t have an account? <Text style={{ color: colors.heroAccent }}>Register</Text>
               </Text>
             </Link>
           ) : (
             <Link href="/sign-in" asChild>
-              <Text style={{ textAlign: "center", color: "#0f172a", fontWeight: "700" }}>
-                Already have an account? <Text style={{ color: HERO_ACCENT }}>Login</Text>
+              <Text style={{ textAlign: "center", color: colors.text, fontWeight: "700" }}>
+                Already have an account? <Text style={{ color: colors.heroAccent }}>Login</Text>
               </Text>
             </Link>
           )}

@@ -70,6 +70,7 @@ export const AuditEvents = {
   USER_DEACTIVATED: "user.deactivated",
   USER_LOCKED: "user.locked",
   PASSWORD_RESET: "user.password_reset",
+  PASSWORD_CHANGED: "user.password_changed",
   EMAIL_VERIFIED: "user.email_verified",
   ROLE_CREATED: "role.created",
   ROLE_UPDATED: "role.updated",

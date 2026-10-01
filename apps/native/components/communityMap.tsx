@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Platform, View } from "react-native";
 import { WebView } from "react-native-webview";
 
+import { useAppTheme } from "@/contexts/app-theme-context";
 import { buildCommunityMapHtml } from "@/lib/community-map-html";
 
 type CommunityMapProps = {
@@ -9,10 +10,11 @@ type CommunityMapProps = {
 };
 
 export default function CommunityMap({ height = 150 }: CommunityMapProps) {
-  const mapHtml = useMemo(() => buildCommunityMapHtml(), []);
+  const { isDark, colors } = useAppTheme();
+  const mapHtml = useMemo(() => buildCommunityMapHtml(undefined, undefined, undefined, isDark), [isDark]);
 
   return (
-    <View style={{ height, width: "100%", backgroundColor: "#e2e8f0", overflow: "hidden" }}>
+    <View style={{ height, width: "100%", backgroundColor: colors.chip, overflow: "hidden" }}>
       <WebView
         source={{ html: mapHtml }}
         style={{ flex: 1, backgroundColor: "transparent" }}

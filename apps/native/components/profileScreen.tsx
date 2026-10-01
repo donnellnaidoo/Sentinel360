@@ -1,19 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ThemeToggle } from "@/components/theme-toggle";
-import { useSession } from "@/contexts/session-context";
+import { useAppTheme } from "@/contexts/app-theme-context";
+import { useUserLocation } from "@/contexts/user-location-context";
+import { useAccountProfile } from "@/lib/account-profile";
 import { supabase } from "@/lib/auth-client";
 import { queryClient } from "@/utils/trpc";
 
-const SHEET_BG = "#ffffff";
-const BRAND_BLUE = "#1e3a8a";
-const CTA_BG = "#0b2e4a";
-
 function Header() {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
@@ -22,9 +20,9 @@ function Header() {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: SHEET_BG,
+        backgroundColor: colors.sheetBg,
         borderBottomWidth: 1,
-        borderBottomColor: "rgba(15, 23, 42, 0.06)",
+        borderBottomColor: colors.border,
       }}
     >
       <Pressable
@@ -38,35 +36,36 @@ function Header() {
           opacity: pressed ? 0.85 : 1,
         })}
       >
-        <Ionicons name="menu" size={22} color={BRAND_BLUE} />
+        <Ionicons name="menu" size={22} color={colors.brand} />
       </Pressable>
 
-      <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: BRAND_BLUE }}>
+      <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: colors.brand }}>
         Community Safety
       </Text>
-
-      <ThemeToggle />
     </View>
   );
 }
 
-function StatCard({ value, label }: { value: string; label: string }) {
+function StatCard({ value, label, onPress }: { value: string; label: string; onPress: () => void }) {
+  const { colors } = useAppTheme();
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
         flex: 1,
-        backgroundColor: "#f8fafc",
+        backgroundColor: colors.surfaceMuted,
         borderRadius: 14,
         paddingVertical: 14,
         paddingHorizontal: 10,
         alignItems: "center",
         borderWidth: 1,
-        borderColor: "rgba(15, 23, 42, 0.06)",
-      }}
+        borderColor: colors.border,
+        opacity: pressed ? 0.88 : 1,
+      })}
     >
-      <Text style={{ fontSize: 20, fontWeight: "900", color: "#0f172a" }}>{value}</Text>
-      <Text style={{ marginTop: 4, fontSize: 11, color: "#64748b", fontWeight: "700" }}>{label}</Text>
-    </View>
+      <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text }}>{value}</Text>
+      <Text style={{ marginTop: 4, fontSize: 11, color: colors.textMuted, fontWeight: "700" }}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -83,6 +82,7 @@ function SettingsRow({
   subtitle?: string;
   onPress?: () => void;
 }) {
+  const { colors } = useAppTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -104,31 +104,32 @@ function SettingsRow({
           justifyContent: "center",
         }}
       >
-        <Ionicons name={icon} size={18} color="#0f172a" />
+        <Ionicons name={icon} size={18} color={colors.text} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: "900", color: "#0f172a" }}>{title}</Text>
+        <Text style={{ fontWeight: "900", color: colors.text }}>{title}</Text>
         {!!subtitle && (
-          <Text style={{ marginTop: 2, fontSize: 12, color: "#64748b", fontWeight: "600" }}>{subtitle}</Text>
+          <Text style={{ marginTop: 2, fontSize: 12, color: colors.textMuted, fontWeight: "600" }}>{subtitle}</Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+      <Ionicons name="chevron-forward" size={16} color={colors.iconMuted} />
     </Pressable>
   );
 }
 
 function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  const { colors } = useAppTheme();
   return (
     <View style={{ marginTop: 22 }}>
-      <Text style={{ fontSize: 12, fontWeight: "900", color: "#94a3b8", letterSpacing: 1 }}>{title}</Text>
+      <Text style={{ fontSize: 12, fontWeight: "900", color: colors.textSubtle, letterSpacing: 1 }}>{title}</Text>
       <View
         style={{
           marginTop: 10,
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.surface,
           borderRadius: 16,
           paddingHorizontal: 14,
           borderWidth: 1,
-          borderColor: "rgba(15, 23, 42, 0.06)",
+          borderColor: colors.border,
           shadowColor: "#000",
           shadowOpacity: 0.04,
           shadowRadius: 10,
@@ -144,18 +145,18 @@ function SettingsGroup({ title, children }: { title: string; children: ReactNode
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { session } = useSession();
-  const user = session?.user;
-
-  const displayName =
-    (typeof user?.user_metadata?.name === "string" && user.user_metadata.name.trim()) ||
-    user?.email?.split("@")[0] ||
-    "Community Member";
-  const email = user?.email || "demo@sentinel360.com";
-  const avatarUri =
-    (typeof user?.user_metadata?.avatar_url === "string" && user.user_metadata.avatar_url) ||
-    (typeof user?.user_metadata?.image === "string" && user.user_metadata.image) ||
-    "https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=256&h=256&q=60";
+  const { colors, isDark, toggleTheme } = useAppTheme();
+  const { status: locationStatus, place, message: locationMessage } = useUserLocation();
+  const { name: displayName, email: accountEmail, image: avatarUri, initials } = useAccountProfile();
+  const email = accountEmail || "demo@sentinel360.com";
+  const areaLabel =
+    locationStatus === "loading"
+      ? "Locating you…"
+      : locationStatus === "denied"
+        ? "Turn on location to show your area"
+        : place
+          ? `${place.label} · 5 km alert radius`
+          : locationMessage ?? "Location unavailable";
 
   function goToSignIn() {
     queryClient.clear();
@@ -173,7 +174,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
       <Header />
 
       <ScrollView
@@ -182,26 +183,36 @@ export default function ProfileScreen() {
       >
         <View
           style={{
-            backgroundColor: CTA_BG,
+            backgroundColor: colors.cta,
             borderRadius: 18,
             padding: 18,
             overflow: "hidden",
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-            <View
-              style={{
+            <Pressable
+              onPress={() => router.push("/edit-profile")}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile picture"
+              style={({ pressed }) => ({
                 width: 72,
                 height: 72,
                 borderRadius: 999,
                 overflow: "hidden",
                 borderWidth: 3,
                 borderColor: "rgba(255,255,255,0.35)",
-                backgroundColor: "#e2e8f0",
-              }}
+                backgroundColor: "#0b2e4a",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.9 : 1,
+              })}
             >
-              <Image source={{ uri: avatarUri }} style={{ width: 72, height: 72 }} />
-            </View>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={{ width: 72, height: 72 }} />
+              ) : (
+                <Text style={{ color: "#ffffff", fontSize: 22, fontWeight: "900" }}>{initials}</Text>
+              )}
+            </Pressable>
 
             <View style={{ flex: 1 }}>
               <View
@@ -223,15 +234,51 @@ export default function ProfileScreen() {
 
           <View style={{ marginTop: 14, flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Ionicons name="location" size={14} color="rgba(255,255,255,0.85)" />
-            <Text style={{ color: "rgba(255,255,255,0.9)", fontWeight: "800" }}>Auckland Park · 5 km alert radius</Text>
+            <Text style={{ color: "rgba(255,255,255,0.9)", fontWeight: "800", flexShrink: 1 }}>{areaLabel}</Text>
           </View>
         </View>
 
         <View style={{ marginTop: 16, flexDirection: "row", gap: 10 }}>
-          <StatCard value="3" label="Reports" />
-          <StatCard value="1" label="Active Tips" />
-          <StatCard value="12" label="Alerts" />
+          <StatCard value="3" label="Reports" onPress={() => router.push("/my-sightings")} />
+          <StatCard value="1" label="Active Tips" onPress={() => router.push("/secure-tips")} />
+          <StatCard value="12" label="Alerts" onPress={() => router.push("/(drawer)/(tabs)/alerts")} />
         </View>
+
+        <SettingsGroup title="APPEARANCE">
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              paddingVertical: 14,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: isDark ? "#0f766e" : "#dbeafe",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name={isDark ? "moon" : "sunny-outline"} size={18} color={colors.text} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: "900", color: colors.text }}>Dark Mode</Text>
+              <Text style={{ marginTop: 2, fontSize: 12, color: colors.textMuted, fontWeight: "600" }}>
+                {isDark ? "On · Dark appearance" : "Off · Light appearance"}
+              </Text>
+            </View>
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: "#cbd5e1", true: colors.heroAccent }}
+              thumbColor="#ffffff"
+            />
+          </View>
+        </SettingsGroup>
 
         <SettingsGroup title="ACCOUNT">
           <SettingsRow
@@ -239,20 +286,31 @@ export default function ProfileScreen() {
             iconBg="#dbeafe"
             title="Edit Profile"
             subtitle="Name, photo, contact details"
+            onPress={() => router.push("/edit-profile")}
           />
-          <View style={{ height: 1, backgroundColor: "rgba(15, 23, 42, 0.06)" }} />
+          <View style={{ height: 1, backgroundColor: colors.border }} />
           <SettingsRow
             icon="notifications-outline"
             iconBg="#fef3c7"
             title="Notification Preferences"
             subtitle="Push, quiet hours, alert types"
+            onPress={() => router.push("/notification-preferences")}
           />
-          <View style={{ height: 1, backgroundColor: "rgba(15, 23, 42, 0.06)" }} />
+          <View style={{ height: 1, backgroundColor: colors.border }} />
+          <SettingsRow
+            icon="lock-closed-outline"
+            iconBg="#e0f2fe"
+            title="Change Password"
+            subtitle="Confirm current password, then set a new one"
+            onPress={() => router.push("/change-password")}
+          />
+          <View style={{ height: 1, backgroundColor: colors.border }} />
           <SettingsRow
             icon="shield-outline"
             iconBg="#dcfce7"
             title="Privacy & Safety"
             subtitle="Visibility, anonymous reporting"
+            onPress={() => router.push("/privacy-safety")}
           />
         </SettingsGroup>
 
@@ -261,30 +319,53 @@ export default function ProfileScreen() {
             icon="navigate-outline"
             iconBg="#e0f2fe"
             title="Home Neighborhood"
-            subtitle="Auckland Park, Johannesburg"
+            subtitle={place?.label ?? "Area used for nearby alerts"}
+            onPress={() =>
+              router.push({
+                pathname: "/home-neighborhood",
+                params: { area: areaLabel },
+              })
+            }
           />
-          <View style={{ height: 1, backgroundColor: "rgba(15, 23, 42, 0.06)" }} />
+          <View style={{ height: 1, backgroundColor: colors.border }} />
           <SettingsRow
             icon="document-text-outline"
             iconBg="#f1f5f9"
             title="My Sightings"
             subtitle="Track submitted reports and status"
+            onPress={() => router.push("/my-sightings")}
           />
-          <View style={{ height: 1, backgroundColor: "rgba(15, 23, 42, 0.06)" }} />
-          <SettingsRow icon="chatbox-ellipses-outline" iconBg="#ede9fe" title="Secure Tips" subtitle="Anonymous tip history" />
+          <View style={{ height: 1, backgroundColor: colors.border }} />
+          <SettingsRow
+            icon="chatbox-ellipses-outline"
+            iconBg="#ede9fe"
+            title="Secure Tips"
+            subtitle="Anonymous tip history"
+            onPress={() => router.push("/secure-tips")}
+          />
         </SettingsGroup>
 
         <SettingsGroup title="SUPPORT">
-          <SettingsRow icon="help-circle-outline" iconBg="#f1f5f9" title="Help Center" />
-          <View style={{ height: 1, backgroundColor: "rgba(15, 23, 42, 0.06)" }} />
-          <SettingsRow icon="document-outline" iconBg="#f1f5f9" title="Terms & Privacy" />
+          <SettingsRow
+            icon="help-circle-outline"
+            iconBg="#f1f5f9"
+            title="Help Center"
+            onPress={() => router.push("/help-center")}
+          />
+          <View style={{ height: 1, backgroundColor: colors.border }} />
+          <SettingsRow
+            icon="document-outline"
+            iconBg="#f1f5f9"
+            title="Terms & Privacy"
+            onPress={() => router.push("/terms-privacy")}
+          />
         </SettingsGroup>
 
         <Pressable
           onPress={handleSignOut}
           style={({ pressed }) => ({
             marginTop: 24,
-            backgroundColor: "#fee2e2",
+            backgroundColor: colors.dangerBg,
             borderRadius: 14,
             paddingVertical: 14,
             alignItems: "center",
@@ -294,11 +375,11 @@ export default function ProfileScreen() {
             opacity: pressed ? 0.92 : 1,
           })}
         >
-          <Ionicons name="log-out-outline" size={18} color="#991b1b" />
-          <Text style={{ fontWeight: "900", color: "#991b1b" }}>Sign Out</Text>
+          <Ionicons name="log-out-outline" size={18} color={colors.dangerText} />
+          <Text style={{ fontWeight: "900", color: colors.dangerText }}>Sign Out</Text>
         </Pressable>
 
-        <Text style={{ marginTop: 14, textAlign: "center", fontSize: 11, color: "#94a3b8", fontWeight: "700" }}>
+        <Text style={{ marginTop: 14, textAlign: "center", fontSize: 11, color: colors.textSubtle, fontWeight: "700" }}>
           Sentinel360 Community · v1.0.0
         </Text>
       </ScrollView>

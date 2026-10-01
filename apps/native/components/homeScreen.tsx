@@ -1,17 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CommunityMap from "./communityMap";
 import { useRouter } from "expo-router";
 
+import { AccountAvatarButton } from "@/lib/account-profile";
+import { useAppTheme } from "@/contexts/app-theme-context";
+import { regionHeadline, useUserLocation } from "@/contexts/user-location-context";
 import { trpc } from "@/utils/trpc";
 
-const HERO_BG = "#0b1f22";
-const HERO_ACCENT = "#0e6d7a";
-const SHEET_BG = "#ffffff";
-const CTA_BG = "#0b2e4a";
-const BRAND_BLUE = "#1e3a8a";
 
 function Pill({ label }: { label: string }) {
   return (
@@ -42,10 +40,11 @@ function CommunityItem({
   title: string;
   time: string;
 }) {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
-        backgroundColor: "#ffffff",
+        backgroundColor: colors.surface,
         borderRadius: 14,
         padding: 12,
         flexDirection: "row",
@@ -79,10 +78,10 @@ function CommunityItem({
           >
             <Text style={{ fontSize: 10, fontWeight: "900", color: tag.fg }}>{tag.label}</Text>
           </View>
-          <Text style={{ fontSize: 11, color: "#64748b", fontWeight: "700" }}>{time}</Text>
+          <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: "700" }}>{time}</Text>
         </View>
-        <Text style={{ marginTop: 6, color: "#0f172a", fontWeight: "800" }}>{title}</Text>
-        <Text style={{ marginTop: 2, color: "#94a3b8", fontSize: 12 }}>
+        <Text style={{ marginTop: 6, color: colors.text, fontWeight: "800" }}>{title}</Text>
+        <Text style={{ marginTop: 2, color: colors.textSubtle, fontSize: 12 }}>
           Updates for Auckland Park residents and nearby streets...
         </Text>
       </View>
@@ -107,10 +106,11 @@ function AlertItem({
   status: string;
   time: string;
 }) {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
-        backgroundColor: "#ffffff",
+        backgroundColor: colors.surface,
         borderRadius: 14,
         overflow: "hidden",
         flexDirection: "row",
@@ -134,18 +134,18 @@ function AlertItem({
             justifyContent: "center",
           }}
         >
-          <Ionicons name={icon} size={16} color="#0f172a" />
+          <Ionicons name={icon} size={16} color={colors.text} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: "#0f172a", fontWeight: "900" }}>{title}</Text>
-          <Text style={{ marginTop: 2, fontSize: 12, color: "#64748b", fontWeight: "600" }}>
+          <Text style={{ color: colors.text, fontWeight: "900" }}>{title}</Text>
+          <Text style={{ marginTop: 2, fontSize: 12, color: colors.textMuted, fontWeight: "600" }}>
             {subtitle}
           </Text>
-          <Text style={{ marginTop: 2, fontSize: 12, color: "#94a3b8" }}>{status}</Text>
+          <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSubtle }}>{status}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 11, color: "#94a3b8", fontWeight: "700" }}>{time}</Text>
-          <Ionicons name="ellipsis-vertical" size={14} color="#94a3b8" />
+          <Text style={{ fontSize: 11, color: colors.textSubtle, fontWeight: "700" }}>{time}</Text>
+          <Ionicons name="ellipsis-vertical" size={14} color={colors.iconMuted} />
         </View>
       </View>
     </View>
@@ -173,9 +173,12 @@ export default function HomeScreen() {
   const { data: alerts, isLoading: isLoadingAlerts } = useQuery(trpc.alerts.listMine.queryOptions());
   const recentAlerts = (alerts ?? []).slice(0, 3);
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const { status: locationStatus, place, message: locationMessage } = useUserLocation();
+  const regionLabel = regionHeadline(locationStatus, place);
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: SHEET_BG }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
       <View
         style={{
           height: 56,
@@ -183,9 +186,9 @@ export default function HomeScreen() {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          backgroundColor: SHEET_BG,
+          backgroundColor: colors.sheetBg,
           borderBottomWidth: 1,
-          borderBottomColor: "rgba(15, 23, 42, 0.06)",
+          borderBottomColor: colors.border,
         }}
       >
         <Pressable
@@ -200,36 +203,17 @@ export default function HomeScreen() {
             alignItems: "center",
             justifyContent: "center",
             opacity: pressed ? 0.85 : 1,
-            backgroundColor: "#e2e8f0",
+            backgroundColor: colors.chip,
           })}
         >
-          <Ionicons name="menu" size={22} color={BRAND_BLUE} />
+          <Ionicons name="menu" size={22} color={colors.brand} />
         </Pressable>
 
-        <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: BRAND_BLUE }}>
+        <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: colors.brand }}>
           Community Safety
         </Text>
 
-        <Pressable
-          onPress={() => router.push("/(drawer)/(tabs)/profile")}
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-          style={({ pressed }) => ({
-            width: 40,
-            height: 40,
-            borderRadius: 999,
-            overflow: "hidden",
-            backgroundColor: "#e2e8f0",
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=128&h=128&q=60",
-            }}
-            style={{ width: 40, height: 40 }}
-          />
-        </Pressable>
+        <AccountAvatarButton />
       </View>
 
       <ScrollView
@@ -242,7 +226,7 @@ export default function HomeScreen() {
         <View
           style={{
             marginTop: 10,
-            backgroundColor: CTA_BG,
+            backgroundColor: colors.cta,
             borderRadius: 18,
             padding: 18,
             overflow: "hidden",
@@ -251,9 +235,14 @@ export default function HomeScreen() {
           <Text style={{ color: "rgba(255,255,255,0.75)", fontWeight: "800", letterSpacing: 1 }}>
             CURRENT REGION
           </Text>
-          <Text style={{ marginTop: 8, fontSize: 30, fontWeight: "900", color: "#fff" }}>
-            Auckland{"\n"}Park
+          <Text style={{ marginTop: 8, fontSize: regionLabel.length > 18 ? 24 : 30, fontWeight: "900", color: "#fff" }}>
+            {regionLabel}
           </Text>
+          {locationStatus !== "ready" && locationMessage ? (
+            <Text style={{ marginTop: 8, color: "rgba(255,255,255,0.8)", fontWeight: "700" }}>
+              {locationMessage}
+            </Text>
+          ) : null}
           <View style={{ marginTop: 12 }}>
             <Pill label="Status: Safe" />
           </View>
@@ -262,7 +251,7 @@ export default function HomeScreen() {
         <View
           style={{
             marginTop: 14,
-            backgroundColor: "#fff",
+            backgroundColor: colors.surface,
             borderRadius: 18,
             shadowColor: "#000",
             shadowOpacity: 0.06,
@@ -283,22 +272,22 @@ export default function HomeScreen() {
               opacity: pressed ? 0.9 : 1,
             })}
           >
-            <Text style={{ color: "#1e3a8a", fontWeight: "800" }}>Nearby Activity</Text>
+            <Text style={{ color: colors.brand, fontWeight: "800" }}>Nearby Activity</Text>
 
-            <Ionicons name="chevron-forward" size={16} color="#64748b" />
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </Pressable>
         </View>
 
         <View style={{ marginTop: 22 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
             <View>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: HERO_BG }}>Community Updates</Text>
-              <Text style={{ marginTop: 4, fontSize: 12, color: "#94a3b8" }}>
-                Verified announcements from Auckland Park
+              <Text style={{ fontSize: 18, fontWeight: "900", color: colors.text }}>Community Updates</Text>
+              <Text style={{ marginTop: 4, fontSize: 12, color: colors.textSubtle }}>
+                Verified announcements from {place?.label ?? "your area"}
               </Text>
             </View>
             <Pressable style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
-              <Text style={{ color: HERO_BG, fontWeight: "900" }}>
+              <Text style={{ color: colors.text, fontWeight: "900" }}>
                 View{`\n`}all
               </Text>
             </Pressable>
@@ -319,11 +308,11 @@ export default function HomeScreen() {
         </View>
 
         <View style={{ marginTop: 22 }}>
-          <Text style={{ fontSize: 18, fontWeight: "900", color: HERO_BG }}>Recent Alerts</Text>
+          <Text style={{ fontSize: 18, fontWeight: "900", color: colors.text }}>Recent Alerts</Text>
           <View style={{ marginTop: 12, gap: 12 }}>
-            {isLoadingAlerts && <Text style={{ color: "#94a3b8" }}>Loading alerts...</Text>}
+            {isLoadingAlerts && <Text style={{ color: colors.textSubtle }}>Loading alerts...</Text>}
             {!isLoadingAlerts && recentAlerts.length === 0 && (
-              <Text style={{ color: "#94a3b8" }}>No recent alerts for your area.</Text>
+              <Text style={{ color: colors.textSubtle }}>No recent alerts for your area.</Text>
             )}
             {recentAlerts.map((a) => {
               const style = ALERT_ITEM_STYLE[a.severity] ?? ALERT_ITEM_STYLE.MEDIUM;
