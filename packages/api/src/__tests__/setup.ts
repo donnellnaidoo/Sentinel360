@@ -1,5 +1,13 @@
 import { vi } from "vitest";
 
+// packages/env validates these at import time. Tests mock the DB and
+// Supabase clients, so placeholders are enough — they are never dialled.
+process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+process.env.SUPABASE_URL ??= "http://localhost:54321";
+process.env.SUPABASE_SERVICE_ROLE_KEY ??= "test-service-role-key";
+process.env.CORS_ORIGIN ??= "http://localhost:3001";
+process.env.AI_SERVICE_API_KEY ??= "test-ai-service-key";
+
 vi.mock("@Sentinel360/auth", () => {
   return {
     supabaseAdmin: {

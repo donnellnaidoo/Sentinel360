@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "../../scripts/free-port.sh 8001; uv run uvicorn app.main:app --reload --port 8001",
-    "setup": "uv sync"
+    "setup": "uv sync",
+    "test": "uv run pytest -q"
   }
 }

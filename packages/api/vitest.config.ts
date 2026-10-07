@@ -19,13 +19,15 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      "@Sentinel360/auth": path.resolve(root, "packages/auth/src/index.ts"),
-      "@Sentinel360/db": path.resolve(root, "packages/db/src/index.ts"),
-      "@Sentinel360/env/server": path.resolve(root, "packages/env/src/server.ts"),
-      "@Sentinel360/db/schema": path.resolve(root, "packages/db/src/schema"),
-      "@Sentinel360/db/schema/auth": path.resolve(root, "packages/db/src/schema/auth.ts"),
-      "@Sentinel360/db/schema/rbac": path.resolve(root, "packages/db/src/schema/rbac.ts"),
-    },
+    // Regexes, not string keys: a string alias also matches as a prefix, so
+    // "@Sentinel360/db" turned "@Sentinel360/db/schema/auth" into
+    // ".../db/src/index.ts/schema/auth".
+    alias: [
+      { find: /^@Sentinel360\/auth$/, replacement: path.resolve(root, "packages/auth/src/index.ts") },
+      { find: /^@Sentinel360\/db$/, replacement: path.resolve(root, "packages/db/src/index.ts") },
+      { find: /^@Sentinel360\/env\/server$/, replacement: path.resolve(root, "packages/env/src/server.ts") },
+      { find: /^@Sentinel360\/db\/schema\/(.+)$/, replacement: path.resolve(root, "packages/db/src/schema/$1.ts") },
+      { find: /^@Sentinel360\/db\/schema$/, replacement: path.resolve(root, "packages/db/src/schema") },
+    ],
   },
 });

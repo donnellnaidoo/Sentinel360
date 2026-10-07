@@ -12,6 +12,7 @@ const mainNavItems = [
   { label: "Evidence", href: "/evidence", icon: "inventory_2" },
   { label: "Sightings", href: "/sightings", icon: "visibility" },
   { label: "Alerts", href: "/alerts", icon: "notifications" },
+  { label: "Live Monitor", href: "/monitoring", icon: "videocam" },
   { label: "Wanted Feed", href: "/wanted-feed", icon: "person_search" },
 ] as const;
 

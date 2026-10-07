@@ -172,6 +172,34 @@ function UploadForm({ caseId }: { caseId: string }) {
   );
 }
 
+// Evidence captured by apps/ai (packages/api/src/services/ai-ingest.ts) —
+// source AI_PIPELINE, with the detection details in metadata.
+function AiProvenance({ cameraId, metadata }: { cameraId: string | null; metadata: unknown }) {
+  const meta = (metadata ?? {}) as Record<string, unknown>;
+  const details = [
+    meta.kind === "CROP" ? "Close-up (clean crop)" : meta.kind === "SNAPSHOT" ? "Annotated snapshot" : null,
+    cameraId ? `Camera ${cameraId}` : null,
+    typeof meta.view === "string" && meta.view !== "Main" ? `${meta.view} view` : null,
+    typeof meta.confidence === "number" ? `${Math.round(meta.confidence * 100)}% confidence` : null,
+    typeof meta.model === "string" ? meta.model : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex items-center gap-1 rounded bg-primary-container/20 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
+        <span className="material-symbols-outlined text-sm" aria-hidden="true">smart_toy</span>
+        AI captured
+      </span>
+      {meta.modelStatus === "experimental" && (
+        <span className="rounded bg-tertiary-container/30 px-2 py-0.5 text-[10px] font-bold uppercase text-tertiary">
+          Experimental model
+        </span>
+      )}
+      {details.length > 0 && <span className="text-[11px] text-on-surface-variant">{details.join(" · ")}</span>}
+    </div>
+  );
+}
+
 function CustodyChain({ evidenceId }: { evidenceId: string }) {
   const chainQuery = useQuery(trpc.evidence.getCustodyChain.queryOptions({ id: evidenceId }));
   return (
@@ -199,7 +227,18 @@ function CustodyChain({ evidenceId }: { evidenceId: string }) {
 function EvidenceItem({
   item,
 }: {
-  item: { id: string; title: string; fileHash: string; mimeType: string; fileSize: number; createdAt: string | Date; description: string | null };
+  item: {
+    id: string;
+    title: string;
+    fileHash: string;
+    mimeType: string;
+    fileSize: number;
+    createdAt: string | Date;
+    description: string | null;
+    source: string;
+    sourceCameraId: string | null;
+    metadata?: unknown;
+  };
 }) {
   const [result, setResult] = useState<IntegrityResult | null>(null);
   const [showChain, setShowChain] = useState(false);
@@ -219,6 +258,7 @@ function EvidenceItem({
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-on-surface break-words">{item.title}</p>
+          {item.source === "AI_PIPELINE" && <AiProvenance cameraId={item.sourceCameraId} metadata={item.metadata} />}
           <p className="text-xs text-on-surface-variant mt-0.5">
             {FRIENDLY_TYPE[item.mimeType] ?? item.mimeType} · {formatFileSize(item.fileSize)} · added{" "}
             {formatDateTime(item.createdAt)}

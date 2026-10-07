@@ -15,12 +15,12 @@ const SESSION_ONLY_ROUTES = ["/reset-password"];
 const CONSOLE_ROUTES: Record<ConsoleRole, string[]> = {
   admin: [
     "/dashboard", "/cases", "/docket", "/evidence",
-    "/sightings", "/alerts", "/wanted-feed",
+    "/sightings", "/alerts", "/monitoring", "/wanted-feed",
     "/admin", "/profile", "/my-data",
   ],
   super_admin: [
     "/dashboard", "/cases", "/docket", "/evidence",
-    "/sightings", "/alerts", "/wanted-feed",
+    "/sightings", "/alerts", "/monitoring", "/wanted-feed",
     "/admin", "/super-admin", "/profile", "/my-data",
   ],
 };

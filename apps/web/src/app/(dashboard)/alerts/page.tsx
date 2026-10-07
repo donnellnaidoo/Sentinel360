@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { queryClient, trpc } from "@/lib/trpc/client";
@@ -24,6 +25,21 @@ const SEVERITY_STYLES: Record<string, { accent: string; badgeBg: string; badgeFg
   MEDIUM: { accent: "border-l-primary-container", badgeBg: "bg-primary-container/20", badgeFg: "text-primary", icon: "info" },
   LOW: { accent: "border-l-outline-variant", badgeBg: "bg-surface-container", badgeFg: "text-on-surface-variant", icon: "notifications" },
 };
+
+// Alerts raised by apps/ai via packages/api/src/services/ai-ingest.ts. Their
+// metadata carries the auto-opened docket and the detection details.
+function readAiAlert(alert: { sourceDomain: string | null; metadata?: unknown }) {
+  if (alert.sourceDomain !== "ai_pipeline") return null;
+  const metadata = (alert.metadata ?? {}) as Record<string, unknown>;
+  return {
+    caseId: typeof metadata.caseId === "string" ? metadata.caseId : null,
+    caseNumber: typeof metadata.caseNumber === "string" ? metadata.caseNumber : null,
+    cameraId: typeof metadata.cameraId === "string" ? metadata.cameraId : null,
+    confidence: typeof metadata.confidence === "number" ? metadata.confidence : null,
+    view: typeof metadata.view === "string" && metadata.view !== "Main" ? metadata.view : null,
+    experimental: metadata.modelStatus === "experimental",
+  };
+}
 
 function getRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -145,6 +161,7 @@ export default function AlertsPage() {
       <div className="space-y-4">
         {visibleItems.map((a) => {
           const style = SEVERITY_STYLES[a.severity] ?? SEVERITY_STYLES.MEDIUM;
+          const ai = readAiAlert(a);
           return (
             <div
               key={a.id}
@@ -164,10 +181,36 @@ export default function AlertsPage() {
                 </div>
               </div>
               {a.description && <p className="text-on-surface-variant text-body-sm flex-1">{a.description}</p>}
-              <div className="mt-4 flex items-center space-x-3">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${style.badgeBg} ${style.badgeFg}`}>
                   Target: {a.targetRole}
                 </span>
+                {ai && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase bg-primary-container/20 text-primary">
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">smart_toy</span>
+                    AI detection
+                    {ai.cameraId && ` · ${ai.cameraId}`}
+                    {ai.view && ` · ${ai.view} view`}
+                    {ai.confidence !== null && ` · ${Math.round(ai.confidence * 100)}%`}
+                  </span>
+                )}
+                {ai?.experimental && (
+                  <span
+                    className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-tertiary-container/30 text-tertiary"
+                    title="The anomaly model is not yet calibrated for this camera — verify before acting."
+                  >
+                    Experimental model
+                  </span>
+                )}
+                {ai?.caseId && (
+                  <Link
+                    href={`/docket/${ai.caseId}`}
+                    className="inline-flex items-center gap-1 text-body-sm font-semibold text-primary hover:underline"
+                  >
+                    Open docket{ai.caseNumber && ` ${ai.caseNumber}`}
+                    <span className="material-symbols-outlined text-base" aria-hidden="true">arrow_forward</span>
+                  </Link>
+                )}
                 {a.expiresAt && (
                   <span className="text-[10px] text-on-surface-variant">
                     Expires {new Date(a.expiresAt).toLocaleString()}
