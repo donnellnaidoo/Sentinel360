@@ -1,154 +1,39 @@
 "use client";
 
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 
 import { queryClient, trpc } from "@/lib/trpc/client";
-import { createClient } from "@/lib/supabase/client";
-
 
 const PAGE_SIZE = 12;
 
-type FetchSightingsInput = {
-  search: string;
-  page: number;
+type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";
+
+const STATUS_FILTERS: Array<{ value: ModerationStatus | undefined; label: string }> = [
+  { value: undefined, label: "All" },
+  { value: "PENDING", label: "Pending" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "DUPLICATE", label: "Duplicate" },
+];
+
+const MODERATION_STATUS_STYLES: Record<ModerationStatus, string> = {
+  PENDING: "bg-amber-100 text-amber-800 border-amber-200",
+  APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  REJECTED: "bg-red-100 text-red-800 border-red-200",
+  DUPLICATE: "bg-surface-container text-on-surface-variant border-outline-variant",
 };
 
-async function fetchSightings({
-  search,
-  page,
-}: FetchSightingsInput): Promise<{
-  items: CommunitySighting[];
-  total: number;
-}> {
-  const supabase = createClient();
+const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  DUPLICATE: "Duplicate",
+};
 
-  const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  console.log("Current Supabase user:", {
-    id: user?.id,
-    email: user?.email,
-    userError,
-  });
-
-  let query = supabase
-     .from("community_sighting")
-     .select(
-      `
-      id,
-      reference_code,
-      reporter_user_id,
-      sighting_type,
-      title,
-      description,
-      location,
-      occurred_at,
-      media_ids,
-      status,
-      severity,
-      visibility,
-      operator_notes,
-      linked_incident_id,
-      moderation_status,
-      moderation_reason,
-      reported_at,
-      is_anonymous,
-      created_at,
-      updated_at,
-
-      author:user!community_sighting_reporter_user_id_fkey (
-        id,
-        name,
-        email,
-        image
-      )
-      `,
-      {
-        count: "exact",
-      },
-     )
-     .order("created_at", {
-      ascending: false,
-     })
-     .range(from, to);
-
-  const filteredSearch = escapeSearchValue(search.trim());
-
-     if(filteredSearch){
-      query = query.or(
-        [
-          `description.ilike.%${filteredSearch}%`,
-          `reference_code.ilike.%${filteredSearch}%`,
-          `title.ilike.%${filteredSearch}%`,
-        ].join(","),
-      );
-     }
-
-     function escapeSearchValue(value:string): string {
-      return value.replace(/[%_,()]/g, "");
-     }
-
-     const { data, error, count } = await query;
-
-    console.log("Sightings query result:", {
-      data,
-      error,
-      count,
-    });
-
-     if(error){
-      throw new Error(error.message);
-     }
-
-     const rows = (data ?? []) as unknown as CommunitySightingQueryRow[];
-
-     const items: CommunitySighting[] = rows.map((row) => ({
-      ...row,
-
-      media_ids: Array.isArray(row.media_ids)
-      ? row.media_ids.filter(
-        (item): item is string => typeof item === "string",
-      )
-      :[],
-
-      author: Array.isArray(row.author)
-      ? row.author[0] ?? null
-      : row.author,
-     }));
-
-     return {
-      items,
-      total: count ?? 0,
-     };
+function moderationStatusOf(value: string): ModerationStatus {
+  return value in MODERATION_STATUS_LABELS ? (value as ModerationStatus) : "PENDING";
 }
-
-// const STATUS_FILTERS = [
-//   { value: undefined, label: "All" },
-//   { value: "PENDING", label: "Pending" },
-//   { value: "APPROVED", label: "Approved" },
-//   { value: "DUPLICATE", label: "Duplicate" },
-//   { value: "REJECTED", label: "Rejected" },
-// ] as const;
-
-// const STATUS_STYLES: Record<string, string> = {
-//   PENDING: "bg-tertiary-container/20 text-tertiary",
-//   APPROVED: "bg-secondary-container/20 text-secondary",
-//   DUPLICATE: "bg-surface-container text-on-surface-variant",
-//   REJECTED: "bg-error-container/20 text-error",
-// };
-
-type SightingAuthor = {
-  id: string;
-  name: string;
-  email: string;
-  image: string | null;
-};
 
 type SightingLocation = {
   address?: string | null;
@@ -157,48 +42,13 @@ type SightingLocation = {
   [key: string]: unknown;
 };
 
-type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
+function asLocation(value: unknown): SightingLocation {
+  return value && typeof value === "object" ? (value as SightingLocation) : {};
+}
 
-const MODERATION_STATUS_STYLES: Record<ModerationStatus, string> = {
-  PENDING: "bg-amber-100 text-amber-800 border-amber-200",
-  APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  REJECTED: "bg-red-100 text-red-800 border-red-200",
-};
-
-const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
-  PENDING: "Pending",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-};
-
-type CommunitySighting = {
-  id: string;
-  reference_code: string;
-  reporter_user_id: string | null;
-  sighting_type: string;
-  title: string | null;
-  description: string;
-  location: SightingLocation;
-  occurred_at: string | null;
-  media_ids: string[];
-  status: string;
-  severity: string | null;
-  visibility: string;
-  operator_notes: string | null;
-  linked_incident_id: string | null;
-  moderation_status: ModerationStatus;
-  moderation_reason: string | null;
-  reported_at: string | null;
-  is_anonymous: boolean;
-  created_at: string;
-  updated_at: string;
-  author: SightingAuthor | null;
-};
-
-type CommunitySightingQueryRow = Omit<CommunitySighting, "author" | "media_ids"> & {
-  media_ids: unknown;
-  author: SightingAuthor | SightingAuthor[] | null;
-};
+function asMediaIds(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+}
 
 function DetailSection({
   title,
@@ -243,269 +93,101 @@ function DetailField({
   );
 }
 
-type ModerateSightingInput = {
-  sightingId: string;
-  authorId: string | null;
-  decision: "APPROVED" | "REJECTED";
-  reason: string;
-  location: SightingLocation;
-};
+function getLocationAddress(location: SightingLocation): string {
+  return typeof location.address === "string" && location.address.trim()
+    ? location.address
+    : "No location supplied";
+}
 
-async function moderateSighting({
-  sightingId,
-  authorId,
-  decision,
-  reason,
-  location,
-}: ModerateSightingInput): Promise<void> {
-  const supabase = createClient();
+function getLatitude(location: SightingLocation): number | null {
+  return typeof location.latitude === "number" ? location.latitude : null;
+}
 
-  const {
-    data: { user: adminUser },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw new Error(userError.message);
-  }
-
-  if (!adminUser) {
-    throw new Error(
-      "You must be logged in to moderate a sighting.",
-    );
-  }
-
-  const now = new Date().toISOString();
-  const cleanedReason = reason.trim();
-  const approved = decision === "APPROVED";
-
-  const { error: updateError } = await supabase
-    .from("community_sighting")
-    .update({
-      moderation_status: decision,
-      moderation_reason: cleanedReason || null,
-      status: approved ? "APPROVED" : "REJECTED",
-      visibility: approved ? "COMMUNITY" : "PRIVATE",
-      operator_notes: cleanedReason || null,
-      updated_at: now,
-    })
-    .eq("id", sightingId);
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-//   const alertsToCreate = [
-//     // Personal alert for the sighting author
-//     ...(authorId
-//       ? [
-//         {
-//           user_id: authorId,
-//           created_by: adminUser.id,
-//           sighting_id: sightingId,
-//           audience: "PERSONAL",
-
-//           alert_type: approved
-//             ? "SIGHTING_APPROVED"
-//             : "SIGHTING_REJECTED",
-
-//           title: approved
-//             ? "Your sighting was approved"
-//             : "Your sighting was rejected",
-
-//           message: approved
-//             ? cleanedReason
-//               ? `Your sighting was approved. Note: ${cleanedReason}`
-//               : "Your submitted sighting was reviewed and approved."
-//             : cleanedReason
-//               ? `Your sighting was rejected. Reason: ${cleanedReason}`
-//               : "Your submitted sighting was reviewed and could not be confirmed.",
-
-//           location,
-//           latitude:
-//             latitude === null
-//               ? null
-//               : String(latitude),
-//           longitude:
-//             longitude === null
-//               ? null
-//               : String(longitude),
-
-//           is_read: false,
-//           created_at: now,
-//           updated_at: now,
-//         },
-//       ]
-//       : []),
-
-//     // Community alert for all approved sightings
-//     ...(approved
-//       ? [
-//         {
-//           user_id: null,
-//           created_by: adminUser.id,
-//           sighting_id: sightingId,
-//           audience: "COMMUNITY",
-//           alert_type:
-//             "COMMUNITY_SIGHTING_APPROVED",
-
-//           title: "Community Sighting Confirmed",
-
-//           message: cleanedReason
-//             ? `A community sighting was confirmed. Note: ${cleanedReason}`
-//             : "A community sighting was reviewed and confirmed.",
-
-//           location,
-//           latitude:
-//             latitude === null
-//               ? null
-//               : String(latitude),
-//           longitude:
-//             longitude === null
-//               ? null
-//               : String(longitude),
-
-//           is_read: false,
-//           created_at: now,
-//           updated_at: now,
-//         },
-//       ]
-//       : []),
-//   ];
-
-//   if (alertsToCreate.length === 0) {
-//     return;
-//   }
-
-//   console.log(
-//     "Alerts being inserted:",
-//     alertsToCreate,
-//   );
-
-//   const { data: insertedAlerts, error: alertError } =
-//     await supabase
-//       .from("Alert")
-//       .insert(alertsToCreate)
-//       .select();
-
-//   console.log("Alert insertion result:", {
-//     insertedAlerts,
-//     alertError,
-//   });
-
-//   if (alertError) {
-//     throw new Error(
-//       `The sighting was moderated, but alerts could not be created: ${alertError.message}`,
-//     );
-//   }
+function getLongitude(location: SightingLocation): number | null {
+  return typeof location.longitude === "number" ? location.longitude : null;
 }
 
 export default function SightingsPage() {
   const [search, setSearch] = useState("");
-  // const [status, setStatus] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<ModerationStatus | undefined>(undefined);
   const [page, setPage] = useState(0);
-  const [selected, setSelected] = useState<CommunitySighting | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [moderationReason, setModerationReason] = useState("");
-  // const [notes, setNotes] = useState("");
 
+  const input = useMemo(
+    () => ({
+      search: search.trim() || undefined,
+      moderationStatus: status,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    }),
+    [search, status, page],
+  );
+
+  const { data: rawData, isLoading, isError, error } = useQuery(trpc.sightings.list.queryOptions(input));
+
+  const data = useMemo(
+    () =>
+      rawData && {
+        total: rawData.total,
+        items: rawData.items.map((item) => ({
+          ...item,
+          location: asLocation(item.location),
+          mediaIds: asMediaIds(item.mediaIds),
+          moderationStatus: moderationStatusOf(item.moderationStatus),
+        })),
+      },
+    [rawData],
+  );
+
+  const selected = data?.items.find((item) => item.id === selectedId) ?? null;
+
+  const closeDetails = () => {
+    setSelectedId(null);
+    setModerationReason("");
+  };
+
+  const verifySighting = useMutation(trpc.sightings.verify.mutationOptions());
   const createModerationAlerts = useMutation(
     trpc.alerts.createForSightingModeration.mutationOptions(),
   );
 
+  // Moderation goes through the API so it is permission-checked
+  // (sightings:moderate) and written to the audit log; the reporter and
+  // community alerts are created afterwards.
   const moderationMutation = useMutation({
-    mutationFn: async (input: ModerateSightingInput) => {
-      await moderateSighting(input);
+    mutationFn: async (args: {
+      sightingId: string;
+      authorId: string | null;
+      decision: "APPROVED" | "REJECTED";
+      reason: string;
+      location: SightingLocation;
+    }) => {
+      const reason = args.reason.trim() || undefined;
+
+      await verifySighting.mutateAsync({
+        id: args.sightingId,
+        decision: args.decision,
+        notes: reason,
+      });
 
       await createModerationAlerts.mutateAsync({
-        sightingId: input.sightingId,
-        authorUserId: input.authorId,
-        decision: input.decision,
-        reason: input.reason.trim() || undefined,
-        location: input.location,
+        sightingId: args.sightingId,
+        authorUserId: args.authorId,
+        decision: args.decision,
+        reason,
+        location: args.location,
       });
     },
 
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["sightings"],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: trpc.alerts.list.queryKey(),
-      });
-
-      setSelected(null);
-      setModerationReason("");
+      await queryClient.invalidateQueries({ queryKey: trpc.sightings.list.queryKey() });
+      await queryClient.invalidateQueries({ queryKey: trpc.alerts.list.queryKey() });
+      closeDetails();
     },
   });
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ["sightings", search, page],
-
-    queryFn: () => 
-      fetchSightings({
-        search,
-        page,
-      }),
-  });
-
-
-
-  // const { data, isLoading, isError, error } = useQuery(trpc.sightings.list.queryOptions(input));
-
-  // const verify = useMutation(
-  //   trpc.sightings.verify.mutationOptions({
-  //     onSuccess: () => {
-  //       queryClient.invalidateQueries({ queryKey: trpc.sightings.list.queryKey() });
-  //       setSelected(null);
-  //       setNotes("");
-  //     },
-  //   }),
-  // );
-
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
-
-  function getLocationAddress(
-    location: SightingLocation | null,
-  ): string {
-    if(!location)
-    {
-      return "No location supplied";
-    }
-
-    if(
-      typeof location.address === "string" &&
-      location.address.trim()
-    )
-    {
-      return location.address;
-    }
-
-    return "No location supplied";
-  }
-
-  function getLatitude(
-    location: SightingLocation | null,
-  ): number | null {
-    return typeof location?.latitude === "number"
-    ? location.latitude
-    : null;
-  }
-
-  function getLongitude(
-    location: SightingLocation | null,
-  ): number | null {
-    return typeof location?.longitude === "number"
-    ? location.longitude
-    : null;
-  }
-
-  
 
   return (
     <div className="max-w-container-max mx-auto">
@@ -530,7 +212,7 @@ export default function SightingsPage() {
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* {STATUS_FILTERS.map((f) => (
+          {STATUS_FILTERS.map((f) => (
             <button
               key={f.label}
               onClick={() => {
@@ -545,7 +227,7 @@ export default function SightingsPage() {
             >
               {f.label}
             </button>
-          ))} */}
+          ))}
         </div>
       </div>
 
@@ -561,24 +243,24 @@ export default function SightingsPage() {
             key={item.id}
             type="button"
             onClick={() => {
-              setSelected(item);
-              setModerationReason(item.moderation_reason ?? "");
+              setSelectedId(item.id);
+              setModerationReason(item.moderationReason ?? "");
             }}
             className="w-full text-left bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant hover:shadow-md transition-all p-6 flex items-start justify-between gap-4"
           >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-label-caps font-mono text-on-surface-variant">{item.reference_code}</span>
+                <span className="text-label-caps font-mono text-on-surface-variant">{item.referenceCode}</span>
 
                 <span
-                  className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${MODERATION_STATUS_STYLES[item.moderation_status]
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${MODERATION_STATUS_STYLES[item.moderationStatus]
                     }`}
                 >
-                  {MODERATION_STATUS_LABELS[item.moderation_status]}
+                  {MODERATION_STATUS_LABELS[item.moderationStatus]}
                 </span>
 
 
-                {item.media_ids.length > 0 && (
+                {item.mediaIds.length > 0 && (
                   <span className="material-symbols-outlined text-on-surface-variant text-sm">
                     photo_camera
                   </span>
@@ -598,7 +280,7 @@ export default function SightingsPage() {
 
             <span className="text-body-sm text-on-surface-variant whitespace-nowrap">
               {new Date(
-                item.reported_at ?? item.occurred_at ?? item.created_at, 
+                item.reportedAt ?? item.occurredAt ?? item.createdAt, 
                 ).toLocaleDateString()}
             </span>
           </button>
@@ -639,7 +321,7 @@ export default function SightingsPage() {
               type="button"
               aria-label="Close Sighting Details"
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setSelected(null)}
+              onClick={closeDetails}
             /> 
 
             <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-outline-variant bg-surface shadow-2xl">
@@ -652,11 +334,11 @@ export default function SightingsPage() {
                   </h3>
 
                   <p className="mt-1 font-mono text-xs text-on-surface-variant">
-                    {selected.reference_code}
+                    {selected.referenceCode}
                   </p>
                 </div>
 
-                <button type="button" onClick={() => {setSelected(null); setModerationReason("")}} className="rounded-lg p-1.5 transition-colors hover:bg-surface-container">
+                <button type="button" onClick={closeDetails} className="rounded-lg p-1.5 transition-colors hover:bg-surface-container">
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
@@ -672,15 +354,15 @@ export default function SightingsPage() {
 
                 {/* Location */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailField label="Location" value={getLocationAddress(selected.location) ?? "Not supplied"}/>
+                  <DetailField label="Location" value={getLocationAddress(selected.location)}/>
 
-                  <DetailField label="Submitted" value={new Date(selected.reported_at ?? selected.occurred_at ?? selected.created_at,).toLocaleString()}/>
+                  <DetailField label="Submitted" value={new Date(selected.reportedAt ?? selected.occurredAt ?? selected.createdAt,).toLocaleString()}/>
 
-                  <DetailField label="Sighting Type" value={selected.sighting_type}/>
+                  <DetailField label="Sighting Type" value={selected.sightingType}/>
 
                   <DetailField label="Visibility" value={selected.visibility}/>
 
-                  <DetailField label="Anonymous" value={selected.is_anonymous ? "Yes" : "No"}/>
+                  <DetailField label="Anonymous" value={selected.isAnonymous ? "Yes" : "No"}/>
                 </div>
 
                 {/* Coordinates */}
@@ -716,9 +398,9 @@ export default function SightingsPage() {
 
                   {/* Submitted Image */}
                 <DetailSection title="Submitted images">
-                  {selected.media_ids.length > 0 ? (
+                  {selected.mediaIds.length > 0 ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {selected.media_ids.map((mediaPath) => (
+                      {selected.mediaIds.map((mediaPath) => (
                         <div key={mediaPath} className="rounded-lg border border-outline-variant p-3">
                           <p className="break-all text-sm text-on-surface-variant">
                             {mediaPath}
@@ -737,20 +419,20 @@ export default function SightingsPage() {
                 <DetailField 
                   label="Submitted by"
                   value={
-                      selected.is_anonymous
+                      selected.isAnonymous
                       ? "Anonymous community member"
                       : selected.author
                         ? `${selected.author.name} (${selected.author.email})`
-                        : selected.reporter_user_id ?? "Unknown user"
+                        : "Unknown user"
                   }
                 />
 
                 <DetailSection title="Moderation Status">
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${
-                    MODERATION_STATUS_STYLES[selected.moderation_status]
+                    MODERATION_STATUS_STYLES[selected.moderationStatus]
                   }`}>
 
-                    {MODERATION_STATUS_LABELS[selected.moderation_status]}
+                    {MODERATION_STATUS_LABELS[selected.moderationStatus]}
                   </span>
                 </DetailSection>
 
@@ -768,7 +450,7 @@ export default function SightingsPage() {
               {/* Admin Rejection & Approval */}
               <div className="sticky bottom-0 flex justify-end gap-3 border-t border-outline-variant bg-surface p-5">
 
-                  {selected.moderation_status !== "PENDING" && (
+                  {selected.moderationStatus !== "PENDING" && (
                     <p className="mr-auto text-sm text-on-surface-variant">
                       This sighting has already been moderated.
                     </p>
@@ -785,13 +467,13 @@ export default function SightingsPage() {
                   <button 
                   type="button" 
                   className="rounded-lg px-4 py-2 text-sm font-medium text-error transition-colors hover:bg-error-container/10"
-                  disabled={moderationMutation.isPending || selected.moderation_status !== "PENDING"}
+                  disabled={moderationMutation.isPending || selected.moderationStatus !== "PENDING"}
                   onClick={() => {
                     if(!selected) return;
 
                     moderationMutation.mutate({
                       sightingId: selected.id,
-                      authorId: selected.reporter_user_id,
+                      authorId: selected.reporterUserId,
                       decision: "REJECTED",
                       reason: moderationReason,
                       location: selected.location,
@@ -808,13 +490,13 @@ export default function SightingsPage() {
                   <button 
                     type="button" 
                     className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary/90"
-                    disabled={moderationMutation.isPending || selected.moderation_status !== "PENDING"}
+                    disabled={moderationMutation.isPending || selected.moderationStatus !== "PENDING"}
                     onClick={() => {
                       if(!selected) return;
 
                       moderationMutation.mutate({
                         sightingId: selected.id,
-                        authorId: selected.reporter_user_id,
+                        authorId: selected.reporterUserId,
                         decision: "APPROVED",
                         reason: moderationReason,
                         location: selected.location,

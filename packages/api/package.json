@@ -15,7 +15,10 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@Sentinel360/auth": "workspace:*",
     "@Sentinel360/db": "workspace:*",
@@ -28,6 +31,7 @@
   },
   "devDependencies": {
     "@Sentinel360/config": "workspace:*",
+    "@vitest/ui": "4.1.8",
     "hono": "catalog:",
     "typescript": "^5",
     "vitest": "^4.1.8"

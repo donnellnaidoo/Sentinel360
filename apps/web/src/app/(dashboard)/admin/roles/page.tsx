@@ -3,9 +3,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import ReadOnlyNotice from "@/components/layout/ReadOnlyNotice";
+import { useConsoleRole } from "@/lib/auth/console-role-context";
 import { queryClient, trpc } from "@/lib/trpc/client";
 
 export default function AdminRolesPage() {
+  const { isSuperAdmin } = useConsoleRole();
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [pendingPermissionIds, setPendingPermissionIds] = useState<string[] | null>(null);
@@ -126,16 +129,20 @@ export default function AdminRolesPage() {
                 <h2 className="text-xl font-bold text-foreground">{activeRole.name}</h2>
                 <p className="text-sm text-muted-foreground">{activeRole.description}</p>
               </div>
-              <button
-                disabled={!hasChanges || updatePermissions.isPending}
-                onClick={() =>
-                  updatePermissions.mutate({ roleId: activeRole.id, permissionIds: pendingPermissionIds ?? [] })
-                }
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-40"
-              >
-                {updatePermissions.isPending ? "Saving..." : "Save Permissions"}
-              </button>
+              {isSuperAdmin && (
+                <button
+                  disabled={!hasChanges || updatePermissions.isPending}
+                  onClick={() =>
+                    updatePermissions.mutate({ roleId: activeRole.id, permissionIds: pendingPermissionIds ?? [] })
+                  }
+                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-40"
+                >
+                  {updatePermissions.isPending ? "Saving..." : "Save Permissions"}
+                </button>
+              )}
             </div>
+
+            {!isSuperAdmin && <ReadOnlyNotice what="role permissions" />}
 
             {updatePermissions.error && (
               <p className="text-sm text-destructive mb-4">{updatePermissions.error.message}</p>
@@ -173,6 +180,7 @@ export default function AdminRolesPage() {
                               <input
                                 type="checkbox"
                                 checked={isChecked(perm.id)}
+                                disabled={!isSuperAdmin}
                                 onChange={() => toggle(perm.id)}
                                 className="h-4 w-4"
                               />

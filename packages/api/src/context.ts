@@ -45,6 +45,20 @@ function splitName(fullName: string): { firstName: string | null; lastName: stri
   return { firstName: parts[0]!, lastName: parts.slice(1).join(" ") };
 }
 
+const ROLE_PRIORITY = [
+  "super_admin",
+  "admin",
+  "security_operator",
+  "investigator",
+  "law_enforcement",
+  "community",
+];
+
+function rolePriority(code: string): number {
+  const i = ROLE_PRIORITY.indexOf(code);
+  return i === -1 ? ROLE_PRIORITY.length : i;
+}
+
 export async function createContext({ context }: CreateContextOptions) {
   const authHeader = context.req.header("Authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -176,7 +190,11 @@ export async function createContext({ context }: CreateContextOptions) {
           : [];
 
       const permCodes = [...new Set(permissionsResult.map((p) => p.code))];
-      const roleCodes = userRoles.map((r) => r.roleCode);
+      // Highest-privilege first, so `role` (the display/primary role) is
+      // deterministic instead of whatever order the DB returned.
+      const roleCodes = userRoles
+        .map((r) => r.roleCode)
+        .sort((a, b) => rolePriority(a) - rolePriority(b));
       const appMetaRole: string = supabaseUser.app_metadata?.role ?? "community";
 
       enrichedSession = {

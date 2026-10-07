@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { STATUS_STYLES, type CaseStatus } from "@/lib/case-status";
 import { trpc } from "@/lib/trpc/client";
 
 interface DashboardStats {
   stats: {
     activeCases: number;
     pendingAlerts: number;
-    openEvidence: number;
+    totalEvidence: number;
     criticalThreats: number;
     totalCases: number;
     totalUsers: number;
@@ -83,22 +84,28 @@ const priorityConfig: Record<string, { label: string; class: string }> = {
   LOW: { label: "Low", class: "bg-surface-container-high text-on-surface-variant" },
 };
 
-const statusConfig: Record<string, { label: string; class: string }> = {
-  OPEN: { label: "Active Investigation", class: "bg-primary-container/20 text-primary" },
-  CLOSED: { label: "Closed", class: "bg-secondary-container/20 text-secondary" },
-  ARCHIVED: { label: "Archived", class: "bg-surface-container-high text-on-surface-variant" },
-};
+function statusBadge(status: string): { label: string; class: string } {
+  return {
+    label: status.replace(/_/g, " ").toLowerCase(),
+    class: STATUS_STYLES[status as CaseStatus] ?? "bg-surface-container-high text-on-surface-variant",
+  };
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     fetch("/api/dashboard/stats")
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<DashboardStats>;
+      })
+      .then(setData)
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const activity = useQuery({
@@ -113,10 +120,10 @@ export default function DashboardPage() {
 
   const stats = data
     ? [
-        { label: "ACTIVE CASES", value: data.stats.activeCases.toLocaleString(), change: `+${Math.min(data.stats.activeCases, 10)}%`, changeClass: "text-secondary", sub: `${data.stats.activeCases} open investigations`, border: "border-primary" },
-        { label: "PENDING ALERTS", value: data.stats.pendingAlerts.toLocaleString(), change: `+${data.stats.pendingAlerts}`, changeClass: "text-error", sub: "Requiring immediate review", border: "border-tertiary" },
-        { label: "OPEN EVIDENCE", value: data.stats.openEvidence.toLocaleString(), change: "Stable", changeClass: "text-on-surface-variant", sub: "Digital/Physical assets", border: "border-secondary" },
-        { label: "CRITICAL THREATS", value: String(data.stats.criticalThreats).padStart(2, "0"), badge: data.stats.criticalThreats > 0 ? "Severe" : undefined, sub: "Level 5 incidents", border: "border-error" },
+        { label: "ACTIVE CASES", value: data.stats.activeCases.toLocaleString(), sub: `Not yet closed, of ${data.stats.totalCases.toLocaleString()} total`, border: "border-primary" },
+        { label: "ACTIVE ALERTS", value: data.stats.pendingAlerts.toLocaleString(), sub: "Alerts currently broadcasting", border: "border-tertiary" },
+        { label: "EVIDENCE ITEMS", value: data.stats.totalEvidence.toLocaleString(), sub: "Linked to cases", border: "border-secondary" },
+        { label: "OPEN CRITICAL INCIDENTS", value: data.stats.criticalThreats.toLocaleString(), badge: data.stats.criticalThreats > 0 ? "Critical" : undefined, sub: "Critical severity, not closed", border: "border-error" },
       ]
     : [];
 
@@ -125,19 +132,21 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="font-headline-xl text-headline-xl text-on-surface">Intelligence Overview</h2>
-          <p className="text-on-surface-variant mt-1">Real-time situational awareness for Precinct 07 operations.</p>
+          <p className="text-on-surface-variant mt-1">Live counts across cases, alerts, evidence and incidents.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/cases" className="bg-surface-container-highest text-primary px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-primary-container/20 transition-all">
-            <span className="material-symbols-outlined text-[20px]">filter_list</span>
-            <span>Adjust Filters</span>
-          </Link>
           <Link href="/cases/new" className="bg-primary text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 shadow-sm hover:shadow-md transition-all">
             <span className="material-symbols-outlined text-[20px]">add</span>
             <span>New Investigation</span>
           </Link>
         </div>
       </div>
+
+      {loadError && (
+        <div className="p-3 bg-error-container text-on-error-container rounded-xl text-body-sm">
+          Dashboard statistics could not be loaded. Refresh the page to try again.
+        </div>
+      )}
 
       {!loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
@@ -146,9 +155,6 @@ export default function DashboardPage() {
               <p className="font-label-caps text-label-caps text-on-surface-variant">{stat.label}</p>
               <div className="flex items-baseline justify-between mt-2">
                 <h3 className="font-headline-lg text-headline-lg">{stat.value}</h3>
-                {stat.change && (
-                  <span className={`${stat.changeClass} font-bold text-xs flex items-center`}>{stat.change}</span>
-                )}
                 {stat.badge && (
                   <span className="bg-error/10 text-error px-2 py-0.5 rounded text-[10px] font-bold uppercase">{stat.badge}</span>
                 )}
@@ -275,7 +281,7 @@ export default function DashboardPage() {
                 ) : data && data.recentCases.length > 0 ? (
                   data.recentCases.map((c) => {
                     const pc = priorityConfig[c.priority] ?? { label: c.priority, class: "bg-surface-container-high text-on-surface-variant" };
-                    const sc = statusConfig[c.status] ?? { label: c.status, class: "bg-surface-container-high text-on-surface-variant" };
+                    const sc = statusBadge(c.status);
                     return (
                       <tr
                         key={c.id}
@@ -320,25 +326,13 @@ export default function DashboardPage() {
               </Link>
             ))}
           </div>
-          <div className="mt-6 pt-6 border-t border-outline-variant">
-            <div className="flex items-center gap-3 p-3 bg-primary-container/10 rounded-lg">
-              <span className="material-symbols-outlined text-primary">support_agent</span>
-              <div className="text-[12px]">
-                <p className="font-bold">Command Link Active</p>
-                <p className="text-on-surface-variant">24/7 Intel Support</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       <footer className="mt-auto flex justify-between items-center w-full py-stack-md border-t border-outline-variant">
-        <span className="font-label-caps text-label-caps text-on-surface-variant">© 2024 Sentinel360 Intelligence. All rights reserved.</span>
+        <span className="font-label-caps text-label-caps text-on-surface-variant">© {new Date().getFullYear()} Sentinel360. All rights reserved.</span>
         <div className="flex gap-6">
-          <Link href="#" className="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity">Privacy Policy</Link>
-          <Link href="#" className="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity">Terms of Service</Link>
-          <Link href="#" className="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity">Security Disclosure</Link>
-          <Link href="#" className="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity">Contact Support</Link>
+          <Link href="/privacy" className="text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-opacity">Privacy Policy</Link>
         </div>
       </footer>
     </div>

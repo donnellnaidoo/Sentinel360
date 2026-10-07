@@ -1,20 +1,20 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-function ResetPasswordForm() {
+import { createClient } from "@/lib/supabase/client";
+
+// Reached from the emailed recovery link: /auth/callback exchanges the code
+// for a session and redirects here, and middleware only lets signed-in
+// users in, so the session is what authorises the password change.
+export default function ResetPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
 
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(
-    !token ? "Invalid or missing reset token." : null,
-  );
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleReset = async (e: React.FormEvent) => {
@@ -28,40 +28,20 @@ function ResetPasswordForm() {
 
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
+    const supabase = createClient();
+    const { error: updateError } = await supabase.auth.updateUser({ password });
 
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.message || data.error || "Password reset failed");
-        return;
-      }
-
-      router.push("/login?reset=success");
-    } catch {
-      setError("An unexpected error occurred");
-    } finally {
+    if (updateError) {
+      setError(updateError.message);
       setLoading(false);
+      return;
     }
-  };
 
-  if (!token) {
-    return (
-      <div className="w-full max-w-[440px] bg-surface-container-lowest rounded-xl p-8 text-center">
-        <h1 className="font-headline-md text-headline-md text-on-surface font-semibold">Invalid Link</h1>
-        <p className="font-body-sm text-body-sm text-on-surface-variant mt-2">
-          This password reset link is invalid or has expired.
-        </p>
-        <Link href="/forgot-password" className="mt-6 inline-block text-primary hover:underline font-medium">
-          Request a new reset link
-        </Link>
-      </div>
-    );
-  }
+    // Make them sign in with the new password; that is also where console
+    // access is re-checked.
+    await supabase.auth.signOut({ scope: "local" });
+    router.push("/login?reset=success");
+  };
 
   return (
     <div className="w-full max-w-[440px] bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.04),0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden">
@@ -140,13 +120,5 @@ function ResetPasswordForm() {
         </button>
       </form>
     </div>
-  );
-}
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense>
-      <ResetPasswordForm />
-    </Suspense>
   );
 }

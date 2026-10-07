@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
+import ReadOnlyNotice from "@/components/layout/ReadOnlyNotice";
+import { useConsoleRole } from "@/lib/auth/console-role-context";
 import { queryClient, trpc } from "@/lib/trpc/client";
 
 const ORG_TYPES = ["security_company", "police_department", "community_group"] as const;
@@ -20,6 +22,7 @@ const typeColors: Record<string, string> = {
 };
 
 export default function AdminOrganizationsPage() {
+  const { isSuperAdmin } = useConsoleRole();
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState({ name: "", type: ORG_TYPES[0] as string, contactEmail: "" });
@@ -56,14 +59,18 @@ export default function AdminOrganizationsPage() {
           <h2 className="text-2xl font-bold text-foreground">Organizations</h2>
           <p className="text-sm text-muted-foreground mt-1">Manage security companies, police departments, and community groups.</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined text-[18px]">add_business</span>
-          Add Organization
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_business</span>
+            Add Organization
+          </button>
+        )}
       </div>
+
+      {!isSuperAdmin && <ReadOnlyNotice what="organizations" />}
 
       <div className="relative mb-4">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[18px]">search</span>
@@ -96,22 +103,24 @@ export default function AdminOrganizationsPage() {
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{org.contactEmail ?? "No contact email"}</span>
             </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                disabled={!org.isActive || deactivateOrg.isPending}
-                onClick={() => {
-                  if (confirm(`Deactivate ${org.name}?`)) deactivateOrg.mutate({ id: org.id });
-                }}
-                className="text-xs text-destructive hover:underline font-medium disabled:opacity-40"
-              >
-                {org.isActive ? "Deactivate" : "Inactive"}
-              </button>
-            </div>
+            {isSuperAdmin && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  disabled={!org.isActive || deactivateOrg.isPending}
+                  onClick={() => {
+                    if (confirm(`Deactivate ${org.name}?`)) deactivateOrg.mutate({ id: org.id });
+                  }}
+                  className="text-xs text-destructive hover:underline font-medium disabled:opacity-40"
+                >
+                  {org.isActive ? "Deactivate" : "Inactive"}
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {showAddModal && (
+      {isSuperAdmin && showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
           <div className="bg-background rounded-xl w-full max-w-lg shadow-2xl relative z-10 border border-border">

@@ -20,7 +20,7 @@ describe("requireRole logic", () => {
   it("should allow when role matches", () => {
     const middleware = getMiddleware(requireRole("super_admin"));
     const result = middleware({
-      ctx: { session: { user: { id: "u1", role: "super_admin" } } },
+      ctx: { session: { user: { id: "u1", role: "super_admin", roles: ["super_admin"] } } },
       next,
     });
     expect(result).toBeDefined();
@@ -30,16 +30,27 @@ describe("requireRole logic", () => {
     const middleware = getMiddleware(requireRole("super_admin"));
     expect(() =>
       middleware({
-        ctx: { session: { user: { id: "u1", role: "admin" } } },
+        ctx: { session: { user: { id: "u1", role: "admin", roles: ["admin"] } } },
         next,
       }),
     ).toThrow(TRPCError);
   });
 
+  it("should allow when the matching role is not the user's first role", () => {
+    // Everyone gets "community" on first login; a later admin grant must
+    // still pass regardless of the order roles come back from the DB.
+    const middleware = getMiddleware(requireRole("admin"));
+    const result = middleware({
+      ctx: { session: { user: { id: "u1", role: "community", roles: ["community", "admin"] } } },
+      next,
+    });
+    expect(result).toBeDefined();
+  });
+
   it("should allow when one of multiple roles matches", () => {
     const middleware = getMiddleware(requireRole("admin", "super_admin"));
     const result = middleware({
-      ctx: { session: { user: { id: "u1", role: "admin" } } },
+      ctx: { session: { user: { id: "u1", role: "admin", roles: ["admin"] } } },
       next,
     });
     expect(result).toBeDefined();
@@ -51,7 +62,7 @@ describe("leoProcedure logic", () => {
 
   it("should allow law_enforcement role", () => {
     const result = middleware({
-      ctx: { session: { user: { id: "u1", role: "law_enforcement" } } },
+      ctx: { session: { user: { id: "u1", role: "law_enforcement", roles: ["law_enforcement"] } } },
       next,
     });
     expect(result).toBeDefined();
@@ -60,7 +71,7 @@ describe("leoProcedure logic", () => {
   it("should allow investigator, security_operator, admin, super_admin roles", () => {
     for (const role of ["investigator", "security_operator", "admin", "super_admin"]) {
       const result = middleware({
-        ctx: { session: { user: { id: "u1", role } } },
+        ctx: { session: { user: { id: "u1", role, roles: [role] } } },
         next,
       });
       expect(result).toBeDefined();
@@ -70,7 +81,7 @@ describe("leoProcedure logic", () => {
   it("should reject community role", () => {
     expect(() =>
       middleware({
-        ctx: { session: { user: { id: "u1", role: "community" } } },
+        ctx: { session: { user: { id: "u1", role: "community", roles: ["community"] } } },
         next,
       }),
     ).toThrow(TRPCError);

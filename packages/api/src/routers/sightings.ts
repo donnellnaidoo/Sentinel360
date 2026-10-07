@@ -1,4 +1,5 @@
 import { db } from "@Sentinel360/db";
+import { user } from "@Sentinel360/db/schema/auth";
 import { mediaAsset } from "@Sentinel360/db/schema/evidence";
 import { communitySighting } from "@Sentinel360/db/schema/sightings";
 import { TRPCError } from "@trpc/server";
@@ -187,6 +188,7 @@ export const sightingsRouter = router({
           ? or(
               ilike(communitySighting.description, `%${input.search}%`),
               ilike(communitySighting.referenceCode, `%${input.search}%`),
+              ilike(communitySighting.title, `%${input.search}%`),
             )
           : undefined,
       );
@@ -202,13 +204,27 @@ export const sightingsRouter = router({
         .select({ count: count() })
         .from(communitySighting)
         .where(where);
-      const items = await db
-        .select()
+      const rows = await db
+        .select({
+          sighting: communitySighting,
+          authorName: user.name,
+          authorEmail: user.email,
+        })
         .from(communitySighting)
+        .leftJoin(user, eq(communitySighting.reporterUserId, user.id))
         .where(where)
         .orderBy(desc(communitySighting.createdAt))
         .limit(input.limit)
         .offset(input.offset);
+
+      // Never reveal who filed an anonymous report, even to moderators.
+      const items = rows.map(({ sighting, authorName, authorEmail }) => ({
+        ...sighting,
+        author:
+          !sighting.isAnonymous && authorName && authorEmail
+            ? { name: authorName, email: authorEmail }
+            : null,
+      }));
 
       return {
         items,
@@ -308,7 +324,8 @@ export const sightingsRouter = router({
         .update(communitySighting)
         .set({
           moderationStatus: input.decision,
-          moderationReason: input.notes,
+          moderationReason: input.notes ?? null,
+          operatorNotes: input.notes ?? null,
           visibility: input.decision === "APPROVED" ? "COMMUNITY" : "PRIVATE",
           status: "RESOLVED",
           updatedAt: new Date(),
@@ -323,7 +340,7 @@ export const sightingsRouter = router({
         targetEntityType: "COMMUNITY_SIGHTING",
         targetEntityId: input.id,
         action: "UPDATE",
-        payload: { decision: input.decision },
+        payload: { decision: input.decision, notes: input.notes ?? null },
       });
 
       return updated;

@@ -2,7 +2,7 @@
   "name": "ai",
   "private": true,
   "scripts": {
-    "dev": "uv run uvicorn app.main:app --reload --port 8001",
+    "dev": "../../scripts/free-port.sh 8001; uv run uvicorn app.main:app --reload --port 8001",
     "setup": "uv sync"
   }
 }

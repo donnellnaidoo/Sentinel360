@@ -1,51 +1,46 @@
 import Link from "next/link";
 import { LogoMark } from "@Sentinel360/ui/components/logo";
 
+// Keep this copy to what the system actually does today — no deployment
+// numbers, certifications or capabilities that aren't built.
 const features = [
   {
-    icon: "visibility",
+    icon: "videocam",
     fill: true,
     iconBg: "bg-primary-container/20",
     iconColor: "text-primary",
-    title: "Real-Time Detection",
+    title: "CCTV Detection",
     description:
-      "Instantaneous identification of anomalies and high-value targets across distributed camera networks with sub-second latency.",
-    footer: "Active Monitoring",
+      "Computer-vision analysis of a camera feed flags watchlist faces, number plates and weapons, then opens an incident, case and alert automatically.",
+    footer: "Watchlist & plate matching",
     footerBadge: true,
     hoverEffect: "group-hover:scale-110",
   },
   {
-    icon: "layers",
+    icon: "folder_open",
     fill: true,
     iconBg: "bg-primary-container",
     iconColor: "text-white",
-    title: "3D Scene Reconstruction",
+    title: "Case Dockets",
     description:
-      "Advanced spatial temporal mapping to recreate environments in three dimensions for evidence gathering and situational analysis.",
-    footer: "Spatial Analysis Engine",
+      "Run an investigation from first report to court: notes, suspects, arrests, prosecution decisions and hearings, with a full timeline of every step.",
+    footer: "Investigation to prosecution",
     footerBadge: false,
     hoverEffect: "group-hover:rotate-12",
     highlight: "border-primary/20 bg-primary/5",
   },
   {
-    icon: "description",
+    icon: "inventory_2",
     fill: true,
     iconBg: "bg-tertiary-container/20",
     iconColor: "text-tertiary",
-    title: "Automated Reporting",
+    title: "Evidence & Community Reports",
     description:
-      "Generate comprehensive dockets and evidence summaries with AI-assisted narratives for courtroom-ready documentation.",
-    footer: "ISO 27001 Compliant",
+      "Hash-verified evidence with a chain-of-custody record, plus a moderated queue for sightings submitted by the public through the mobile app.",
+    footer: "POPIA-aware data handling",
     footerBadge: false,
     hoverEffect: "group-hover:scale-110",
   },
-];
-
-const stats = [
-  { value: "2.4M", label: "Nodes Connected" },
-  { value: "99.9%", label: "Uptime Reliability" },
-  { value: "42ms", label: "Avg Detection Speed" },
-  { value: "150+", label: "Federal Agencies" },
 ];
 
 export default function Home() {
@@ -66,7 +61,7 @@ export default function Home() {
               <span className="text-primary">Intelligence</span>
             </h1>
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">
-              A sophisticated instrument for intelligence analysts and law enforcement, delivering surgical precision through real-time surveillance data and predictive analytics.
+              Case management, evidence handling and CCTV-assisted detection for law enforcement and security teams, with community sightings feeding straight into the review queue.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-stack-md mt-stack-md">
@@ -76,13 +71,6 @@ export default function Home() {
             >
               Login
               <span className="material-symbols-outlined">login</span>
-            </Link>
-            <Link
-              href="/wanted-feed"
-              className="px-8 py-4 bg-surface-container-highest text-primary font-bold rounded-xl border border-outline-variant hover:bg-surface-container-high transition-colors flex items-center gap-stack-sm"
-            >
-              Explore Wanted Feed
-              <span className="material-symbols-outlined">person_search</span>
             </Link>
           </div>
           <div className="absolute bottom-10 animate-bounce text-on-surface-variant/40">
@@ -94,8 +82,8 @@ export default function Home() {
       <section className="py-24 bg-background relative z-40">
         <div className="container mx-auto px-margin-desktop">
           <div className="flex flex-col items-center text-center mb-16">
-            <span className="font-label-caps text-label-caps text-primary uppercase tracking-widest mb-stack-xs">Operational Capabilities</span>
-            <h2 className="font-headline-lg text-headline-lg text-on-surface">Precision Surveillance Tools</h2>
+            <span className="font-label-caps text-label-caps text-primary uppercase tracking-widest mb-stack-xs">What It Does</span>
+            <h2 className="font-headline-lg text-headline-lg text-on-surface">One Platform, Report to Courtroom</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
             {features.map((feature) => (
@@ -120,17 +108,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-20 border-t border-outline-variant bg-surface-container-low">
-        <div className="container mx-auto px-margin-desktop grid grid-cols-2 md:grid-cols-4 gap-gutter text-center">
-          {stats.map((stat) => (
-            <div key={stat.label} className="space-y-stack-xs">
-              <div className="font-headline-xl text-headline-xl text-primary">{stat.value}</div>
-              <div className="font-label-caps text-label-caps text-on-surface-variant">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <footer className="bg-surface-container-lowest dark:bg-on-surface flex justify-between px-margin-desktop items-center w-full py-stack-md border-t border-outline-variant">
         <div className="flex flex-col md:flex-row items-center gap-stack-md">
           <div className="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest font-bold">
@@ -138,13 +115,10 @@ export default function Home() {
             Sentinel360 Intelligence
           </div>
           <span className="hidden md:block text-outline">|</span>
-          <p className="font-body-sm text-body-sm text-on-surface-variant">© 2024 Sentinel360 Intelligence. All rights reserved.</p>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">© {new Date().getFullYear()} Sentinel360 Intelligence. All rights reserved.</p>
         </div>
         <div className="flex gap-stack-md">
-          <Link href="#" className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity">Privacy Policy</Link>
-          <Link href="#" className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity">Terms of Service</Link>
-          <Link href="#" className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity">Security Disclosure</Link>
-          <Link href="#" className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity">Contact Support</Link>
+          <Link href="/privacy" className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity">Privacy Policy</Link>
         </div>
       </footer>
 

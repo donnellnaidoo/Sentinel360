@@ -13,8 +13,18 @@ const PRIORITY_STYLES: Record<string, { badge: string; match: string }> = {
   LOW: { badge: "bg-surface text-on-surface border border-outline", match: "text-on-surface-variant" },
 };
 
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=900&q=70";
+// Never substitute a real person's photo for a missing one — on a wanted
+// feed that reads as an identification. Show a neutral placeholder instead.
+function NoPhotoPlaceholder() {
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-surface-container-high text-on-surface-variant">
+      <span className="material-symbols-outlined text-[96px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+        person
+      </span>
+      <span className="font-label-caps text-label-caps">No photo on file</span>
+    </div>
+  );
+}
 
 function chargesOf(attributes: unknown): string[] {
   const attrs = (attributes && typeof attributes === "object" ? attributes : {}) as Record<string, unknown>;
@@ -113,11 +123,15 @@ export default function WantedFeedPage() {
               className="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm hover:shadow-md transition-all group"
             >
               <div className={`relative h-64 ${apprehended ? "grayscale" : ""}`}>
-                <img
-                  className="w-full h-full object-cover"
-                  src={subject.primaryFaceImageUrl ?? FALLBACK_IMAGE}
-                  alt={subject.displayName ?? "Unidentified subject"}
-                />
+                {subject.primaryFaceImageUrl ? (
+                  <img
+                    className="w-full h-full object-cover"
+                    src={subject.primaryFaceImageUrl}
+                    alt={subject.displayName ?? "Unidentified subject"}
+                  />
+                ) : (
+                  <NoPhotoPlaceholder />
+                )}
                 {apprehended ? (
                   <div className="absolute inset-0 bg-on-surface/40 flex items-center justify-center">
                     <span className="bg-surface text-on-surface font-label-caps px-3 py-1.5 rounded-full border border-outline shadow-xl">

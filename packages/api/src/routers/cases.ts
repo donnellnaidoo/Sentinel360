@@ -55,6 +55,13 @@ import { insertCaseWithGeneratedNumber } from "../services/case-number";
 import { getCaseStatusTransitionError } from "../services/case-status";
 import { getCaseNextActions } from "../services/case-next-actions";
 import { recordCaseEvent } from "../services/case-timeline";
+import {
+  canViewSensitiveCase,
+  getCaseOrThrow,
+  PRIVILEGED_ROLES,
+  type ViewerCtx,
+} from "../services/case-access";
+import { caseStatusLabel, formatSAST, humanizeEnum } from "../services/case-labels";
 import { sweepCaseRetention } from "../services/retention";
 
 function pushIf<T>(arr: T[], item: T | undefined): void {
@@ -63,35 +70,10 @@ function pushIf<T>(arr: T[], item: T | undefined): void {
   }
 }
 
-type CaseRow = typeof investigationCase.$inferSelect;
-type ViewerCtx = { session: { user: { id: string; roles: string[] } } };
-
-const PRIVILEGED_ROLES = ["admin", "super_admin"];
-
 // Domain doc invariant: "only users with law_enforcement role or higher can
 // be assigned as investigators." security_operator and community are
 // excluded — they can work a case (notes, evidence) but don't lead one.
 const ASSIGNABLE_INVESTIGATOR_ROLES = ["investigator", "law_enforcement", "admin", "super_admin"];
-
-// POPIA condition 6: a case flagged is_sensitive is only visible to its
-// assigned investigator and admin/super_admin — everyone else gets a 403,
-// not a filtered/redacted view. Every read path below routes through this
-// (directly or via getCaseOrThrow) so the restriction can't be bypassed by
-// going through a sub-resource endpoint instead of cases.getById.
-function assertCaseVisible(caseRow: CaseRow, ctx: ViewerCtx): void {
-  if (!caseRow.isSensitive) {
-    return;
-  }
-  const { id, roles } = ctx.session.user;
-  const isAssignedInvestigator = caseRow.assignedToUserId === id;
-  const isPrivileged = roles.some((r) => PRIVILEGED_ROLES.includes(r));
-  if (!isAssignedInvestigator && !isPrivileged) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "This case is restricted to its assigned investigator and administrators",
-    });
-  }
-}
 
 function sensitiveCaseVisibilityCondition(ctx: ViewerCtx): SQL | undefined {
   const { id, roles } = ctx.session.user;
@@ -115,20 +97,6 @@ async function assertEligibleInvestigatorRole(userId: string): Promise<void> {
         "Target user does not have an eligible investigator role (investigator, law_enforcement, admin, or super_admin)",
     });
   }
-}
-
-async function getCaseOrThrow(id: string, ctx: ViewerCtx) {
-  const [found] = await db
-    .select()
-    .from(investigationCase)
-    .where(eq(investigationCase.id, id))
-    .limit(1);
-
-  if (!found) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Case not found" });
-  }
-  assertCaseVisible(found, ctx);
-  return found;
 }
 
 export const casesRouter = router({
@@ -228,13 +196,43 @@ export const casesRouter = router({
     .input(updateCaseSchema)
     .mutation(async ({ ctx, input }) => {
       const { id, ...updateData } = input;
-      await getCaseOrThrow(id, ctx);
+      const existing = await getCaseOrThrow(id, ctx);
+
+      const sensitiveChanged =
+        updateData.isSensitive !== undefined && updateData.isSensitive !== existing.isSensitive;
+      const nextAssignee =
+        updateData.assignedToUserId !== undefined
+          ? updateData.assignedToUserId
+          : existing.assignedToUserId;
+      // Flagging a case sensitive hides it from everyone but its investigator
+      // and admins — refuse a change that would lock the actor out mid-edit.
+      if ((updateData.isSensitive ?? existing.isSensitive) &&
+        !canViewSensitiveCase({ assignedToUserId: nextAssignee }, ctx)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Only the assigned investigator or an administrator can mark this case sensitive — you would lose access to it",
+        });
+      }
 
       const [updated] = await db
         .update(investigationCase)
         .set({ ...updateData, updatedAt: new Date() })
         .where(eq(investigationCase.id, id))
         .returning();
+
+      if (sensitiveChanged) {
+        await recordCaseEvent({
+          caseId: id,
+          eventType: "SENSITIVITY_CHANGED",
+          summary: updateData.isSensitive
+            ? "Case marked sensitive — restricted to the assigned investigator and administrators"
+            : "Sensitive restriction removed — case visible to all case readers",
+          payload: { isSensitive: updateData.isSensitive },
+          actorUserId: ctx.session.user.id,
+        });
+      }
+
       return updated;
     }),
 
@@ -275,21 +273,21 @@ export const casesRouter = router({
         .where(eq(investigationCase.id, input.id))
         .returning();
 
+      const statusSummary = `Status changed from ${caseStatusLabel(existing.status)} to ${caseStatusLabel(input.status)}${
+        input.reason ? `: ${input.reason}` : ""
+      }`;
+
       await db.insert(investigationNote).values({
         caseId: input.id,
         noteType: "STATUS_CHANGE",
-        content: `Status changed from ${existing.status} to ${input.status}${
-          input.reason ? `: ${input.reason}` : ""
-        }`,
+        content: statusSummary,
         createdByUserId: ctx.session.user.id,
       });
 
       await recordCaseEvent({
         caseId: input.id,
         eventType: "STATUS_CHANGE",
-        summary: `Status changed from ${existing.status} to ${input.status}${
-          input.reason ? `: ${input.reason}` : ""
-        }`,
+        summary: statusSummary,
         payload: { from: existing.status, to: input.status, reason: input.reason },
         actorUserId: ctx.session.user.id,
       });
@@ -304,8 +302,9 @@ export const casesRouter = router({
     .query(async ({ ctx, input }) => {
       await getCaseOrThrow(input.caseId, ctx);
       return db
-        .select()
+        .select({ ...getTableColumns(investigationNote), authorName: user.name })
         .from(investigationNote)
+        .leftJoin(user, eq(investigationNote.createdByUserId, user.id))
         .where(eq(investigationNote.caseId, input.caseId))
         .orderBy(desc(investigationNote.createdAt));
     }),
@@ -418,6 +417,24 @@ export const casesRouter = router({
         .where(eq(entityProfile.id, input.entityProfileId))
         .limit(1);
 
+      const [duplicate] = await db
+        .select({ id: caseCriminal.id })
+        .from(caseCriminal)
+        .where(
+          and(
+            eq(caseCriminal.caseId, input.caseId),
+            eq(caseCriminal.entityProfileId, input.entityProfileId),
+            eq(caseCriminal.role, input.role),
+          ),
+        )
+        .limit(1);
+      if (duplicate) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${entity?.displayName ?? "This profile"} is already linked to this case as ${humanizeEnum(input.role)}`,
+        });
+      }
+
       const [created] = await db
         .insert(caseCriminal)
         .values({ ...input, linkedByUserId: ctx.session.user.id })
@@ -479,6 +496,35 @@ export const casesRouter = router({
     .input(recordCaseArrestSchema)
     .mutation(async ({ ctx, input }) => {
       await getCaseOrThrow(input.caseId, ctx);
+
+      // An arrest must be of someone this case already treats as a suspect —
+      // never a linked witness or victim.
+      const [suspectLink] = await db
+        .select({ id: caseCriminal.id })
+        .from(caseCriminal)
+        .where(
+          and(
+            eq(caseCriminal.caseId, input.caseId),
+            eq(caseCriminal.entityProfileId, input.entityProfileId),
+            inArray(caseCriminal.role, ["SUSPECT", "PERSON_OF_INTEREST", "ARRESTED"]),
+          ),
+        )
+        .limit(1);
+      if (!suspectLink) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only a person linked to this case as a suspect or person of interest can be arrested",
+        });
+      }
+      if (input.arrestedAt.getTime() > Date.now() + 60_000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The arrest time can't be in the future" });
+      }
+      if (input.rightsInformedAt && input.rightsInformedAt.getTime() < input.arrestedAt.getTime()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Rights can't have been explained before the arrest time",
+        });
+      }
       const [entity] = await db
         .select({ displayName: entityProfile.displayName })
         .from(entityProfile)
@@ -493,7 +539,7 @@ export const casesRouter = router({
       await recordCaseEvent({
         caseId: input.caseId,
         eventType: "ARREST_RECORDED",
-        summary: `${entity?.displayName ?? "Suspect"} arrested ${input.arrestedAt.toLocaleString()}${
+        summary: `${entity?.displayName ?? "Suspect"} arrested ${formatSAST(input.arrestedAt)}${
           input.withWarrant ? " (with warrant)" : " (without warrant)"
         }`,
         payload: { entityProfileId: input.entityProfileId, withWarrant: input.withWarrant },
@@ -518,6 +564,9 @@ export const casesRouter = router({
     .input(recordProsecutionDecisionSchema)
     .mutation(async ({ ctx, input }) => {
       await getCaseOrThrow(input.caseId, ctx);
+      if (input.decidedAt && input.decidedAt.getTime() > Date.now() + 60_000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The decision date can't be in the future" });
+      }
       const [created] = await db
         .insert(caseProsecutionDecision)
         .values({ ...input, createdByUserId: ctx.session.user.id })
@@ -565,7 +614,7 @@ export const casesRouter = router({
       await recordCaseEvent({
         caseId: input.caseId,
         eventType: "HEARING_SCHEDULED",
-        summary: `${input.hearingType.replace(/_/g, " ").toLowerCase()} scheduled for ${input.scheduledAt.toLocaleString()}${
+        summary: `${input.hearingType.replace(/_/g, " ").toLowerCase()} scheduled for ${formatSAST(input.scheduledAt)}${
           input.courtName ? ` at ${input.courtName}` : ""
         }`,
         payload: { hearingType: input.hearingType, scheduledAt: input.scheduledAt },
@@ -588,6 +637,28 @@ export const casesRouter = router({
       }
       await getCaseOrThrow(existing.caseId, ctx);
 
+      // A result (verdict, sentence, "proceeded", struck off) can only be
+      // recorded once the hearing has actually taken place. Postponement and
+      // withdrawal can legitimately be arranged beforehand.
+      const RESULT_OUTCOMES = ["PROCEEDED", "GUILTY", "NOT_GUILTY", "SENTENCED", "STRUCK_OFF_ROLL"];
+      if (RESULT_OUTCOMES.includes(input.outcomeType) && existing.scheduledAt.getTime() > Date.now()) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `This hearing is scheduled for ${formatSAST(existing.scheduledAt)} — its result can only be recorded after it has taken place`,
+        });
+      }
+      if (input.outcomeType === "POSTPONED") {
+        if (!input.nextHearingAt) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "A postponed hearing needs the next court date" });
+        }
+        if (input.nextHearingAt.getTime() <= existing.scheduledAt.getTime()) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "The next court date must be after this hearing's date",
+          });
+        }
+      }
+
       const [updated] = await db
         .update(caseHearing)
         .set({
@@ -604,7 +675,7 @@ export const casesRouter = router({
         caseId: existing.caseId,
         eventType: "HEARING_OUTCOME_RECORDED",
         summary: `${existing.hearingType.replace(/_/g, " ").toLowerCase()} outcome: ${input.outcomeType.replace(/_/g, " ").toLowerCase()}${
-          input.nextHearingAt ? `, next date ${input.nextHearingAt.toLocaleString()}` : ""
+          input.nextHearingAt ? `, next date ${formatSAST(input.nextHearingAt)}` : ""
         }`,
         payload: { outcomeType: input.outcomeType, nextHearingAt: input.nextHearingAt },
         actorUserId: ctx.session.user.id,
@@ -652,8 +723,9 @@ export const casesRouter = router({
     .query(async ({ ctx, input }) => {
       await getCaseOrThrow(input.caseId, ctx);
       return db
-        .select()
+        .select({ ...getTableColumns(caseTimelineEntry), actorName: user.name })
         .from(caseTimelineEntry)
+        .leftJoin(user, eq(caseTimelineEntry.actorUserId, user.id))
         .where(eq(caseTimelineEntry.caseId, input.caseId))
         .orderBy(desc(caseTimelineEntry.occurredAt));
     }),
@@ -689,6 +761,22 @@ export const casesRouter = router({
     .input(assignCaseInvestigatorSchema)
     .mutation(async ({ ctx, input }) => {
       const existing = await getCaseOrThrow(input.caseId, ctx);
+
+      // Under investigation / awaiting review both require a lead
+      // investigator (see case-status.ts), so they can be reassigned but not
+      // left without one.
+      if (!input.userId && (existing.status === "UNDER_INVESTIGATION" || existing.status === "AWAITING_REVIEW")) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `A case that is ${caseStatusLabel(existing.status).toLowerCase()} must keep a lead investigator — reassign it instead`,
+        });
+      }
+      if (existing.isSensitive && !canViewSensitiveCase({ assignedToUserId: input.userId }, ctx)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This case is sensitive — reassigning it away from yourself would remove your access. Ask an administrator.",
+        });
+      }
 
       let assigneeName: string | null = null;
       if (input.userId) {

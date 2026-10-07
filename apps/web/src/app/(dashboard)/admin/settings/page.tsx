@@ -3,9 +3,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import ReadOnlyNotice from "@/components/layout/ReadOnlyNotice";
+import { useConsoleRole } from "@/lib/auth/console-role-context";
 import { queryClient, trpc } from "@/lib/trpc/client";
 
 export default function AdminSettingsPage() {
+  // Writes are superAdminProcedure; admins can read settings and flags.
+  const { isSuperAdmin } = useConsoleRole();
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [editValues, setEditValues] = useState<Record<string, string>>({});
@@ -77,6 +81,8 @@ export default function AdminSettingsPage() {
         </p>
       </div>
 
+      {!isSuperAdmin && <ReadOnlyNotice what="settings and feature flags" />}
+
       {jsonError && <p className="text-sm text-destructive">{jsonError}</p>}
 
       <div className="bg-card border border-border/30 rounded-lg shadow-sm overflow-hidden">
@@ -98,63 +104,70 @@ export default function AdminSettingsPage() {
                 </div>
                 <input
                   value={raw}
+                  readOnly={!isSuperAdmin}
                   onChange={(e) => setEditValues((prev) => ({ ...prev, [s.settingKey]: e.target.value }))}
                   className="flex-1 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <button
-                  disabled={upsertSetting.isPending}
-                  onClick={() => saveEdit(s.settingKey, s.settingType)}
-                  className="px-3 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
-                >
-                  Save
-                </button>
-                <button
-                  disabled={deleteSetting.isPending}
-                  onClick={() => {
-                    if (confirm(`Delete setting "${s.settingKey}"?`)) deleteSetting.mutate({ id: s.id });
-                  }}
-                  className="p-2 text-muted-foreground hover:text-destructive rounded-lg transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">delete</span>
-                </button>
+                {isSuperAdmin && (
+                  <>
+                    <button
+                      disabled={upsertSetting.isPending}
+                      onClick={() => saveEdit(s.settingKey, s.settingType)}
+                      className="px-3 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      disabled={deleteSetting.isPending}
+                      onClick={() => {
+                        if (confirm(`Delete setting "${s.settingKey}"?`)) deleteSetting.mutate({ id: s.id });
+                      }}
+                      className="p-2 text-muted-foreground hover:text-destructive rounded-lg transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            try {
-              const parsed = newValue.trim() ? JSON.parse(newValue) : {};
-              setJsonError(null);
-              upsertSetting.mutate({ settingKey: newKey, settingValue: parsed });
-            } catch {
-              setJsonError("New value is not valid JSON");
-            }
-          }}
-          className="p-5 border-t border-border flex gap-3 bg-muted/20"
-        >
-          <input
-            required
-            value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
-            placeholder="setting_key"
-            className="w-56 shrink-0 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
-          />
-          <input
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            placeholder='JSON value, e.g. "true" or {"key":"value"}'
-            className="flex-1 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
-          />
-          <button
-            type="submit"
-            disabled={upsertSetting.isPending}
-            className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+        {isSuperAdmin && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                const parsed = newValue.trim() ? JSON.parse(newValue) : {};
+                setJsonError(null);
+                upsertSetting.mutate({ settingKey: newKey, settingValue: parsed });
+              } catch {
+                setJsonError("New value is not valid JSON");
+              }
+            }}
+            className="p-5 border-t border-border flex gap-3 bg-muted/20"
           >
-            Add
-          </button>
-        </form>
+            <input
+              required
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              placeholder="setting_key"
+              className="w-56 shrink-0 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
+            />
+            <input
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              placeholder='JSON value, e.g. "true" or {"key":"value"}'
+              className="flex-1 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
+            />
+            <button
+              type="submit"
+              disabled={upsertSetting.isPending}
+              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+            >
+              Add
+            </button>
+          </form>
+        )}
       </div>
 
       <div>
@@ -178,6 +191,7 @@ export default function AdminSettingsPage() {
                 <input
                   type="checkbox"
                   checked={f.isEnabled}
+                  disabled={!isSuperAdmin}
                   onChange={(e) => toggleFlag.mutate({ id: f.id, isEnabled: e.target.checked })}
                   className="h-4 w-4"
                 />
@@ -186,34 +200,36 @@ export default function AdminSettingsPage() {
             </div>
           ))}
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createFlag.mutate({ name: flagName, description: flagDescription || undefined });
-          }}
-          className="p-5 border-t border-border flex gap-3 bg-muted/20"
-        >
-          <input
-            required
-            value={flagName}
-            onChange={(e) => setFlagName(e.target.value)}
-            placeholder="flag_name"
-            className="w-56 shrink-0 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
-          />
-          <input
-            value={flagDescription}
-            onChange={(e) => setFlagDescription(e.target.value)}
-            placeholder="Description"
-            className="flex-1 border border-input bg-background rounded-lg px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={createFlag.isPending}
-            className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+        {isSuperAdmin && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createFlag.mutate({ name: flagName, description: flagDescription || undefined });
+            }}
+            className="p-5 border-t border-border flex gap-3 bg-muted/20"
           >
-            Add
-          </button>
-        </form>
+            <input
+              required
+              value={flagName}
+              onChange={(e) => setFlagName(e.target.value)}
+              placeholder="flag_name"
+              className="w-56 shrink-0 border border-input bg-background rounded-lg px-3 py-2 text-sm font-mono"
+            />
+            <input
+              value={flagDescription}
+              onChange={(e) => setFlagDescription(e.target.value)}
+              placeholder="Description"
+              className="flex-1 border border-input bg-background rounded-lg px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={createFlag.isPending}
+              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+            >
+              Add
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,15 @@
 > **Jurisdiction:** Republic of South Africa
 > **Last Updated:** June 2026
 
+> **⚠️ Sprint status update (2026-07-29):** this snapshot predates the current sprint's work on
+> the investigation module. The tables below still read "documented only" / "not implemented" for
+> several items that are now built and live — the case/evidence/POPIA/profiles tRPC routers,
+> chain-of-custody hashing, sensitive-case access control, and the POPIA SAR/deletion API. For the
+> current, code-verified status of the investigation (case/docket) process specifically, see
+> `INVESTIGATION-PROCESS-REVIEW.md` at the repo root — it supersedes §3.2/§3.3 below for that
+> module. This document has not been fully rewritten for time; treat the tables as historical
+> baseline, not current state.
+
 ---
 
 ## 1. Purpose
@@ -71,12 +80,12 @@ Sentinel360 is a **multi-layered surveillance intelligence platform** operating 
 
 | Requirement | Status | Gap |
 |-------------|--------|-----|
-| **POPIA compliance** | Documented only | No SAR mechanism, no consent management, no breach notification workflow |
+| **POPIA compliance** | 🟡 Mitigated (2026-07-29) | SAR + deletion API live (s23/s24); no breach notification workflow, legacy consent recapture is opt-in not proactive |
 | **SAPS data standards** | Documented only | No XSD schema alignment, no integration testing |
 | **Data residency (SA borders)** | On Supabase (AWS Cape Town) | Compliant, but no documented policy enforcement |
-| **Chain of custody** | Not implemented | SHA-256 hashing + immutable audit not built |
-| **Audit logging** | Partially (Super Admin page exists) | Backend audit service not implemented |
-| **Evidence retention (7 years)** | Documented only | No archival/retention policy enforcement |
+| **Chain of custody** | ✅ Implemented | SHA-256 hash at upload + immutable custody ledger + live integrity re-verification |
+| **Audit logging** | ✅ Implemented, canonical hash chain | Immutable going forward; pre-fix rows use an older canonicalization (see GAP-LEG-05) |
+| **Evidence retention (7 years)** | 🟡 Mitigated (2026-07-29) | 90-day closed→archived sweep exists but is manually triggered, not scheduled; broader 7-year policy not yet automated |
 | **RBAC enforcement** | Partially (middleware checks roles) | No granular permission resolution service |
 | **ISO/IEC 27037** | Referenced in NFR | No implementation plan |
 

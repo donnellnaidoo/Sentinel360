@@ -18,6 +18,8 @@ import {
   sha256Hex,
   verifyEvidenceIntegrity,
 } from "../services/chain-of-custody";
+import { getCaseOrThrow } from "../services/case-access";
+import { recordCaseEvent } from "../services/case-timeline";
 import {
   downloadEvidenceFile,
   getEvidenceSignedUrl,
@@ -41,8 +43,10 @@ async function getEvidenceOrThrow(id: string) {
 export const evidenceRouter = router({
   list: requirePermission("evidence:read")
     .input(evidenceListSchema)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       if (input.caseId) {
+        // A sensitive case's evidence is as restricted as the case itself.
+        await getCaseOrThrow(input.caseId, ctx);
         const links = await db
           .select({ evidenceEntityId: caseEvidence.evidenceEntityId })
           .from(caseEvidence)
@@ -100,6 +104,12 @@ export const evidenceRouter = router({
   upload: requirePermission("evidence:create")
     .input(createEvidenceSchema)
     .mutation(async ({ ctx, input }) => {
+      // Uploading into a case is a write to that case: it must respect the
+      // sensitive-case restriction like every other case sub-resource.
+      if (input.caseId) {
+        await getCaseOrThrow(input.caseId, ctx);
+      }
+
       const fileBytes = Buffer.from(input.fileBase64, "base64");
       const fileHash = sha256Hex(fileBytes);
 
@@ -153,6 +163,14 @@ export const evidenceRouter = router({
           evidenceEntityId: created.id,
           relationshipDescription: input.relationshipDescription,
           createdByUserId: ctx.session.user.id,
+        });
+
+        await recordCaseEvent({
+          caseId: input.caseId,
+          eventType: "EVIDENCE_LINKED",
+          summary: `Evidence uploaded: ${input.title} (SHA-256 ${fileHash.slice(0, 12)}…)`,
+          payload: { evidenceId: created.id, fileHash, mimeType: input.mimeType },
+          actorUserId: ctx.session.user.id,
         });
       }
 

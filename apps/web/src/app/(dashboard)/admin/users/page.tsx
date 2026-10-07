@@ -9,6 +9,8 @@ import type { SearchFilter } from "@Sentinel360/ui/components/search-bar";
 import { StatusBadge } from "@Sentinel360/ui/components/status-badge";
 import { ProfileAvatar } from "@Sentinel360/ui/components/profile-avatar";
 
+import ReadOnlyNotice from "@/components/layout/ReadOnlyNotice";
+import { useConsoleRole } from "@/lib/auth/console-role-context";
 import { queryClient, trpc } from "@/lib/trpc/client";
 
 const PAGE_SIZE = 20;
@@ -61,6 +63,7 @@ export default function AdminUsersPage() {
     [searchQuery, activeFilters],
   );
 
+  const { isSuperAdmin } = useConsoleRole();
   const { data, isLoading } = useQuery(trpc.users.list.queryOptions(input));
   const { data: roles } = useQuery(trpc.roles.list.queryOptions());
   const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
@@ -94,7 +97,7 @@ export default function AdminUsersPage() {
     trpc.users.deactivate.mutationOptions({ onSuccess: invalidateUsers }),
   );
 
-  const columns: Column<UserRow>[] = [
+  const allColumns: Column<UserRow>[] = [
     {
       key: "name",
       label: "User",
@@ -157,6 +160,9 @@ export default function AdminUsersPage() {
     },
   ];
 
+  // Create/update/deactivate are superAdminProcedure — admins get a read-only table.
+  const columns = isSuperAdmin ? allColumns : allColumns.filter((c) => c.key !== "actions");
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
@@ -166,14 +172,18 @@ export default function AdminUsersPage() {
             Manage all registered users and their roles
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined text-[18px]">person_add</span>
-          Add User
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">person_add</span>
+            Add User
+          </button>
+        )}
       </div>
+
+      {!isSuperAdmin && <ReadOnlyNotice what="user accounts" />}
 
       <div className="mb-4">
         <SearchBar
@@ -197,7 +207,7 @@ export default function AdminUsersPage() {
         emptyMessage="No users found matching your filters."
       />
 
-      {showAddModal && (
+      {isSuperAdmin && showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"

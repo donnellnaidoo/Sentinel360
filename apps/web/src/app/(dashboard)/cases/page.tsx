@@ -2,9 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import { STATUS_OPTIONS, STATUS_STYLES } from "@/lib/case-status";
+import { StatusBadge } from "@/components/case/StatusBadge";
+import { label, PRIORITY_LABELS } from "@/lib/case-labels";
+import { STATUS_LABELS, STATUS_OPTIONS } from "@/lib/case-status";
 import { trpc } from "@/lib/trpc/client";
 
 const PAGE_SIZE = 20;
@@ -22,9 +25,16 @@ function formatRelativeTime(date: Date): string {
 }
 
 export default function CasesPage() {
-  const [search, setSearch] = useState("");
+  // ?q= comes from the header search box.
+  const urlQuery = useSearchParams().get("q") ?? "";
+  const [search, setSearch] = useState(urlQuery);
   const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number] | "">("");
   const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setSearch(urlQuery);
+    setPage(0);
+  }, [urlQuery]);
 
   const input = useMemo(
     () => ({
@@ -95,7 +105,7 @@ export default function CasesPage() {
               <option value="">All Statuses</option>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
-                  {s.replace(/_/g, " ")}
+                  {STATUS_LABELS[s]}
                 </option>
               ))}
             </select>
@@ -167,13 +177,9 @@ export default function CasesPage() {
                   <div className="font-bold text-on-surface">{c.title}</div>
                   <div className="text-xs text-on-surface-variant">{c.caseType}</div>
                 </td>
-                <td className="p-4 text-body-sm">{c.priority}</td>
+                <td className="p-4 text-body-sm">{label(PRIORITY_LABELS, c.priority)}</td>
                 <td className="p-4">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit ${STATUS_STYLES[c.status as (typeof STATUS_OPTIONS)[number]] ?? "bg-on-surface-variant/10 text-on-surface-variant"}`}
-                  >
-                    {c.status.replace(/_/g, " ")}
-                  </span>
+                  <StatusBadge status={c.status} />
                 </td>
                 <td className="p-4 text-body-sm">{c.assignedToName ?? "Unassigned"}</td>
                 <td className="p-4 text-body-sm">{formatRelativeTime(new Date(c.updatedAt))}</td>

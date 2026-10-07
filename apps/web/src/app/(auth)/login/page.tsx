@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/client";
 import { LogoMark } from "@Sentinel360/ui/components/logo";
 
@@ -28,6 +29,7 @@ function LoginForm() {
         : null,
   );
   const [loading, setLoading] = useState(false);
+  const resetSucceeded = searchParams.get("reset") === "success";
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +48,7 @@ function LoginForm() {
       return;
     }
 
-    const redirect = searchParams.get("redirect") ?? "/dashboard";
+    const redirect = safeRedirectPath(searchParams.get("redirect"));
     router.push(redirect as "/dashboard");
     router.refresh();
   };
@@ -77,6 +79,12 @@ function LoginForm() {
       </div>
 
       <form onSubmit={handleSignIn} className="px-stack-lg pb-10 space-y-6">
+        {resetSucceeded && !error && (
+          <div className="p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl font-body-sm text-body-sm">
+            Your password has been updated. Sign in with your new password.
+          </div>
+        )}
+
         {error && (
           <div className="p-3 bg-error-container text-on-error-container rounded-xl font-body-sm text-body-sm">
             {error}

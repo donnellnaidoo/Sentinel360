@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ConsoleRole } from "@/lib/auth/console-role";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@Sentinel360/ui/components/logo";
 
@@ -14,15 +15,20 @@ const mainNavItems = [
   { label: "Wanted Feed", href: "/wanted-feed", icon: "person_search" },
 ] as const;
 
+// Admins get read access to these pages; the pages hide write controls
+// (create/edit/deactivate) unless the user is a super admin, matching the
+// adminProcedure/superAdminProcedure split in the API.
 const adminNavItems = [
   { label: "Users", href: "/admin/users", icon: "group" },
+  { label: "Roles", href: "/admin/roles", icon: "shield_person" },
+  { label: "Organizations", href: "/admin/organizations", icon: "corporate_fare" },
   { label: "Profiles", href: "/admin/profiles", icon: "badge" },
   { label: "Settings", href: "/admin/settings", icon: "settings" },
 ] as const;
 
 const superAdminNavItems = [
   { label: "Audit Logs", href: "/super-admin/audit-logs", icon: "analytics" },
-  { label: "Users", href: "/super-admin/users", icon: "admin_panel_settings" },
+  { label: "Role Assignment", href: "/super-admin/users", icon: "admin_panel_settings" },
 ] as const;
 
 const profileNavItem = { label: "Profile", href: "/profile", icon: "person" } as const;
@@ -30,12 +36,12 @@ const myDataNavItem = { label: "My Data", href: "/my-data", icon: "privacy_tip" 
 
 interface SidebarProps {
   currentPath: string;
-  userRole?: string;
+  userRole: ConsoleRole;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export default function Sidebar({ currentPath, userRole = "admin", isMobileOpen = false, onMobileClose }: SidebarProps) {
+export default function Sidebar({ currentPath, userRole, isMobileOpen = false, onMobileClose }: SidebarProps) {
   const router = useRouter();
   const isSuperAdmin = userRole === "super_admin";
 

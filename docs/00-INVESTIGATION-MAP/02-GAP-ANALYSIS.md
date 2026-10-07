@@ -4,6 +4,11 @@
 > **Group:** Alpha Tech
 > **Last Updated:** June 2026
 
+> **⚠️ Sprint status update (2026-07-29):** GAP-LEG-01 (POPIA), GAP-LEG-05 (audit immutability),
+> and GAP-LEG-03 (retention) below are stale — see the inline status notes added to each row, and
+> `INVESTIGATION-PROCESS-REVIEW.md` at the repo root for the full remediation detail (what closed,
+> what's mitigated vs. closed, and residual limitations on each).
+
 ---
 
 ## 1. Gap Severity Classification
@@ -153,11 +158,11 @@
 
 | Gap ID | Description | Severity | Current State | Required State |
 |--------|-------------|----------|---------------|----------------|
-| GAP-LEG-01 | No POPIA compliance implementation | **Critical** | Documented in NFR-07-001; no implementation | Build consent management, SAR API, breach notification, data minimisation |
-| GAP-LEG-02 | No SAPS data standard alignment | **High** | FR-05-004 requires alignment; no XSD/JSON Schema | Align export schemas with SAPS standards |
-| GAP-LEG-03 | No data retention enforcement | **High** | NFR-03-005 requires 7-year retention; no policy engine | Build configurable retention policy + auto-archive |
-| GAP-LEG-04 | No evidence integrity verification | **Critical** | NFR-03-001 requires SHA-256 chain; not implemented | Build hash verification tool for court evidence |
-| GAP-LEG-05 | No audit log immutability | **High** | US-18 requires immutable logs; not enforced | Build append-only audit log with WORM storage |
+| GAP-LEG-01 | No POPIA compliance implementation | **Critical** | Documented in NFR-07-001; no implementation | 🟡 **Mitigated (2026-07-29):** `popia.myData`/`requestDeletion`/`reviewDeletionRequest` (SAR + deletion, s23/s24) shipped and audit-logged; consent capture exists for new signups, backfill for legacy accounts is opt-in only (no proactive banner yet), breach notification still not built — see `INVESTIGATION-PROCESS-REVIEW.md` §3.5 |
+| GAP-LEG-02 | No SAPS data standard alignment | **High** | FR-05-004 requires alignment; no XSD/JSON Schema | ⬜ Still open — no SAPS integration spec available to align against |
+| GAP-LEG-03 | No data retention enforcement | **High** | NFR-03-005 requires 7-year retention; no policy engine | 🟡 **Mitigated (2026-07-29):** `cases.runRetentionSweep` batch-archives closed cases past the 90-day cutoff, but it's manually triggered (no cron/job queue yet, still GAP-INF-06) and doesn't yet cover the broader 7-year anonymisation policy |
+| GAP-LEG-04 | No evidence integrity verification | **Critical** | NFR-03-001 requires SHA-256 chain; not implemented | ✅ Closed — SHA-256 hash at upload + chain-of-custody ledger (`chain-of-custody.ts`), live re-verification via `evidence.verifyIntegrity` |
+| GAP-LEG-05 | No audit log immutability | **High** | US-18 requires immutable logs; not enforced | ✅ Closed going forward — `audit-log.ts` canonicalizes object keys recursively for a true hash chain; rows written before the fix are not retroactively rehashed (append-only ledger) |
 | GAP-LEG-06 | No data residency enforcement | **Medium** | NFR-07-003 requires SA-based storage; Supabase Cape Town OK | Document data location policy; add cross-border transfer blocks |
 
 ---

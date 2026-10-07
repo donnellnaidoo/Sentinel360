@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getConsoleRole } from "@/lib/auth/console-role";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
@@ -8,6 +9,12 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // This route reads with the service-role key (bypassing RLS), so it must
+  // enforce console access itself — a session alone is not enough.
+  if (!(await getConsoleRole(user.id))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const adminClient = createAdminClient();
@@ -27,7 +34,8 @@ export async function GET() {
     { data: recentCases },
   ] = await Promise.all([
     adminClient.from("case").select("*", { count: "exact", head: true }),
-    adminClient.from("case").select("*", { count: "exact", head: true }).eq("status", "OPEN"),
+    // "Active" = anything not yet closed/archived (OPEN, UNDER_INVESTIGATION, AWAITING_REVIEW).
+    adminClient.from("case").select("*", { count: "exact", head: true }).not("status", "in", "(CLOSED,ARCHIVED)"),
     adminClient.from("alert").select("*", { count: "exact", head: true }).eq("status", "ACTIVE"),
     adminClient.from("case_evidence").select("*", { count: "exact", head: true }),
     adminClient.from("incident").select("*", { count: "exact", head: true }).eq("severity", "CRITICAL").neq("status", "CLOSED"),
@@ -44,7 +52,7 @@ export async function GET() {
     stats: {
       activeCases: activeCases ?? 0,
       pendingAlerts: activeAlerts ?? 0,
-      openEvidence: totalEvidence ?? 0,
+      totalEvidence: totalEvidence ?? 0,
       criticalThreats: criticalIncidents ?? 0,
       totalCases: totalCases ?? 0,
       totalUsers: totalUsers ?? 0,

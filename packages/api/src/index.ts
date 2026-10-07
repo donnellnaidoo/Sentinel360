@@ -1,7 +1,24 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import { ZodError } from "zod";
+
 import type { Context } from "./context";
 
-export const t = initTRPC.context<Context>().create();
+export const t = initTRPC.context<Context>().create({
+  // Input-validation failures otherwise reach clients only as a JSON string
+  // in `message`; expose them as per-field errors forms can show inline.
+  errorFormatter({ shape, error }) {
+    const zodError = error.cause instanceof ZodError ? error.cause : null;
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        fieldErrors: zodError
+          ? (zodError.flatten().fieldErrors as Record<string, string[] | undefined>)
+          : null,
+      },
+    };
+  },
+});
 
 export const router = t.router;
 
@@ -25,8 +42,10 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 
 export function requireRole(...roles: string[]) {
   return protectedProcedure.use(({ ctx, next }) => {
-    const userRole = ctx.session?.user.role;
-    if (!userRole || !roles.includes(userRole)) {
+    // Users can hold several roles (everyone also gets "community" on first
+    // login), so match against all of them, not just the primary one.
+    const userRoles = ctx.session?.user.roles ?? [];
+    if (!userRoles.some((r) => roles.includes(r))) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: `Requires one of roles: ${roles.join(", ")}`,
