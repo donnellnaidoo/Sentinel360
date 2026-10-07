@@ -60,29 +60,36 @@ def classify(frame: np.ndarray) -> str:
     return "360-panorama"
 
 
-def open_device(index: int) -> cv2.VideoCapture:
-    # DirectShow is the most reliable backend for USB webcams on Windows.
+def backends() -> list[tuple[str, int]]:
+    # Some USB cameras only open through one of Windows' two camera stacks,
+    # so try both before giving up on a device number.
     if sys.platform.startswith("win"):
-        return cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    return cv2.VideoCapture(index)
+        return [("DirectShow", cv2.CAP_DSHOW), ("MediaFoundation", cv2.CAP_MSMF)]
+    return [("default", cv2.CAP_ANY)]
 
 
-def probe(index: int) -> tuple[Camera, np.ndarray] | None:
-    cap = open_device(index)
-    try:
-        if not cap.isOpened():
-            return None
-        frame = None
-        for _ in range(WARMUP_FRAMES):
-            ok, candidate = cap.read()
-            if ok and candidate is not None:
-                frame = candidate
-        if frame is None:
-            return None
-        height, width = frame.shape[:2]
-        return Camera(index, width, height, classify(frame)), frame
-    finally:
-        cap.release()
+def probe(index: int) -> tuple[Camera, np.ndarray, str] | str:
+    """(camera, frame, backend) on success, else a reason string."""
+    reasons = []
+    for name, backend in backends():
+        cap = cv2.VideoCapture(index, backend)
+        try:
+            if not cap.isOpened():
+                reasons.append(f"{name}: not present")
+                continue
+            frame = None
+            for _ in range(WARMUP_FRAMES):
+                ok, candidate = cap.read()
+                if ok and candidate is not None:
+                    frame = candidate
+            if frame is None:
+                reasons.append(f"{name}: opened but sent no frames")
+                continue
+            height, width = frame.shape[:2]
+            return Camera(index, width, height, classify(frame)), frame, name
+        finally:
+            cap.release()
+    return "; ".join(reasons)
 
 
 def choose(cameras: list[Camera]) -> Camera | None:
@@ -117,13 +124,17 @@ def main() -> int:
     cameras: list[Camera] = []
     for index in range(MAX_DEVICES):
         found = probe(index)
-        if found is None:
+        if isinstance(found, str):
+            print(f"  camera {index}: -- ({found})")
             continue
-        camera, frame = found
+        camera, frame, backend = found
         preview = PREVIEW_DIR / f"cam{index}.jpg"
         cv2.imwrite(str(preview), frame)
         cameras.append(camera)
-        print(f"  camera {index}: {camera.width}x{camera.height}  {camera.kind:13}  preview: {preview.relative_to(AI_ROOT)}")
+        print(
+            f"  camera {index}: {camera.width}x{camera.height}  {camera.kind:13}  "
+            f"via {backend}  preview: {preview.relative_to(AI_ROOT)}"
+        )
 
     if not cameras:
         print("No cameras found. Is the X3 connected by USB and set to Webcam mode?")
