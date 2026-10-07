@@ -29,7 +29,9 @@ function matches(pathname: string, routes: string[]) {
   return routes.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 "proxy" (formerly middleware): runs on the Node.js runtime,
+// which Vercel Services require (no Edge functions).
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   let supabaseResponse = NextResponse.next({ request });

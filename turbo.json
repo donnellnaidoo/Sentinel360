@@ -12,7 +12,11 @@
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
         "DATABASE_URL",
-        "DB_URL"
+        "DB_URL",
+        "SUPABASE_URL",
+        "CORS_ORIGIN",
+        "AI_SERVICE_API_KEY",
+        "AI_SERVICE_URL"
       ]
     },
     "lint": {

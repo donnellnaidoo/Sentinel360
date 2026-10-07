@@ -1,0 +1,41 @@
+# `vercel deploy` uploads from disk. Keep secrets, local tooling and the AI
+# service's runtime files out of the upload. apps/ai/package.json stays: it
+# is a workspace member, and bun install needs it to resolve the lockfile.
+
+# Secrets — env vars are set in the Vercel project instead
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and build output (Vercel installs and builds itself)
+node_modules
+**/node_modules
+.turbo
+**/.turbo
+**/.next
+**/dist
+*.tsbuildinfo
+
+# AI service runs on the camera machine, not on Vercel
+apps/ai/.venv
+apps/ai/models
+apps/ai/samples
+apps/ai/app
+apps/ai/tests
+apps/ai/scripts
+apps/ai/uv.lock
+**/__pycache__
+**/.pytest_cache
+
+# Mobile app build caches
+apps/native/.expo
+apps/native/ios
+apps/native/android
+
+# Local docs and tooling not needed to build
+graphify-out
+*.pdf
+.claude

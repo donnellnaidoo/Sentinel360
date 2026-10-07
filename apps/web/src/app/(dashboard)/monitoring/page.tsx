@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { formatDateTime } from "@/lib/format";
 import { queryClient } from "@/lib/trpc/client";
@@ -50,6 +50,13 @@ interface AiStatus {
 
 const STATUS_KEY = ["ai-monitor", "status"];
 
+// /api/ai/feed is a serverless function: on Vercel it ends after its max
+// duration (300s on Hobby). Reopen the stream a little before that, and
+// retry briefly on errors, so the feed looks continuous to the operator.
+const FEED_REFRESH_MS = 270_000;
+const FEED_RETRY_MS = 2_000;
+const FEED_MAX_RETRIES = 3;
+
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -91,6 +98,8 @@ function Panel({ title, icon, children }: { title: string; icon: string; childre
 
 export default function MonitoringPage() {
   const [feedError, setFeedError] = useState(false);
+  const [feedNonce, setFeedNonce] = useState(0);
+  const [feedRetries, setFeedRetries] = useState(0);
 
   const statusQuery = useQuery({
     queryKey: STATUS_KEY,
@@ -104,11 +113,30 @@ export default function MonitoringPage() {
       readJson<AiStatus>(await fetch(`/api/ai/control/${action}`, { method: "POST" })),
     onSuccess: (status) => {
       setFeedError(false);
+      setFeedRetries(0);
       queryClient.setQueryData(STATUS_KEY, status);
     },
   });
 
   const status = statusQuery.data;
+
+  useEffect(() => {
+    if (!status?.running) return;
+    const timer = setInterval(() => setFeedNonce((n) => n + 1), FEED_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [status?.running]);
+
+  const handleFeedError = () => {
+    if (feedRetries >= FEED_MAX_RETRIES) {
+      setFeedError(true);
+      return;
+    }
+    setTimeout(() => {
+      setFeedRetries((r) => r + 1);
+      setFeedNonce((n) => n + 1);
+    }, FEED_RETRY_MS);
+  };
+
   const offline = (statusQuery.error as (Error & { offline?: boolean }) | null)?.offline;
   const running = status?.running ?? false;
   const lastCase = status?.publisher.last_result;
@@ -161,11 +189,12 @@ export default function MonitoringPage() {
             {running && !feedError ? (
               // Plain <img>: next/image can't render a multipart MJPEG stream.
               <img
-                key={status?.started_at ?? "feed"}
-                src="/api/ai/feed"
+                key={`${status?.started_at ?? "feed"}-${feedNonce}`}
+                src={`/api/ai/feed?n=${feedNonce}`}
                 alt={`Live feed from camera ${status?.camera_id ?? ""}`}
                 className="h-full w-full object-contain"
-                onError={() => setFeedError(true)}
+                onLoad={() => setFeedRetries(0)}
+                onError={handleFeedError}
               />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">

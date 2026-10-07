@@ -52,7 +52,10 @@ const AI_ALERT_RECIPIENT_ROLE_CODES = [
 
 export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP"] as const;
 export const AI_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-export const MAX_AI_MEDIA_BYTES = 2 * 1024 * 1024;
+// Two images base64-encoded (4/3 overhead) plus the JSON envelope must fit
+// Vercel's 4.5 MB request-body cap: 2 x 2 MB base64 + 64 KB ~= 4.06 MB.
+// Real snapshots are 10-200 KB.
+export const MAX_AI_MEDIA_BYTES = 1.5 * 1024 * 1024;
 const AI_EVIDENCE_SOURCE = "AI_PIPELINE";
 
 const MEDIA_EXTENSION: Record<(typeof AI_MEDIA_MIME_TYPES)[number], string> = {

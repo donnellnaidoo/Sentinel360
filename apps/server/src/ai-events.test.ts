@@ -8,7 +8,7 @@ process.env.AI_SERVICE_API_KEY = API_KEY;
 process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 process.env.CORS_ORIGIN ??= "http://localhost:3001";
 
-const MAX_AI_MEDIA_BYTES = 2 * 1024 * 1024;
+const MAX_AI_MEDIA_BYTES = 1.5 * 1024 * 1024;
 let ingestResult: Record<string, unknown> = {};
 const ingestAiEvent = mock(async (_input: unknown) => ingestResult);
 
@@ -113,7 +113,12 @@ describe("POST /internal/ai/events", () => {
     expect(ingestAiEvent).not.toHaveBeenCalled();
   });
 
-  it("rejects a single image over 2 MB with 400", async () => {
+  it("keeps the largest valid body under Vercel's 4.5 MB request cap", () => {
+    const maxBase64 = Math.ceil(MAX_AI_MEDIA_BYTES / 3) * 4;
+    expect(2 * maxBase64 + 64 * 1024).toBeLessThan(4.5 * 1024 * 1024);
+  });
+
+  it("rejects a single image over 1.5 MB with 400", async () => {
     const tooBig = "A".repeat(Math.ceil(MAX_AI_MEDIA_BYTES / 3) * 4 + 4);
     const response = await post(event({ media: [{ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: tooBig }] }));
     expect(response.status).toBe(400);

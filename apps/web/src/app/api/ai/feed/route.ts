@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { aiServiceUnavailable, denyUnlessConsoleUser, fetchAiService } from "@/lib/ai-service";
 
 export const dynamic = "force-dynamic";
+// The monitoring page reopens the stream every 270s, inside this limit
+// (300s is the Vercel Hobby maximum).
+export const maxDuration = 300;
 
 // Streams the AI service's MJPEG feed through to an <img> on the monitoring
 // page, so the browser never needs the internal key or the service's address.
