@@ -220,7 +220,9 @@ export default function WantedPersonDetail() {
             </View>
 
             <Pressable
-              onPress={() => router.push("/(drawer)/(tabs)/report")}
+              onPress={() =>
+                router.push({ pathname: "/(drawer)/(tabs)/report", params: { profileId: id } })
+              }
               style={({ pressed }) => ({
                 marginTop: 16,
                 backgroundColor: colors.cta,

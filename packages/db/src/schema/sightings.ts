@@ -1,8 +1,9 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, uuid, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb, boolean, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 import { incident } from "./cases";
+import { entityProfile } from "./entities";
 
 // Community-submitted sighting reports. This table already exists in the
 // live database (provisioned ahead of this repo's Drizzle schema/migrations)
@@ -27,6 +28,19 @@ export const communitySighting = pgTable("community_sighting", {
   linkedIncidentId: uuid("linked_incident_id").references(() => incident.id, {
     onDelete: "set null",
   }),
+  // The wanted person the reporter says they saw (picked from the wanted
+  // feed). Optional — general reports have no subject. Added in 0011.
+  subjectEntityProfileId: uuid("subject_entity_profile_id").references(() => entityProfile.id, {
+    onDelete: "set null",
+  }),
+  // Case ids the subject is tied to (active watchlist entries + case_criminal
+  // rows), captured at submission. Suggestions for the moderator only —
+  // never returned to community users. Added in 0011.
+  suggestedCaseIds: jsonb("suggested_case_ids").$type<string[]>().default([]).notNull(),
+  duplicateOfSightingId: uuid("duplicate_of_sighting_id").references(
+    (): AnyPgColumn => communitySighting.id,
+    { onDelete: "set null" },
+  ),
   moderationStatus: text("moderation_status").default("PENDING").notNull(),
   moderationReason: text("moderation_reason"),
   reportedAt: timestamp("reported_at", { withTimezone: true }),
@@ -43,5 +57,9 @@ export const communitySightingRelations = relations(communitySighting, ({ one })
   linkedIncident: one(incident, {
     fields: [communitySighting.linkedIncidentId],
     references: [incident.id],
+  }),
+  subject: one(entityProfile, {
+    fields: [communitySighting.subjectEntityProfileId],
+    references: [entityProfile.id],
   }),
 }));

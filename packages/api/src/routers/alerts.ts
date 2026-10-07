@@ -98,8 +98,11 @@ export const alertsRouter = router({
     z.object({
       sightingId: z.string().uuid(),
       authorUserId: z.string().nullable(),
-      decision: z.enum(["APPROVED", "REJECTED"]),
+      decision: z.enum(["APPROVED", "REJECTED", "DUPLICATE"]),
       reason: z.string().optional(),
+      // From sightings.verify's result. Says the sighting reached a case
+      // without saying which one — case details never go to the reporter.
+      passedToInvestigators: z.boolean().default(false),
       location: z.record(z.string(), z.unknown()).optional(),
     }),
   )
@@ -111,6 +114,7 @@ export const alertsRouter = router({
     );
 
     const approved = input.decision === "APPROVED";
+    const duplicate = input.decision === "DUPLICATE";
     const now = new Date();
 
     const createdAlerts: string[] = [];
@@ -122,19 +126,27 @@ export const alertsRouter = router({
       .values({
         title: approved
         ? "Your sighting was approved."
-          : "Your sighting was rejected.",
+          : duplicate
+            ? "Your sighting was already reported."
+            : "Your sighting was rejected.",
 
         message: approved
-        ? input.reason
-            ? `Your sighting was approved. Note: ${input.reason}`
-            : "Your sighting was reviewed and approved"
-        : input.reason
-            ? `Your sighting was rejected. Reason: ${input.reason}`
-            : "Your sighting was reviewed and could not be confirmed.",
+        ? `${
+            input.passedToInvestigators
+              ? "Your sighting was approved and passed to investigators."
+              : "Your sighting was reviewed and approved."
+          }${input.reason ? ` Note: ${input.reason}` : ""}`
+        : duplicate
+            ? "Someone already reported this sighting, so it has been merged with the earlier report. Thank you for helping."
+            : input.reason
+              ? `Your sighting was rejected. Reason: ${input.reason}`
+              : "Your sighting was reviewed and could not be confirmed.",
         
         alertType: approved
         ? "SIGHTING_APPROVED"
-        : "SIGHTING_REJECTED",
+        : duplicate
+          ? "SIGHTING_DUPLICATE"
+          : "SIGHTING_REJECTED",
 
         severity: "LOW",
         sourceDomain: "COMMUNITY_SIGHTING",

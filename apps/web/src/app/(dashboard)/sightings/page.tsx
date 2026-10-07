@@ -107,12 +107,186 @@ function getLongitude(location: SightingLocation): number | null {
   return typeof location.longitude === "number" ? location.longitude : null;
 }
 
+type CaseChoice =
+  | { mode: "existing"; caseId: string; label: string }
+  | { mode: "new" }
+  | { mode: "none" };
+
+type CaseOption = { id: string; caseNumber: string; title: string; status: string };
+
+function CaseOptionRow({
+  option,
+  checked,
+  onSelect,
+  badge,
+}: {
+  option: CaseOption;
+  checked: boolean;
+  onSelect: () => void;
+  badge?: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3 hover:bg-surface-container">
+      <input type="radio" name="case-link" checked={checked} onChange={onSelect} className="mt-1" />
+      <span className="flex-1">
+        <span className="flex items-center gap-2">
+          <span className="font-mono text-xs text-on-surface-variant">{option.caseNumber}</span>
+          {badge && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="block text-sm text-on-surface">{option.title}</span>
+      </span>
+    </label>
+  );
+}
+
+// Where an approved sighting goes. Suggestions come from the wanted person
+// the reporter named; the moderator can search for another case, open a new
+// one, or approve without a case.
+function CaseLinkPicker({
+  sightingId,
+  choice,
+  onChange,
+  newCaseTitle,
+  onNewCaseTitleChange,
+}: {
+  sightingId: string;
+  choice: CaseChoice | null;
+  onChange: (choice: CaseChoice) => void;
+  newCaseTitle: string;
+  onNewCaseTitleChange: (title: string) => void;
+}) {
+  const [caseSearch, setCaseSearch] = useState("");
+  const options = useQuery(trpc.sightings.caseLinkOptions.queryOptions({ id: sightingId }));
+  const suggested = options.data?.suggestedCases ?? [];
+  const searchTerm = caseSearch.trim();
+  const searchResults = useQuery({
+    ...trpc.cases.list.queryOptions({ search: searchTerm, limit: 5, offset: 0 }),
+    enabled: searchTerm.length >= 2,
+  });
+
+  const effective = resolveCaseChoice(choice, suggested);
+  const suggestedIds = new Set(suggested.map((c) => c.id));
+  const otherResults = (searchResults.data?.items ?? []).filter((c) => !suggestedIds.has(c.id));
+  const pickedOther =
+    effective.mode === "existing" && !suggestedIds.has(effective.caseId) ? effective : null;
+
+  return (
+    <div className="space-y-2">
+      {options.isLoading && <p className="text-sm text-on-surface-variant">Loading suggested cases...</p>}
+      {options.isError && (
+        <p className="text-sm text-error">Couldn't load suggested cases: {options.error.message}</p>
+      )}
+      {!options.isLoading && suggested.length === 0 && (
+        <p className="text-sm text-on-surface-variant">
+          No suggested cases — the reporter didn't name a wanted person, or that person isn't on an open case.
+        </p>
+      )}
+
+      {suggested.map((option, index) => (
+        <CaseOptionRow
+          key={option.id}
+          option={option}
+          badge={index === 0 ? "Suggested" : undefined}
+          checked={effective.mode === "existing" && effective.caseId === option.id}
+          onSelect={() => onChange({ mode: "existing", caseId: option.id, label: option.caseNumber })}
+        />
+      ))}
+
+      {pickedOther && (
+        <label className="flex items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3">
+          <input type="radio" name="case-link" checked readOnly className="mt-1" />
+          <span className="text-sm text-on-surface">
+            Link to <span className="font-mono">{pickedOther.label}</span>
+          </span>
+        </label>
+      )}
+
+      <div className="rounded-lg border border-outline-variant p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+          Link to another case
+        </p>
+        <input
+          value={caseSearch}
+          onChange={(e) => setCaseSearch(e.target.value)}
+          placeholder="Search by case number or title..."
+          className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm"
+        />
+        {searchResults.isError && (
+          <p className="mt-2 text-sm text-error">Case search failed: {searchResults.error.message}</p>
+        )}
+        {searchTerm.length >= 2 && searchResults.isSuccess && otherResults.length === 0 && (
+          <p className="mt-2 text-sm text-on-surface-variant">No other cases match.</p>
+        )}
+        {otherResults.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {otherResults.map((option) => (
+              <CaseOptionRow
+                key={option.id}
+                option={option}
+                checked={effective.mode === "existing" && effective.caseId === option.id}
+                onSelect={() => onChange({ mode: "existing", caseId: option.id, label: option.caseNumber })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3 hover:bg-surface-container">
+        <input
+          type="radio"
+          name="case-link"
+          checked={effective.mode === "new"}
+          onChange={() => onChange({ mode: "new" })}
+          className="mt-1"
+        />
+        <span className="flex-1 text-sm text-on-surface">
+          Open a new case
+          {effective.mode === "new" && (
+            <input
+              value={newCaseTitle}
+              onChange={(e) => onNewCaseTitleChange(e.target.value)}
+              placeholder="Case title (optional — defaults to the sighting reference)"
+              className="mt-2 block w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+            />
+          )}
+        </span>
+      </label>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3 hover:bg-surface-container">
+        <input
+          type="radio"
+          name="case-link"
+          checked={effective.mode === "none"}
+          onChange={() => onChange({ mode: "none" })}
+          className="mt-1"
+        />
+        <span className="text-sm text-on-surface">Don't link to a case</span>
+      </label>
+    </div>
+  );
+}
+
+// Until the moderator picks something, default to the first suggested case.
+function resolveCaseChoice(choice: CaseChoice | null, suggested: CaseOption[]): CaseChoice {
+  if (choice) return choice;
+  const first = suggested[0];
+  return first ? { mode: "existing", caseId: first.id, label: first.caseNumber } : { mode: "none" };
+}
+
 export default function SightingsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ModerationStatus | undefined>(undefined);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [moderationReason, setModerationReason] = useState("");
+  const [caseChoice, setCaseChoice] = useState<CaseChoice | null>(null);
+  const [newCaseTitle, setNewCaseTitle] = useState("");
+  const [attachPhotos, setAttachPhotos] = useState(true);
+  const [duplicateRef, setDuplicateRef] = useState("");
 
   const input = useMemo(
     () => ({
@@ -142,10 +316,25 @@ export default function SightingsPage() {
 
   const selected = data?.items.find((item) => item.id === selectedId) ?? null;
 
+  const resetModerationForm = () => {
+    setModerationReason("");
+    setCaseChoice(null);
+    setNewCaseTitle("");
+    setAttachPhotos(true);
+    setDuplicateRef("");
+  };
+
   const closeDetails = () => {
     setSelectedId(null);
-    setModerationReason("");
+    resetModerationForm();
   };
+
+  // Same query the picker uses, so the default choice can be resolved here
+  // when Approve is clicked without touching the picker.
+  const caseLinkOptions = useQuery({
+    ...trpc.sightings.caseLinkOptions.queryOptions({ id: selectedId ?? "" }),
+    enabled: selectedId !== null,
+  });
 
   const verifySighting = useMutation(trpc.sightings.verify.mutationOptions());
   const createModerationAlerts = useMutation(
@@ -159,16 +348,29 @@ export default function SightingsPage() {
     mutationFn: async (args: {
       sightingId: string;
       authorId: string | null;
-      decision: "APPROVED" | "REJECTED";
+      decision: "APPROVED" | "REJECTED" | "DUPLICATE";
       reason: string;
       location: SightingLocation;
+      caseChoice?: CaseChoice;
+      newCaseTitle?: string;
+      attachPhotos?: boolean;
+      duplicateOfReferenceCode?: string;
     }) => {
       const reason = args.reason.trim() || undefined;
+      const choice = args.caseChoice ?? { mode: "none" as const };
 
-      await verifySighting.mutateAsync({
+      const result = await verifySighting.mutateAsync({
         id: args.sightingId,
         decision: args.decision,
         notes: reason,
+        caseLink:
+          choice.mode === "existing"
+            ? { mode: "existing", caseId: choice.caseId }
+            : choice.mode === "new"
+              ? { mode: "new", title: args.newCaseTitle?.trim() || undefined }
+              : { mode: "none" },
+        attachPhotosAsEvidence: args.attachPhotos ?? false,
+        duplicateOfReferenceCode: args.duplicateOfReferenceCode?.trim() || undefined,
       });
 
       await createModerationAlerts.mutateAsync({
@@ -177,6 +379,7 @@ export default function SightingsPage() {
         decision: args.decision,
         reason,
         location: args.location,
+        passedToInvestigators: result.passedToInvestigators,
       });
     },
 
@@ -243,6 +446,7 @@ export default function SightingsPage() {
             key={item.id}
             type="button"
             onClick={() => {
+              resetModerationForm();
               setSelectedId(item.id);
               setModerationReason(item.moderationReason ?? "");
             }}
@@ -263,6 +467,12 @@ export default function SightingsPage() {
                 {item.mediaIds.length > 0 && (
                   <span className="material-symbols-outlined text-on-surface-variant text-sm">
                     photo_camera
+                  </span>
+                )}
+
+                {item.subjectName && (
+                  <span className="rounded-full border border-outline-variant px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+                    Sighting of {item.subjectName}
                   </span>
                 )}
               </div>
@@ -363,6 +573,8 @@ export default function SightingsPage() {
                   <DetailField label="Visibility" value={selected.visibility}/>
 
                   <DetailField label="Anonymous" value={selected.isAnonymous ? "Yes" : "No"}/>
+
+                  <DetailField label="Wanted person" value={selected.subjectName ?? "Not specified"}/>
                 </div>
 
                 {/* Coordinates */}
@@ -445,6 +657,53 @@ export default function SightingsPage() {
                   >
                   </textarea>
                 </DetailSection>
+
+                {selected.moderationStatus === "PENDING" && (
+                  <>
+                    <DetailSection title="On approval, link to case">
+                      <CaseLinkPicker
+                        sightingId={selected.id}
+                        choice={caseChoice}
+                        onChange={setCaseChoice}
+                        newCaseTitle={newCaseTitle}
+                        onNewCaseTitleChange={setNewCaseTitle}
+                      />
+
+                      <label className="mt-3 flex items-center gap-2 text-sm text-on-surface">
+                        <input
+                          type="checkbox"
+                          checked={attachPhotos && selected.mediaIds.length > 0}
+                          disabled={selected.mediaIds.length === 0}
+                          onChange={(e) => setAttachPhotos(e.target.checked)}
+                        />
+                        Attach the sighting's photos to the case as evidence
+                        {selected.mediaIds.length === 0 && (
+                          <span className="text-on-surface-variant">(no photos)</span>
+                        )}
+                      </label>
+                    </DetailSection>
+
+                    <DetailSection title="Duplicate of">
+                      <input
+                        value={duplicateRef}
+                        onChange={(e) => setDuplicateRef(e.target.value)}
+                        placeholder="Original sighting reference, e.g. ST-2026-00012"
+                        className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 font-mono text-sm"
+                      />
+                    </DetailSection>
+                  </>
+                )}
+
+                {selected.moderationStatus === "DUPLICATE" && selected.duplicateOfSightingId && (
+                  <DetailField
+                    label="Duplicate of"
+                    value={
+                      data?.items.find((item) => item.id === selected.duplicateOfSightingId)?.referenceCode ??
+                      selected.duplicateOfSightingId
+                    }
+                    mono
+                  />
+                )}
               </div>
 
               {/* Admin Rejection & Approval */}
@@ -462,6 +721,30 @@ export default function SightingsPage() {
                       {moderationMutation.error.message}
                     </p>
                   )}
+
+                  {/* Mark Duplicate Button */}
+                  <button
+                  type="button"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-40"
+                  disabled={
+                    moderationMutation.isPending ||
+                    selected.moderationStatus !== "PENDING" ||
+                    !duplicateRef.trim()
+                  }
+                  title={duplicateRef.trim() ? undefined : "Enter the original sighting's reference first"}
+                  onClick={() => {
+                    moderationMutation.mutate({
+                      sightingId: selected.id,
+                      authorId: selected.reporterUserId,
+                      decision: "DUPLICATE",
+                      reason: moderationReason,
+                      location: selected.location,
+                      duplicateOfReferenceCode: duplicateRef,
+                    });
+                  }}
+                  >
+                    Mark Duplicate
+                  </button>
 
                   {/* Reject Sighting Button */}
                   <button 
@@ -490,7 +773,11 @@ export default function SightingsPage() {
                   <button 
                     type="button" 
                     className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary/90"
-                    disabled={moderationMutation.isPending || selected.moderationStatus !== "PENDING"}
+                    disabled={
+                      moderationMutation.isPending ||
+                      selected.moderationStatus !== "PENDING" ||
+                      caseLinkOptions.isLoading
+                    }
                     onClick={() => {
                       if(!selected) return;
 
@@ -500,6 +787,12 @@ export default function SightingsPage() {
                         decision: "APPROVED",
                         reason: moderationReason,
                         location: selected.location,
+                        caseChoice: resolveCaseChoice(
+                          caseChoice,
+                          caseLinkOptions.data?.suggestedCases ?? [],
+                        ),
+                        newCaseTitle,
+                        attachPhotos: attachPhotos && selected.mediaIds.length > 0,
                       });
                     }}
                   >

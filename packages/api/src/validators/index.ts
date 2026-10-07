@@ -478,6 +478,9 @@ export const submitSightingSchema = z.object({
     )
     .max(4)
     .default([]),
+  // The wanted person the reporter picked from the wanted feed. The
+  // reporter never picks a case — case suggestions are derived server-side.
+  subjectEntityProfileId: z.string().uuid().optional(),
 });
 
 export const sightingListSchema = z.object({
@@ -487,10 +490,23 @@ export const sightingListSchema = z.object({
   moderationStatus: sightingModerationStatusSchema.optional(),
 });
 
+// Where an approved sighting goes. "existing" defaults (in the UI) to the
+// first suggested case; "none" approves without opening any case link.
+export const sightingCaseLinkSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("existing"), caseId: z.string().uuid() }),
+  z.object({ mode: z.literal("new"), title: z.string().min(1).max(200).optional() }),
+  z.object({ mode: z.literal("none") }),
+]);
+
 export const verifySightingSchema = z.object({
   id: z.string().uuid(),
   decision: z.enum(["APPROVED", "REJECTED", "DUPLICATE"]),
   notes: z.string().max(2000).optional(),
+  // Only read when decision is APPROVED.
+  caseLink: sightingCaseLinkSchema.default({ mode: "none" }),
+  attachPhotosAsEvidence: z.boolean().default(false),
+  // Only read when decision is DUPLICATE: the original's reference code.
+  duplicateOfReferenceCode: z.string().min(1).max(50).optional(),
 });
 
 // --- Alerts ---

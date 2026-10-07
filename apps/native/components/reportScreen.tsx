@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, Platform, ScrollView, Text, TextInput, View, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -47,6 +47,27 @@ export default function ReportScreen() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [referenceCode, setReferenceCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Set when the reporter came from a wanted person's page. The reporter
+  // only ever names a person — which case it goes to is decided by
+  // moderators, and case details never reach this app.
+  const params = useLocalSearchParams<{ profileId?: string }>();
+  const [subjectId, setSubjectId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof params.profileId === "string" && params.profileId) {
+      setSubjectId(params.profileId);
+    }
+  }, [params.profileId]);
+  const subjectQuery = useQuery({
+    ...trpc.profiles.getPublicWantedById.queryOptions({ id: subjectId ?? "" }),
+    enabled: Boolean(subjectId),
+  });
+  const subject = subjectId ? subjectQuery.data : undefined;
+
+  function clearSubject() {
+    setSubjectId(null);
+    router.setParams({ profileId: undefined });
+  }
 
   const submitSighting = useMutation(
     trpc.sightings.submit.mutationOptions({
@@ -245,10 +266,13 @@ export default function ReportScreen() {
         isAnonymous,
 
         photos: preparedPhotos,
+
+        subjectEntityProfileId: subject?.id,
       });
 
       setReferenceCode(created.referenceCode);
       setIsSubmitted(true);
+      clearSubject();
 
       toast.show({
         variant: "success",
@@ -416,6 +440,51 @@ export default function ReportScreen() {
         <Text style={{ marginTop: 6, color: colors.textMuted, lineHeight: 18 }}>
           Your immediate report helps keep the community safe. All fields are confidential.
         </Text>
+
+        {/* Wanted person this report is about */}
+        {subjectId && (
+          <View
+            style={{
+              marginTop: 18,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+            }}
+          >
+            <Ionicons name="person-circle-outline" size={26} color={colors.brand} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: colors.textMuted }}>
+                Reporting a sighting of
+              </Text>
+              {subjectQuery.isLoading ? (
+                <ActivityIndicator style={{ alignSelf: "flex-start", marginTop: 4 }} color={colors.brand} />
+              ) : subjectQuery.isError ? (
+                <Text style={{ marginTop: 2, color: colors.textSubtle, lineHeight: 18 }}>
+                  This person is no longer on the wanted list. Your report will be sent as a general sighting.
+                </Text>
+              ) : (
+                <Text style={{ marginTop: 2, fontSize: 16, fontWeight: "800", color: colors.text }}>
+                  {subject?.displayName ?? "Unnamed wanted person"}
+                </Text>
+              )}
+            </View>
+            <Pressable
+              onPress={clearSubject}
+              accessibilityRole="button"
+              accessibilityLabel="Remove wanted person from this report"
+              hitSlop={8}
+              style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}
+            >
+              <Ionicons name="close-circle" size={22} color={colors.textMuted} />
+            </Pressable>
+          </View>
+        )}
 
         {/* Upload evidence */}
         <Pressable
@@ -603,13 +672,26 @@ export default function ReportScreen() {
           style={({ pressed }) => ({
             marginTop: 18,
             flexDirection: "row",
-            alignItems: "center",
+            alignItems: "flex-start",
             gap: 10,
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Ionicons name={isAnonymous ? "checkbox" : "square-outline"} size={20} color={colors.brand} />
-          <Text style={{ color: colors.text, fontWeight: "700" }}>Submit anonymously</Text>
+          <Ionicons
+            name={isAnonymous ? "checkbox" : "square-outline"}
+            size={20}
+            color={colors.brand}
+            style={{ marginTop: 1 }}
+          />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons name="lock-closed" size={13} color={colors.textMuted} />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>Submit anonymously</Text>
+            </View>
+            <Text style={{ marginTop: 2, fontSize: 12, color: colors.textSubtle, lineHeight: 16 }}>
+              Your name stays hidden from other users — only safety moderators can see who reported this.
+            </Text>
+          </View>
         </Pressable>
 
         {submitSighting.isSuccess && (
