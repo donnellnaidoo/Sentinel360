@@ -69,6 +69,10 @@ def test_open_capture_picks_source_by_scheme():
     assert isinstance(open_capture("http://10.0.0.3:8081/video"), StreamCapture)
     assert isinstance(open_capture("samples/demo.mp4"), StreamCapture)
 
+    webcam = open_capture("0")
+    assert isinstance(webcam, StreamCapture) and webcam._is_device and webcam._is_network
+    assert open_capture("1", panoramic=True).panoramic is True
+
 
 def test_x3_url_requires_port():
     with pytest.raises(ValueError):

@@ -6,6 +6,7 @@ knows the difference — use `open_capture(source)` to get the right one.
 Source formats:
   x3tcp://127.0.0.1:5001     Sentinel360X3Stitcher.exe TCP feed (equirectangular)
   rtsp://... / http://...    network camera (e.g. IP Camera Lite's /video MJPEG)
+  0, 1, 2 ...                USB webcam by device number (0 = first camera)
   anything else              local video file path
 """
 
@@ -31,6 +32,10 @@ _NETWORK_SCHEMES = ("rtsp://", "rtsps://", "http://", "https://")
 
 def _is_network(source: str) -> bool:
     return source.startswith(_NETWORK_SCHEMES)
+
+
+def _is_device(source: str) -> bool:
+    return source.strip().isdigit()
 
 
 @dataclass
@@ -69,6 +74,7 @@ class StreamCapture:
         loop: bool = True,
         reconnect_delay_seconds: float = 2.0,
         stop_event: threading.Event | None = None,
+        panoramic: bool = False,
     ):
         self.source = source
         self.loop = loop
@@ -77,12 +83,16 @@ class StreamCapture:
         self.stop_event = stop_event or threading.Event()
         # Why frames aren't arriving (e.g. camera unreachable), for /stream/status.
         self.last_error: str | None = None
-        self._is_network = _is_network(source)
+        # Webcams behave like network cameras: live, never "end", retried if
+        # they drop out.
+        self._is_device = _is_device(source)
+        self._is_network = _is_network(source) or self._is_device
+        self.panoramic = panoramic
         self._cap: cv2.VideoCapture | None = None
         self._frame_index = 0
 
     def open(self) -> None:
-        self._cap = cv2.VideoCapture(self.source)
+        self._cap = cv2.VideoCapture(int(self.source) if self._is_device else self.source)
         if not self._cap.isOpened():
             raise RuntimeError(f"Failed to open stream source: {self.source}")
 
@@ -135,7 +145,7 @@ class StreamCapture:
             break
 
         self.last_error = None
-        frame = Frame(image=image, frame_index=self._frame_index, timestamp=time.time())
+        frame = Frame(image=image, frame_index=self._frame_index, timestamp=time.time(), panoramic=self.panoramic)
         self._frame_index += 1
         return frame
 
@@ -258,8 +268,16 @@ class X3TcpCapture:
         self.close()
 
 
-def open_capture(source: str, *, loop: bool = True, stop_event: threading.Event | None = None) -> FrameSource:
-    """Picks the capture implementation from the source's scheme."""
+def open_capture(
+    source: str,
+    *,
+    loop: bool = True,
+    stop_event: threading.Event | None = None,
+    panoramic: bool = False,
+) -> FrameSource:
+    """Picks the capture implementation from the source's scheme.
+    `panoramic` marks a webcam/network/file source as a 2:1 equirectangular
+    360° image (e.g. an X3 in USB webcam mode) so it's split into 4 views."""
     if source.startswith(f"{X3_SCHEME}://"):
         return X3TcpCapture.from_url(source, stop_event=stop_event)
-    return StreamCapture(source, loop=loop, stop_event=stop_event)
+    return StreamCapture(source, loop=loop, stop_event=stop_event, panoramic=panoramic)

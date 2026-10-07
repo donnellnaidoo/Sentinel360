@@ -330,7 +330,12 @@ class PipelineRunner:
             anomaly_detector, self._anomaly_unavailable = load_anomaly_detector()
             self._processor = FrameProcessor(weapon_detector, anomaly_detector, emit=self._record_event)
 
-            with open_capture(settings.stream_source, loop=settings.stream_loop, stop_event=stop_event) as capture:
+            with open_capture(
+                settings.stream_source,
+                loop=settings.stream_loop,
+                stop_event=stop_event,
+                panoramic=settings.stream_panoramic,
+            ) as capture:
                 self._capture = capture
                 last_frame_at = time.time()
                 while not stop_event.is_set():

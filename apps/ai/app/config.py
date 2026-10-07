@@ -7,9 +7,13 @@ class Settings(BaseSettings):
     # Stream source — see pipeline/capture.py#open_capture. One of:
     #   x3tcp://127.0.0.1:5001   Insta360 X3 via Sentinel360X3Stitcher.exe
     #   rtsp://... / http://...  network camera
+    #   0, 1, ...                USB webcam by device number
     #   samples/demo.mp4         local file, looped as the "stream"
     # All go through the exact same capture interface.
     stream_source: str = "samples/demo.mp4"
+    # True when a webcam/network/file source is a 2:1 360° panorama (e.g. the
+    # X3 in USB webcam mode), so it is split into Front/Right/Rear/Left.
+    stream_panoramic: bool = False
     stream_loop: bool = True
     camera_id: str = "CAM-DEMO-1"
 
