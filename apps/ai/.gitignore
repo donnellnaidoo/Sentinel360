@@ -15,3 +15,4 @@ tmp/
 # Synthetic smoke-test clip — regenerate with samples/generate_smoketest_clip.py
 samples/demo.mp4
 samples/knife_demo.mp4
+camera_previews/
