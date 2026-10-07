@@ -91,7 +91,7 @@ describe("POST /internal/ai/events", () => {
     ingestResult = created(true);
     const response = await post(event());
     expect(response.status).toBe(200);
-    expect((await response.json()).duplicate).toBe(true);
+    expect(((await response.json()) as { duplicate: boolean }).duplicate).toBe(true);
   });
 
   it("accepts ANOMALY_DETECTED", async () => {

@@ -124,8 +124,6 @@ export const sightingsRouter = router({
         photo.mimeType,
       );
 
-      let createdMedia;
-
       try {
         const [createdMedia] = await db
           .insert(mediaAsset)
