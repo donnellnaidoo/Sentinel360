@@ -25,6 +25,7 @@ interface AiStatus {
   fps: number;
   started_at: number | null;
   error: string | null;
+  source_warning: string | null;
   knife_streaks: Record<string, number>;
   anomaly:
     | { enabled: false; reason: string | null }
@@ -175,6 +176,11 @@ export default function MonitoringPage() {
       {control.isError && (
         <p role="alert" className="mb-6 text-body-sm text-error">
           {control.error.message}
+        </p>
+      )}
+      {status?.source_warning && (
+        <p role="status" className="mb-6 rounded-xl border border-tertiary-container/60 bg-tertiary-container/20 p-4 text-body-sm text-tertiary">
+          {status.source_warning} Monitoring will start automatically once the camera is streaming.
         </p>
       )}
       {status?.error && (

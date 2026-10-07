@@ -23,7 +23,7 @@ import numpy as np
 
 from app.config import settings
 from app.pipeline.anomaly import AnomalyConfirmer, AnomalyObservation, SlowFastAnomalyDetector
-from app.pipeline.capture import Frame, open_capture
+from app.pipeline.capture import Frame, FrameSource, open_capture
 from app.pipeline.dewarp import ViewSplitter, compose_grid
 from app.pipeline.events import DetectionEvent, EventQueue
 from app.pipeline.weapon import (
@@ -248,6 +248,7 @@ class PipelineRunner:
         self._error: str | None = None
         self._processor: FrameProcessor | None = None
         self._anomaly_unavailable: str | None = None
+        self._capture: FrameSource | None = None
         # Outlives individual runs so the publisher can keep draining it.
         self.events = EventQueue(maxsize=settings.event_queue_size)
         self._recent_events: collections.deque[dict] = collections.deque(maxlen=20)
@@ -280,6 +281,9 @@ class PipelineRunner:
             "fps": round(self._fps, 2),
             "started_at": self._started_at,
             "error": self._error,
+            # Set while the camera/stitcher isn't delivering frames (the
+            # pipeline keeps retrying rather than failing).
+            "source_warning": self._capture.last_error if self._capture and self.is_running else None,
             "knife_streaks": dict(processor.knife_confirmer.streaks) if processor else {},
             "anomaly": anomaly,
             "events": {
@@ -296,10 +300,15 @@ class PipelineRunner:
     def start(self) -> None:
         if self.is_running:
             return
-        self._stop_event.clear()
+        # A fresh event per run: a previous run still stuck waiting on a
+        # camera keeps its own (set) event and exits, instead of being
+        # revived when this one clears it.
+        self._stop_event = threading.Event()
         self._error = None
         self._started_at = time.time()
-        self._thread = threading.Thread(target=self._run, name="pipeline-capture", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, args=(self._stop_event,), name="pipeline-capture", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -312,7 +321,7 @@ class PipelineRunner:
         self._recent_events.appendleft(event.describe())
         self.events.put(event)
 
-    def _run(self) -> None:
+    def _run(self, stop_event: threading.Event) -> None:
         min_frame_interval = 1.0 / settings.target_fps
         anomaly_detector: SlowFastAnomalyDetector | None = None
 
@@ -321,14 +330,15 @@ class PipelineRunner:
             anomaly_detector, self._anomaly_unavailable = load_anomaly_detector()
             self._processor = FrameProcessor(weapon_detector, anomaly_detector, emit=self._record_event)
 
-            with open_capture(settings.stream_source, loop=settings.stream_loop) as capture:
+            with open_capture(settings.stream_source, loop=settings.stream_loop, stop_event=stop_event) as capture:
+                self._capture = capture
                 last_frame_at = time.time()
-                while not self._stop_event.is_set():
+                while not stop_event.is_set():
                     loop_start = time.time()
 
                     frame = capture.read()
                     if frame is None:
-                        # Non-looping file source reached its end.
+                        # Stopped, or a non-looping file source reached its end.
                         break
 
                     display = self._processor.process(frame)

@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import socket
 import struct
+import threading
 import time
 from dataclasses import dataclass
 from typing import Protocol
@@ -43,6 +44,8 @@ class Frame:
 
 
 class FrameSource(Protocol):
+    last_error: str | None
+
     def open(self) -> None: ...
     def close(self) -> None: ...
     def read(self) -> Frame | None: ...
@@ -59,10 +62,21 @@ class StreamCapture:
     like a continuous "stream" for as long as the pipeline runs.
     """
 
-    def __init__(self, source: str, *, loop: bool = True, reconnect_delay_seconds: float = 2.0):
+    def __init__(
+        self,
+        source: str,
+        *,
+        loop: bool = True,
+        reconnect_delay_seconds: float = 2.0,
+        stop_event: threading.Event | None = None,
+    ):
         self.source = source
         self.loop = loop
         self.reconnect_delay_seconds = reconnect_delay_seconds
+        # Set by the pipeline on Stop, so a camera retry loop can be interrupted.
+        self.stop_event = stop_event or threading.Event()
+        # Why frames aren't arriving (e.g. camera unreachable), for /stream/status.
+        self.last_error: str | None = None
         self._is_network = _is_network(source)
         self._cap: cv2.VideoCapture | None = None
         self._frame_index = 0
@@ -79,8 +93,10 @@ class StreamCapture:
 
     def _reconnect(self) -> None:
         logger.warning("Stream read failed, reconnecting to %s", self.source)
+        self.last_error = f"Camera not responding at {self.source}, retrying"
         self.close()
-        time.sleep(self.reconnect_delay_seconds)
+        if self.stop_event.wait(self.reconnect_delay_seconds):
+            return
         try:
             self.open()
         except RuntimeError:
@@ -93,6 +109,8 @@ class StreamCapture:
         forever, since a demo camera dropping out shouldn't stop the pipeline.
         """
         while True:
+            if self.stop_event.is_set():
+                return None
             if self._cap is None:
                 if self._is_network:
                     self._reconnect()
@@ -116,12 +134,20 @@ class StreamCapture:
                 raise RuntimeError(f"Failed to loop video source: {self.source}")
             break
 
+        self.last_error = None
         frame = Frame(image=image, frame_index=self._frame_index, timestamp=time.time())
         self._frame_index += 1
         return frame
 
     def __enter__(self) -> "StreamCapture":
-        self.open()
+        try:
+            self.open()
+        except RuntimeError:
+            if not self._is_network:
+                raise  # a missing file won't appear by waiting
+            # A camera that's down at start is handled like a dropped one.
+            self.last_error = f"Camera not reachable at {self.source}, retrying"
+            logger.warning("Could not open %s yet, will keep retrying", self.source)
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -147,20 +173,23 @@ class X3TcpCapture:
         *,
         reconnect_delay_seconds: float = 2.0,
         socket_timeout_seconds: float = 5.0,
+        stop_event: threading.Event | None = None,
     ):
         self.host = host
         self.port = port
+        self.stop_event = stop_event or threading.Event()
+        self.last_error: str | None = None
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self.socket_timeout_seconds = socket_timeout_seconds
         self._sock: socket.socket | None = None
         self._frame_index = 0
 
     @classmethod
-    def from_url(cls, source: str, **kwargs: float) -> "X3TcpCapture":
+    def from_url(cls, source: str, **kwargs: object) -> "X3TcpCapture":
         parsed = urlparse(source)
         if parsed.scheme != X3_SCHEME or not parsed.hostname or not parsed.port:
             raise ValueError(f"Expected {X3_SCHEME}://host:port, got: {source}")
-        return cls(parsed.hostname, parsed.port, **kwargs)
+        return cls(parsed.hostname, parsed.port, **kwargs)  # type: ignore[arg-type]
 
     def open(self) -> None:
         self._sock = socket.create_connection(
@@ -193,7 +222,11 @@ class X3TcpCapture:
         return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
     def read(self) -> Frame | None:
+        """Waits for the stitcher (at start or after a drop) until a frame
+        arrives; returns None only when stop_event is set."""
         while True:
+            if self.stop_event.is_set():
+                return None
             try:
                 if self._sock is None:
                     self.open()
@@ -202,24 +235,31 @@ class X3TcpCapture:
             except (OSError, ConnectionError) as exc:
                 # A desynced stream can't be recovered mid-connection, so a
                 # bad header (ValueError) is deliberately not retried here.
+                self.last_error = (
+                    f"Waiting for the X3 stitcher at {self.host}:{self.port} "
+                    f"({exc.__class__.__name__}) — is Sentinel360X3Stitcher.exe running?"
+                )
                 logger.warning("X3 read failed (%s), reconnecting to %s:%s", exc, self.host, self.port)
                 self.close()
-                time.sleep(self.reconnect_delay_seconds)
+                if self.stop_event.wait(self.reconnect_delay_seconds):
+                    return None
 
+        self.last_error = None
         frame = Frame(image=image, frame_index=self._frame_index, timestamp=time.time(), panoramic=True)
         self._frame_index += 1
         return frame
 
     def __enter__(self) -> "X3TcpCapture":
-        self.open()
+        # Connecting is left to read(), which retries until the stitcher is
+        # up — so the stitcher and the pipeline can start in either order.
         return self
 
     def __exit__(self, *exc_info: object) -> None:
         self.close()
 
 
-def open_capture(source: str, *, loop: bool = True) -> FrameSource:
+def open_capture(source: str, *, loop: bool = True, stop_event: threading.Event | None = None) -> FrameSource:
     """Picks the capture implementation from the source's scheme."""
     if source.startswith(f"{X3_SCHEME}://"):
-        return X3TcpCapture.from_url(source)
-    return StreamCapture(source, loop=loop)
+        return X3TcpCapture.from_url(source, stop_event=stop_event)
+    return StreamCapture(source, loop=loop, stop_event=stop_event)

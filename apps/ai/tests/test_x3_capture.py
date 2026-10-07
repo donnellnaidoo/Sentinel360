@@ -5,6 +5,7 @@ is Windows-only, so the wire format is exercised with a local TCP server.
 import socket
 import struct
 import threading
+import time
 
 import numpy as np
 import pytest
@@ -72,3 +73,50 @@ def test_open_capture_picks_source_by_scheme():
 def test_x3_url_requires_port():
     with pytest.raises(ValueError):
         X3TcpCapture.from_url("x3tcp://127.0.0.1")
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def test_waits_for_a_stitcher_that_starts_later():
+    port = _free_port()
+    rgb = np.zeros((480, 960, 3), dtype=np.uint8)
+
+    def start_late() -> None:
+        time.sleep(0.5)
+        server = socket.socket()
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(("127.0.0.1", port))
+        server.listen(1)
+        conn, _ = server.accept()
+        with conn, server:
+            conn.sendall(_x3_message(rgb))
+
+    threading.Thread(target=start_late, daemon=True).start()
+
+    capture = X3TcpCapture("127.0.0.1", port, reconnect_delay_seconds=0.1)
+    with capture:  # must not raise "connection refused" at start
+        frame = capture.read()
+
+    assert frame is not None and frame.panoramic
+    assert capture.last_error is None
+
+
+def test_reports_waiting_and_stops_promptly_without_a_stitcher():
+    stop = threading.Event()
+    capture = X3TcpCapture("127.0.0.1", _free_port(), reconnect_delay_seconds=5, stop_event=stop)
+    result: list = []
+    reader = threading.Thread(target=lambda: result.append(capture.read()), daemon=True)
+
+    with capture:
+        reader.start()
+        time.sleep(0.3)
+        assert capture.last_error and "Sentinel360X3Stitcher.exe" in capture.last_error
+        stop.set()
+        reader.join(timeout=2)
+
+    assert not reader.is_alive(), "Stop must interrupt the retry wait"
+    assert result == [None]
