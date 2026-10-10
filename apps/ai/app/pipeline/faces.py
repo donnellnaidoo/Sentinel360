@@ -1,9 +1,9 @@
 """Face crops attached to a docket as evidence.
 
 Runs only when an event fires (weapon, anomaly, panic), on the clean views
-of that frame, so it costs nothing on ordinary frames. Detection only: no
-embeddings or identity — the crops are stored on the case for investigators
-to look at. Every face in every view is kept (largest first, capped), which
+of that frame, so it costs nothing on ordinary frames. Detection only: the
+crops are stored on the case for investigators to look at. Matching them
+against wanted persons is a separate, opt-in stage (watchlist.py). Every face in every view is kept (largest first, capped), which
 includes bystanders; see apps/ai/README.md.
 
 YuNet (OpenCV Zoo, ~230 KB ONNX) runs on CPU through cv2.FaceDetectorYN.
@@ -31,6 +31,9 @@ class FaceCrop:
     confidence: float
     bbox: tuple[int, int, int, int]  # x1, y1, x2, y2 in view pixels
     jpeg: bytes
+    # YuNet's raw row (box + 5 landmarks + score), for aligning the face
+    # before recognition (watchlist.py).
+    landmarks: np.ndarray | None = None
 
 
 def _crop_face(image: np.ndarray, bbox: tuple[int, int, int, int], padding: float, max_side: int) -> np.ndarray:
@@ -62,6 +65,12 @@ class FaceDetector:
 
     def detect(self, image: np.ndarray) -> list[tuple[float, tuple[int, int, int, int]]]:
         """(confidence, bbox) per face, bbox clipped to the image."""
+        return [(confidence, bbox) for confidence, bbox, _ in self.detect_with_landmarks(image)]
+
+    def detect_with_landmarks(
+        self, image: np.ndarray
+    ) -> list[tuple[float, tuple[int, int, int, int], np.ndarray | None]]:
+        """(confidence, bbox, YuNet row) per face."""
         height, width = image.shape[:2]
         self._detector.setInputSize((width, height))
         _, faces = self._detector.detect(image)
@@ -74,7 +83,7 @@ class FaceDetector:
             x2, y2 = min(width, x + w), min(height, y + h)
             if min(x2 - x1, y2 - y1) < self.min_size:
                 continue
-            results.append((float(face[-1]), (x1, y1, x2, y2)))
+            results.append((float(face[-1]), (x1, y1, x2, y2), face.copy()))
         return results
 
     def crops(
@@ -87,23 +96,23 @@ class FaceDetector:
     ) -> list[FaceCrop]:
         """Largest faces across all views, up to max_faces. A view that
         fails is logged and skipped — losing a face must not lose the event."""
-        found: list[tuple[int, str, float, tuple[int, int, int, int]]] = []
+        found: list[tuple[int, str, float, tuple[int, int, int, int], np.ndarray | None]] = []
         for name, image in views.items():
             try:
-                for confidence, bbox in self.detect(image):
+                for confidence, bbox, landmarks in self.detect_with_landmarks(image):
                     area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-                    found.append((area, name, confidence, bbox))
+                    found.append((area, name, confidence, bbox, landmarks))
             except cv2.error:
                 logger.exception("Face detection failed on %s view", name)
 
         found.sort(key=lambda item: item[0], reverse=True)
         crops = []
-        for _, name, confidence, bbox in found[:max_faces]:
+        for _, name, confidence, bbox, landmarks in found[:max_faces]:
             ok, buffer = cv2.imencode(
                 ".jpg", _crop_face(views[name], bbox, padding, max_side), [cv2.IMWRITE_JPEG_QUALITY, 90]
             )
             if ok:
-                crops.append(FaceCrop(name, confidence, bbox, buffer.tobytes()))
+                crops.append(FaceCrop(name, confidence, bbox, buffer.tobytes(), landmarks))
         return crops
 
 

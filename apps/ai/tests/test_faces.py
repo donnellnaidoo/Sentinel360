@@ -16,8 +16,8 @@ class _ScriptedFaces(FaceDetector):
         self.min_size = 0
         self._faces_by_value = faces_by_value
 
-    def detect(self, image):
-        return self._faces_by_value.get(int(image.mean()), [])
+    def detect_with_landmarks(self, image):
+        return [(conf, bbox, None) for conf, bbox in self._faces_by_value.get(int(image.mean()), [])]
 
 
 def test_real_model_finds_nothing_on_a_blank_frame():

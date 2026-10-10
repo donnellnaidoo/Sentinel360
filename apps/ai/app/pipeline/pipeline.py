@@ -1,11 +1,12 @@
 """Per-frame orchestration, running in a background thread so the blocking
 cv2 capture/inference loop doesn't block FastAPI's event loop.
 
-capture -> views (X3 dewarp or single view) -> batched YOLO (person/knife)
--> KnifeConfirmer -> SlowFast clip buffer (background thread)
--> AnomalyConfirmer -> overlays -> latest JPEG for MJPEG
--> confirmed detections (plus face crops from that frame) onto the
-EventQueue for the backend publisher.
+capture -> views (X3 dewarp or single view) -> batched YOLO (person/weapon)
+-> KnifeConfirmer -> [pose rules] -> SlowFast clip buffer (background
+thread) -> AnomalyConfirmer -> overlays -> latest JPEG for MJPEG
+-> confirmed detections (plus face crops from that frame, and any
+watchlist suggestions) onto the EventQueue for the backend publisher.
+Stages in [] and watchlist matching are off unless enabled in config.py.
 
 Overlays are drawn on copies only: the raw views must stay clean because
 the evidence crops and the SlowFast input are taken from them.
@@ -25,14 +26,17 @@ import numpy as np
 
 from app.config import settings
 from app.pipeline.anomaly import AnomalyConfirmer, AnomalyObservation, SlowFastAnomalyDetector
-from app.pipeline.capture import Frame, FrameSource, open_capture
+from app.pipeline.capture import Frame, FrameSource, is_live_source, open_capture
 from app.pipeline.dewarp import ViewSplitter, compose_grid
 from app.pipeline.events import DetectionEvent, EventQueue
-from app.pipeline.faces import YUNET_MODEL_NAME, FaceDetector, load_face_detector
+from app.pipeline.faces import YUNET_MODEL_NAME, FaceCrop, FaceDetector, load_face_detector
+from app.pipeline.pose import AltercationAnalyzer, PoseEstimator, PoseObservation, load_pose_estimator
+from app.pipeline.watchlist import SFACE_MODEL_NAME, WatchlistMatcher, load_watchlist_matcher
 from app.pipeline.weapon import (
     KnifeConfirmer,
     KnifeObservation,
     ViewDetection,
+    PERSON_LABEL,
     WeaponDetector,
     best_knife_per_view,
     crop_with_padding,
@@ -43,12 +47,11 @@ logger = logging.getLogger(__name__)
 # BGR
 _PERSON_COLOR = (46, 204, 113)
 _KNIFE_COLOR = (0, 0, 255)
+_POSE_COLOR = (0, 140, 255)
 _NORMAL_COLOR = (0, 200, 0)
 _TEXT_COLOR = (255, 255, 255)
 
-SLOWFAST_CELL_SIZE = (224, 224)
 ALARM_BANNER_SECONDS = 3.0
-WEAPON_MODEL_NAME = "yolov8n-coco"
 ANOMALY_MODEL_NAME = "slowfast_r50-ucfcrime-binary"
 
 
@@ -70,17 +73,23 @@ def _draw_view(
     detections: list[ViewDetection],
     knife: KnifeObservation | None,
     show_view_name: bool,
+    pose: PoseObservation | None = None,
 ) -> np.ndarray:
     annotated = raw.copy()
     for det in detections:
         x1, y1, x2, y2 = det.bbox
-        color = _KNIFE_COLOR if det.label == "knife" else _PERSON_COLOR
+        color = _PERSON_COLOR if det.label == PERSON_LABEL else _KNIFE_COLOR
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
         _label(annotated, f"{det.label} {det.confidence:.2f}", (x1, y1 - 4), color)
 
     if knife is not None and knife.confirmed:
         x1, y1, x2, y2 = knife.bbox
         cv2.rectangle(annotated, (x1 - 3, y1 - 3), (x2 + 3, y2 + 3), _KNIFE_COLOR, 4)
+
+    if pose is not None and pose.confirmed:
+        x1, y1, x2, y2 = pose.bbox
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), _POSE_COLOR, 3)
+        _label(annotated, f"{pose.reason} (experimental)", (x1, y2 + 16), _POSE_COLOR)
 
     if show_view_name:
         _label(annotated, view, (10, 24), (40, 40, 40))
@@ -94,16 +103,41 @@ def _encode_jpeg(image: np.ndarray | None) -> bytes | None:
     return buffer.tobytes() if ok else None
 
 
-def _attach_faces(event: DetectionEvent, detector: FaceDetector | None, views: dict[str, np.ndarray]) -> None:
-    """Adds every face in the clean views to the event's evidence."""
+def _set_faces(event: DetectionEvent, crops: list[FaceCrop], watchlist: WatchlistMatcher | None, views) -> None:
+    event.face_jpegs = [crop.jpeg for crop in crops]
+    faces = [{"view": crop.view, "bbox": list(crop.bbox), "confidence": round(crop.confidence, 4)} for crop in crops]
+    event.metadata["faces"] = faces
+    event.metadata["faceModel"] = YUNET_MODEL_NAME
+    if watchlist is None or not crops:
+        return
+
+    # Suggestions only: an officer must confirm any identity.
+    best: dict[str, dict] = {}
+    for number, (face, matches) in enumerate(zip(faces, watchlist.match_crops(views, crops)), start=1):
+        if not matches:
+            continue
+        face["watchlistMatches"] = [m.describe() for m in matches]
+        for match in matches:
+            current = best.get(match.entity_profile_id)
+            if current is None or match.similarity > current["similarity"]:
+                best[match.entity_profile_id] = {**match.describe(), "faceNumber": number}
+    if best:
+        event.metadata["watchlistMatches"] = sorted(best.values(), key=lambda m: -m["similarity"])
+        event.metadata["watchlistReview"] = "required"
+        event.metadata["faceMatchModel"] = SFACE_MODEL_NAME
+
+
+def _attach_faces(
+    event: DetectionEvent,
+    detector: FaceDetector | None,
+    views: dict[str, np.ndarray],
+    watchlist: WatchlistMatcher | None = None,
+) -> None:
+    """Adds every face in the clean views to the event's evidence, with
+    watchlist suggestions if matching is on."""
     if detector is None:
         return
-    crops = detector.crops(views)
-    event.face_jpegs = [crop.jpeg for crop in crops]
-    event.metadata["faces"] = [
-        {"view": crop.view, "bbox": list(crop.bbox), "confidence": round(crop.confidence, 4)} for crop in crops
-    ]
-    event.metadata["faceModel"] = YUNET_MODEL_NAME
+    _set_faces(event, detector.crops(views), watchlist, views)
 
 
 class FrameProcessor:
@@ -118,16 +152,31 @@ class FrameProcessor:
         emit: Callable[[DetectionEvent], None],
         camera_id: str = settings.camera_id,
         face_detector: FaceDetector | None = None,
+        pose_estimator: PoseEstimator | None = None,
+        watchlist: WatchlistMatcher | None = None,
+        *,
+        watchlist_scan: bool = settings.face_watchlist_scan,
+        scan_every_frames: int = settings.face_scan_every_frames,
+        watchlist_cooldown_seconds: float = settings.watchlist_match_cooldown_seconds,
     ):
         self.weapon_detector = weapon_detector
         self.anomaly_detector = anomaly_detector
         self.face_detector = face_detector
+        self.pose_estimator = pose_estimator
+        self.watchlist = watchlist
         self.emit = emit
         self.camera_id = camera_id
         self.splitter = ViewSplitter()
         self.knife_confirmer = KnifeConfirmer()
         self.anomaly_confirmer = AnomalyConfirmer()
+        self.pose_analyzer = AltercationAnalyzer()
         self.last_anomaly: AnomalyObservation | None = None
+        self.last_pose: list[PoseObservation] = []
+        self.watchlist_scan = watchlist_scan and watchlist is not None and face_detector is not None
+        self.scan_every_frames = max(1, scan_every_frames)
+        self.watchlist_cooldown_seconds = watchlist_cooldown_seconds
+        self._last_watchlist_alert: dict[str, float] = {}
+        self._frame_counter = 0
         self._alarm_until = 0.0
         # Unannotated views of the most recent frame, for the panic button.
         self.latest_views: dict[str, np.ndarray] | None = None
@@ -138,41 +187,88 @@ class FrameProcessor:
         self.latest_views = views
 
         detections = self.weapon_detector.detect(views)
-        knife_observations = self.knife_confirmer.update(best_knife_per_view(detections), now=frame.timestamp)
+        candidates = best_knife_per_view(detections, alarm_labels=self.weapon_detector.alarm_labels)
+        knife_observations = self.knife_confirmer.update(candidates, now=frame.timestamp)
         knife_by_view = {obs.view: obs for obs in knife_observations}
+        self._frame_counter += 1
+
+        people_views = {name for name, dets in detections.items() if any(d.label == PERSON_LABEL for d in dets)}
+        pose_observations = self._update_pose(views, frame.timestamp, people_views)
+        pose_by_view = {obs.view: obs for obs in pose_observations}
 
         display = compose_grid(
             {
-                name: _draw_view(raw, name, detections[name], knife_by_view.get(name), multi_view)
+                name: _draw_view(
+                    raw, name, detections[name], knife_by_view.get(name), multi_view, pose_by_view.get(name)
+                )
                 for name, raw in views.items()
             }
         )
 
-        anomaly_fired = self._update_anomaly(views, multi_view)
+        anomaly_fired = self._update_anomaly(views, frame.video_time, people_views)
         fired_knives = [obs for obs in knife_observations if obs.alarm_fired]
-        if fired_knives or anomaly_fired is not None:
+        fired_poses = [obs for obs in pose_observations if obs.alarm_fired]
+        if fired_knives or anomaly_fired is not None or fired_poses:
             self._alarm_until = frame.timestamp + ALARM_BANNER_SECONDS
 
         self._draw_status(display, frame.timestamp)
 
-        if fired_knives or anomaly_fired is not None:
+        if fired_knives or anomaly_fired is not None or fired_poses:
             snapshot = _encode_jpeg(display)
             for obs in fired_knives:
                 self._emit_weapon(obs, views, snapshot, multi_view)
             if anomaly_fired is not None:
                 self._emit_anomaly(anomaly_fired, views, snapshot)
+            for obs in fired_poses:
+                self._emit_altercation(obs, views, snapshot, multi_view)
+
+        if self.watchlist_scan and self._frame_counter % self.scan_every_frames == 0:
+            self._scan_watchlist(views, display, frame.timestamp)
 
         return display
 
-    def _update_anomaly(self, views: dict[str, np.ndarray], multi_view: bool) -> AnomalyObservation | None:
-        """Feeds SlowFast; returns the observation only if it fired an alarm."""
+    def _update_pose(
+        self, views: dict[str, np.ndarray], now: float, people_views: set[str]
+    ) -> list[PoseObservation]:
+        """Pose rules on the views with people in them (the weapon model
+        already found the persons, so empty views cost nothing)."""
+        if self.pose_estimator is None:
+            return []
+        poses = self.pose_estimator.estimate({name: views[name] for name in sorted(people_views)})
+        self.last_pose = self.pose_analyzer.update(now, poses)
+        return self.last_pose
+
+    def _scan_watchlist(self, views: dict[str, np.ndarray], display: np.ndarray, now: float) -> None:
+        """Looks for watchlisted faces on an ordinary frame; each new
+        suggestion becomes a WATCHLIST_MATCH for an officer to verify."""
+        assert self.face_detector is not None and self.watchlist is not None
+        if not self.watchlist.people:
+            return
+        crops = self.face_detector.crops(views)
+        if not crops:
+            return
+        snapshot: bytes | None = None
+        for crop, matches in zip(crops, self.watchlist.match_crops(views, crops)):
+            if not matches:
+                continue
+            top = matches[0]
+            last = self._last_watchlist_alert.get(top.entity_profile_id)
+            if last is not None and now - last < self.watchlist_cooldown_seconds:
+                continue
+            self._last_watchlist_alert[top.entity_profile_id] = now
+            if snapshot is None:
+                snapshot = _encode_jpeg(display)
+            self._emit_watchlist(top, crop, views, snapshot, multi_view=len(views) > 1)
+
+    def _update_anomaly(
+        self, views: dict[str, np.ndarray], video_time: float, people_views: set[str]
+    ) -> AnomalyObservation | None:
+        """Feeds SlowFast; returns the observation only if it fired an alarm.
+        The detector copies what it keeps from the clean views."""
         if self.anomaly_detector is None:
             return None
 
-        # Clean input: a fresh 2x2 composite of raw views (X3), or a copy
-        # of the single raw view.
-        clip_frame = compose_grid(views, cell_size=SLOWFAST_CELL_SIZE) if multi_view else next(iter(views.values())).copy()
-        result = self.anomaly_detector.update(clip_frame)
+        result = self.anomaly_detector.update(views, video_time, people_views)
         if result is None:
             return None
 
@@ -201,24 +297,74 @@ class FrameProcessor:
     ) -> None:
         where = f" in {obs.view} view" if multi_view else ""
         logger.warning(
-            "Confirmed knife%s conf=%.2f bbox=%s [%s]", where, obs.confidence, obs.bbox, obs.confirmation_method
+            "Confirmed %s%s conf=%.2f bbox=%s [%s]",
+            obs.label,
+            where,
+            obs.confidence,
+            obs.bbox,
+            obs.confirmation_method,
         )
         event = DetectionEvent(
             event_type="WEAPON_DETECTED",
             camera_id=self.camera_id,
             confidence=obs.confidence,
-            summary=f"Knife detected{where} — camera {self.camera_id}",
+            summary=f"{obs.label.capitalize()} detected{where} — camera {self.camera_id}",
             metadata={
                 "view": obs.view,
                 "bbox": list(obs.bbox),
+                "weaponClass": obs.label,
                 "confirmationMethod": obs.confirmation_method,
                 "streak": obs.streak,
-                "model": WEAPON_MODEL_NAME,
+                "model": self.weapon_detector.model_name,
             },
             snapshot_jpeg=snapshot,
             crop_jpeg=_encode_jpeg(crop_with_padding(views[obs.view], obs.bbox)),
         )
-        _attach_faces(event, self.face_detector, views)
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        self.emit(event)
+
+    def _emit_altercation(
+        self, obs: PoseObservation, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
+        where = f" in {obs.view} view" if multi_view else ""
+        what = "Possible fight" if obs.reason == "strike" else "Possible fall"
+        logger.warning("Confirmed %s%s [%d frames, %d people]", obs.reason, where, obs.hits, obs.people)
+        event = DetectionEvent(
+            event_type="ALTERCATION",
+            camera_id=self.camera_id,
+            confidence=min(1.0, obs.hits / self.pose_analyzer.window_frames),
+            summary=f"{what}{where} — camera {self.camera_id}",
+            metadata={
+                "view": obs.view,
+                "bbox": list(obs.bbox),
+                "reason": obs.reason,
+                "people": obs.people,
+                "framesWithSignal": obs.hits,
+                "model": self.pose_estimator.model_name if self.pose_estimator else None,
+                "modelStatus": "experimental",
+            },
+            snapshot_jpeg=snapshot,
+            crop_jpeg=_encode_jpeg(crop_with_padding(views[obs.view], obs.bbox)),
+        )
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        self.emit(event)
+
+    def _emit_watchlist(
+        self, match, crop: FaceCrop, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
+        who = match.display_name or "a watchlisted person"
+        where = f" in {crop.view} view" if multi_view else ""
+        logger.warning("Possible watchlist match%s: %s (similarity %.2f)", where, match.entity_profile_id, match.similarity)
+        event = DetectionEvent(
+            event_type="WATCHLIST_MATCH",
+            camera_id=self.camera_id,
+            confidence=match.similarity,
+            summary=f"Possible match: {who}{where} — camera {self.camera_id} (verify)",
+            metadata={"view": crop.view},
+            snapshot_jpeg=snapshot,
+        )
+        # The matched face is face 1; its match list is all this event is about.
+        _set_faces(event, [crop], self.watchlist, views)
         self.emit(event)
 
     def _emit_anomaly(self, obs: AnomalyObservation, views: dict[str, np.ndarray], snapshot: bytes | None) -> None:
@@ -233,6 +379,7 @@ class FrameProcessor:
             metadata={
                 "streak": obs.streak,
                 "threshold": self.anomaly_confirmer.threshold,
+                **({"view": obs.view} if obs.view else {}),
                 "model": ANOMALY_MODEL_NAME,
                 # Model team: not calibrated for X3 footage. Surfaced in the
                 # UI so investigators weigh these alerts accordingly.
@@ -240,7 +387,7 @@ class FrameProcessor:
             },
             snapshot_jpeg=snapshot,
         )
-        _attach_faces(event, self.face_detector, views)
+        _attach_faces(event, self.face_detector, views, self.watchlist)
         self.emit(event)
 
 
@@ -281,6 +428,10 @@ class PipelineRunner:
         self._face_detector: FaceDetector | None = None
         self._face_unavailable: str | None = None
         self._face_loaded = False
+        # Also once: its gallery refreshes in the background across runs.
+        self._watchlist: WatchlistMatcher | None = None
+        self._watchlist_unavailable: str | None = None
+        self._pose_unavailable: str | None = None
         self._capture: FrameSource | None = None
         # Outlives individual runs so the publisher can keep draining it.
         self.events = EventQueue(maxsize=settings.event_queue_size)
@@ -302,7 +453,10 @@ class PipelineRunner:
                 "enabled": True,
                 "device": detector.device,
                 "threshold": processor.anomaly_confirmer.threshold,
+                "clip_seconds": detector.clip_seconds,
+                "view_mode": detector.view_mode,
                 "last_probability": round(last.probability, 4) if last else None,
+                "last_view": last.view if last else None,
                 "streak": processor.anomaly_confirmer.streak,
                 "event_active": processor.anomaly_confirmer.event_active,
                 "last_error": detector.last_error,
@@ -322,6 +476,22 @@ class PipelineRunner:
             "knife_streaks": dict(processor.knife_confirmer.streaks) if processor else {},
             "anomaly": anomaly,
             "faces": {"enabled": self._face_detector is not None, "reason": self._face_unavailable},
+            "watchlist": (
+                {"enabled": True, "scan": processor.watchlist_scan if processor else None, **self._watchlist.status()}
+                if self._watchlist is not None
+                else {"enabled": False, "reason": self._watchlist_unavailable}
+            ),
+            "pose": (
+                {
+                    "enabled": True,
+                    "recent": [
+                        {"view": o.view, "reason": o.reason, "hits": o.hits, "confirmed": o.confirmed}
+                        for o in processor.last_pose
+                    ],
+                }
+                if processor is not None and processor.pose_estimator is not None
+                else {"enabled": False, "reason": self._pose_unavailable}
+            ),
             "events": {
                 "queued": self.events.qsize(),
                 "dropped": self.events.dropped,
@@ -385,7 +555,7 @@ class PipelineRunner:
                 snapshot_jpeg=snapshot,
                 occurred_at=pressed_at,
             )
-            _attach_faces(event, self._face_detector, views)
+            _attach_faces(event, self._face_detector, views, self._watchlist)
             logger.warning("Panic button pressed — queued %s", event.event_id)
             self._record_event(event)
             self._last_panic = event
@@ -415,18 +585,38 @@ class PipelineRunner:
         try:
             weapon_detector = WeaponDetector()
             anomaly_detector, self._anomaly_unavailable = load_anomaly_detector()
+            pose_estimator, self._pose_unavailable = load_pose_estimator()
             if not self._face_loaded:
                 self._face_detector, self._face_unavailable = load_face_detector()
+                self._watchlist, self._watchlist_unavailable = load_watchlist_matcher(self._face_detector)
                 self._face_loaded = True
             self._processor = FrameProcessor(
-                weapon_detector, anomaly_detector, emit=self._record_event, face_detector=self._face_detector
+                weapon_detector,
+                anomaly_detector,
+                emit=self._record_event,
+                face_detector=self._face_detector,
+                pose_estimator=pose_estimator,
+                watchlist=self._watchlist,
             )
+
+            # With a timed clip window, SlowFast takes frames straight from a
+            # live camera at its own rate instead of the ~5 fps processed
+            # ones. A file's every frame reaches the pipeline anyway.
+            tap = None
+            if (
+                anomaly_detector is not None
+                and anomaly_detector.clip_seconds > 0
+                and is_live_source(settings.stream_source)
+            ):
+                anomaly_detector.attach_feed()
+                tap = anomaly_detector.feed
 
             with open_capture(
                 settings.stream_source,
                 loop=settings.stream_loop,
                 stop_event=stop_event,
                 panoramic=settings.stream_panoramic,
+                tap=tap,
             ) as capture:
                 self._capture = capture
                 last_frame_at = time.time()

@@ -19,6 +19,7 @@ import socket
 import struct
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import urlparse
@@ -48,6 +49,20 @@ class Frame:
     # True for a 360° equirectangular panorama (X3) that must be dewarped
     # into perspective views before detection — see pipeline/dewarp.py.
     panoramic: bool = False
+    # Position in the video (seconds) for file sources, which the pipeline
+    # reads slower than real time; None for live sources.
+    media_time: float | None = None
+
+    @property
+    def video_time(self) -> float:
+        """Seconds on the video's own clock: media_time for files, the
+        capture time for live sources."""
+        return self.media_time if self.media_time is not None else self.timestamp
+
+
+# Called on the capture thread for every frame a live source delivers,
+# including the ones the pipeline skips (see open_capture's `tap`).
+FrameTap = Callable[[Frame], None]
 
 
 class FrameSource(Protocol):
@@ -103,6 +118,8 @@ class StreamCapture:
         self._last_returned_index = -1
         self._frame_ready = threading.Condition()
         self._grabber: threading.Thread | None = None
+        # Live sources only: sees every grabbed frame (open_capture's `tap`).
+        self.on_frame: FrameTap | None = None
 
     def open(self) -> None:
         if self.source.startswith(("rtsp://", "rtsps://")):
@@ -157,6 +174,8 @@ class StreamCapture:
             frame = self._read_next()
             if frame is None:
                 break
+            if self.on_frame is not None:
+                _call_tap(self.on_frame, frame)
             with self._frame_ready:
                 self._latest = frame
                 self._frame_ready.notify_all()
@@ -191,7 +210,14 @@ class StreamCapture:
             break
 
         self.last_error = None
-        frame = Frame(image=image, frame_index=self._frame_index, timestamp=time.time(), panoramic=self.panoramic)
+        media_time = None if self._is_network else self._cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+        frame = Frame(
+            image=image,
+            frame_index=self._frame_index,
+            timestamp=time.time(),
+            panoramic=self.panoramic,
+            media_time=media_time,
+        )
         self._frame_index += 1
         return frame
 
@@ -323,16 +349,107 @@ class X3TcpCapture:
         self.close()
 
 
+def _call_tap(tap: FrameTap, frame: Frame) -> None:
+    try:
+        tap(frame)
+    except Exception:  # noqa: BLE001 — a failing tap must not stop capture
+        logger.exception("Frame tap failed")
+
+
+class LatestFrameReader:
+    """Reads another source on a background thread. read() returns the
+    newest frame (skipping any the pipeline was too slow for) and `on_frame`
+    sees every frame. Used to tap the X3 feed, which otherwise is only read
+    as fast as the pipeline processes.
+    """
+
+    def __init__(self, inner: FrameSource, on_frame: FrameTap | None = None):
+        self._inner = inner
+        self.on_frame = on_frame
+        self._latest: Frame | None = None
+        self._last_returned_index = -1
+        self._error: BaseException | None = None
+        self._done = False
+        self._ready = threading.Condition()
+        self._thread: threading.Thread | None = None
+        self._stop_event: threading.Event = getattr(inner, "stop_event", threading.Event())
+
+    @property
+    def last_error(self) -> str | None:
+        return self._inner.last_error
+
+    def open(self) -> None:
+        self._inner.open()
+
+    def close(self) -> None:
+        self._inner.close()
+
+    def _loop(self) -> None:
+        try:
+            while not self._stop_event.is_set():
+                frame = self._inner.read()
+                if frame is None:
+                    break
+                if self.on_frame is not None:
+                    _call_tap(self.on_frame, frame)
+                with self._ready:
+                    self._latest = frame
+                    self._ready.notify_all()
+        except BaseException as exc:  # noqa: BLE001 — re-raised from read() on the pipeline thread
+            self._error = exc
+        finally:
+            with self._ready:
+                self._done = True
+                self._ready.notify_all()
+
+    def read(self) -> Frame | None:
+        with self._ready:
+            while True:
+                latest = self._latest
+                if latest is not None and latest.frame_index > self._last_returned_index:
+                    self._last_returned_index = latest.frame_index
+                    return latest
+                if self._error is not None:
+                    raise self._error
+                if self._done or self._stop_event.is_set():
+                    return None
+                self._ready.wait(timeout=0.5)
+
+    def __enter__(self) -> "LatestFrameReader":
+        self._inner.__enter__()
+        self._thread = threading.Thread(target=self._loop, name="capture-reader", daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=3)
+            self._thread = None
+        self._inner.__exit__(*exc_info)
+
+
+def is_live_source(source: str) -> bool:
+    """X3, network cameras and webcams; False for a video file."""
+    return source.startswith(f"{X3_SCHEME}://") or _is_network(source) or _is_device(source)
+
+
 def open_capture(
     source: str,
     *,
     loop: bool = True,
     stop_event: threading.Event | None = None,
     panoramic: bool = False,
+    tap: FrameTap | None = None,
 ) -> FrameSource:
     """Picks the capture implementation from the source's scheme.
     `panoramic` marks a webcam/network/file source as a 2:1 equirectangular
-    360° image (e.g. an X3 in USB webcam mode) so it's split into 4 views."""
+    360° image (e.g. an X3 in USB webcam mode) so it's split into 4 views.
+    `tap` is called with every frame a live source delivers (ignored for
+    files, whose every frame reaches the pipeline anyway)."""
     if source.startswith(f"{X3_SCHEME}://"):
-        return X3TcpCapture.from_url(source, stop_event=stop_event)
-    return StreamCapture(source, loop=loop, stop_event=stop_event, panoramic=panoramic)
+        x3 = X3TcpCapture.from_url(source, stop_event=stop_event)
+        return LatestFrameReader(x3, on_frame=tap) if tap is not None else x3
+    capture = StreamCapture(source, loop=loop, stop_event=stop_event, panoramic=panoramic)
+    capture.on_frame = tap
+    return capture
