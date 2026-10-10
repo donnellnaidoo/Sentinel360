@@ -1,0 +1,31 @@
+{
+  "clips": [
+    {
+      "file": "clips/knife_front_01.mp4",
+      "panoramic": true,
+      "notes": "Kitchen knife drawn at the counter, Front view, good light",
+      "events": [{ "type": "WEAPON_DETECTED", "start": 7.0, "end": 13.5 }]
+    },
+    {
+      "file": "clips/phone_in_hand_01.mp4",
+      "panoramic": true,
+      "notes": "Hard negative: phone held like a knife, no weapon",
+      "events": []
+    },
+    {
+      "file": "clips/scuffle_rear_01.mp4",
+      "panoramic": true,
+      "notes": "Staged push and shove, Rear view",
+      "events": [
+        { "type": "ALTERCATION", "start": 4.0, "end": 9.0 },
+        { "type": "ANOMALY_DETECTED", "start": 4.0, "end": 9.0 }
+      ]
+    },
+    {
+      "file": "clips/normal_corridor_01.mp4",
+      "panoramic": true,
+      "notes": "Five minutes of people walking past — false alarm baseline and SlowFast calibration",
+      "events": []
+    }
+  ]
+}

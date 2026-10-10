@@ -1,8 +1,8 @@
 # apps/ai — Sentinel360 CCTV AI pipeline (demo scope)
 
-Single-stream, CPU-only computer vision pipeline: person/vehicle detection +
-tracking, face recognition against a watchlist, ALPR, and weapon/altercation
-"crime" triggers. On a trigger it posts a structured event to the existing
+Single-stream computer vision pipeline: weapon detection, SlowFast anomaly
+detection, face crops on every docket, plus opt-in pose-based altercation
+detection and watchlist face matching. On a trigger it posts a structured event to the existing
 Node backend (`POST /internal/ai/events`), which creates the incident, opens
 a case (docket), and raises an alert in the normal Sentinel360 tables — see
 `packages/api/src/services/ai-ingest.ts`.
@@ -25,12 +25,6 @@ uv sync                 # or: bun run setup (from repo root: bun run --filter ai
 ```
 
 Download model weights into `models/` (gitignored — not committed):
-
-```bash
-# Ultralytics auto-downloads YOLO11n on first run if models/yolo11n.pt is
-# missing, but pre-fetching keeps first-run latency out of a live demo:
-uv run python -c "from ultralytics import YOLO; YOLO('yolo11n.pt').save('models/yolo11n.pt')"
-```
 
 Weapon + anomaly models come from the model team's handoff
 (`sentinal360-AI-model_Integration.zip`, `py-weight/`) — copy them into
@@ -55,6 +49,16 @@ curl -L -o models/face_detection_yunet_2023mar.onnx \
 Without it the pipeline still runs; events just carry no face crops
 (`/stream/status` -> `faces.reason` says why).
 
+Optional models, only needed if you switch the matching stage on:
+
+```bash
+# Watchlist face matching (FACE_RECOGNITION_ENABLED), ~37 MB
+curl -L -o models/face_recognition_sface_2021dec.onnx \
+  https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx
+# Pose-based altercation detection (POSE_ENABLED), ~6 MB
+uv run python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt').save('models/yolo11n-pose.pt')" && rm -f yolo11n-pose.pt
+```
+
 ### Face crops
 
 When an event fires (knife, anomaly or panic button), YuNet runs on the clean
@@ -69,8 +73,48 @@ personal information under POPIA), so set `FACE_ENABLED=false` where that
 isn't justified, and treat them under the same retention rules as other
 case evidence.
 
-Face recognition (watchlist matching) and ALPR (PaddleOCR mobile models) are
-added in later phases.
+ALPR (plate matching) is a later phase.
+
+## Improving accuracy
+
+Measure first, then change one thing at a time — see `eval/README.md`:
+
+1. **Measure.** Record labelled clips (`scripts/record_clip.py`), then
+   `scripts/evaluate.py run` reports recall, precision, false alarms per
+   hour and time to detect; `sweep` finds the alarm settings that would
+   have done best; `calibrate` sets the SlowFast threshold from normal
+   footage.
+2. **Fine-tune the weapon model.** `scripts/export_frames.py` turns your
+   clips into the views the detector sees, for labelling;
+   `scripts/train_weapon.py` fine-tunes YOLO11 on a public weapon dataset
+   plus those frames (knife, pistol, rifle) and prints the `.env` lines to
+   switch to it. The stock `yolov8n.pt` is never touched.
+3. **Switch on the optional rules** below if the evaluation says they help.
+
+Every option below is off (or at its original value) by default, so the
+pipeline behaves exactly as before until you set it.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `WEAPON_ALARM_LABELS` | `["knife"]` | Classes that raise a weapon alarm (JSON list). A fine-tuned model adds e.g. `"pistol"`. |
+| `WEAPON_PERSON_MODEL_PATH` | empty | COCO model for person boxes when the weapon model has no person class (e.g. `models/yolov8n.pt`). |
+| `WEAPON_REQUIRE_PERSON` | `false` | Only alarm on a weapon near a person — knives lying on a counter don't fire. |
+| `KNIFE_WINDOW_FRAMES` | `3` | Alarm when the weapon is in `KNIFE_CONSECUTIVE_REQUIRED` of the last N frames. `5` lets one missed frame through. |
+| `DETECT_INPUT_SIZE` | `640` | YOLO input size. `960` finds smaller knives, ~2x slower. |
+| `ANOMALY_CLIP_SECONDS` | `0` | SlowFast clip length in real seconds. `0` = last 32 processed frames (~6.4 s at 5 fps, vs ~1 s in training). `1.5` takes frames straight from the camera at its own rate. |
+| `ANOMALY_VIEW_MODE` | `composite` | `per_view` scores each X3 view at full 224 px instead of four views squashed into one (~3x slower; it just scores less often); `per_view_people` only views with someone in them. |
+| `POSE_ENABLED` | `false` | YOLO11n-pose + rules (fast strikes between people close together, falls) raise `ALTERCATION`. Experimental. |
+| `FACE_RECOGNITION_ENABLED` | `false` | Match faces on each event against wanted persons' photos (fetched from the backend). Matches are suggestions for an officer to verify. |
+| `FACE_WATCHLIST_SCAN` | `false` | Also check every 5th frame for watchlisted faces and raise `WATCHLIST_MATCH` (once per person per 5 min). |
+
+### Watchlist matching and POPIA
+
+Face matching is biometric processing of special personal information.
+Only switch it on where there is a lawful basis, and treat every match as a
+lead: the backend records it as an `entity_match` suggestion and the alert
+says an officer must verify the identity — nothing is linked or acted on
+automatically. The gallery is `GET /internal/ai/watchlist`: active wanted
+persons with a photo, refreshed every 5 minutes.
 
 ## Configuration
 
@@ -99,7 +143,8 @@ cd apps/ai && uv run uvicorn app.main:app --reload --port 8001
 - `GET /stream/mjpeg` — live preview: person/knife boxes, 2x2 Front/Right/Left/Rear
   grid for X3, anomaly score, red border while an alarm is active
 - `GET /stream/status` — fps, per-view knife streaks, SlowFast state
-  (device, last probability, streak), queued/dropped/recent events
+  (device, clip mode, last probability, streak), pose and watchlist state,
+  queued/dropped/recent events
 
 Confirmed detections (knife: 3 consecutive frames in one view or ≥0.85;
 anomaly: 3 consecutive fresh SlowFast results ≥0.60) become events with an
