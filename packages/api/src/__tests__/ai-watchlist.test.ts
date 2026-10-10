@@ -25,14 +25,16 @@ function fakeSelect(rows: Map<unknown, Row[]>) {
 describe("listAiWatchlist", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns photographed wanted persons with their newest active priority", async () => {
+  it("returns wanted profiles with a photo or plates, with their newest active priority", async () => {
     fakeSelect(
       new Map<unknown, Row[]>([
         [
           entityProfile,
           [
-            { id: "p1", displayName: "One", photoUrl: "https://x/p1.jpg" },
-            { id: "p2", displayName: null, photoUrl: "https://x/p2.jpg" },
+            { id: "p1", displayName: "One", photoUrl: "https://x/p1.jpg", knownPlateNumbers: [] },
+            { id: "p2", displayName: null, photoUrl: "https://x/p2.jpg", knownPlateNumbers: null },
+            { id: "v1", displayName: "Getaway car", photoUrl: null, knownPlateNumbers: [" CA 123-456 ", "", 7] },
+            { id: "n1", displayName: "Nothing to match", photoUrl: null, knownPlateNumbers: [] },
           ],
         ],
         [
@@ -47,8 +49,9 @@ describe("listAiWatchlist", () => {
     );
 
     expect(await listAiWatchlist()).toEqual([
-      { entityProfileId: "p1", displayName: "One", photoUrl: "https://x/p1.jpg", priorityLevel: "CRITICAL" },
-      { entityProfileId: "p2", displayName: null, photoUrl: "https://x/p2.jpg", priorityLevel: null },
+      { entityProfileId: "p1", displayName: "One", photoUrl: "https://x/p1.jpg", plates: [], priorityLevel: "CRITICAL" },
+      { entityProfileId: "p2", displayName: null, photoUrl: "https://x/p2.jpg", plates: [], priorityLevel: null },
+      { entityProfileId: "v1", displayName: "Getaway car", photoUrl: null, plates: ["CA 123-456"], priorityLevel: null },
     ]);
   });
 

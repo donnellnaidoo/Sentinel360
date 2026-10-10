@@ -128,6 +128,29 @@ class Settings(BaseSettings):
     # One WATCHLIST_MATCH per person per this many seconds.
     watchlist_match_cooldown_seconds: float = 300.0
 
+    # Licence plate recognition against the watchlist (pipeline/plates.py).
+    # OFF by default. Only plates matching a wanted profile's
+    # knownPlateNumbers are kept (as PLATE_MATCH suggestions for an officer
+    # to verify); every other reading is discarded at once (POPIA).
+    alpr_enabled: bool = False
+    alpr_detector_model: str = "yolo-v9-t-384-license-plate-end2end"
+    alpr_ocr_model: str = "cct-xs-v2-global-model"
+    alpr_detector_confidence: float = 0.4
+    # Mean per-character OCR confidence a reading needs to count.
+    alpr_min_confidence: float = 0.7
+    # Read plates every N processed frames (5 fps / 2 = 2.5 reads a second).
+    alpr_every_frames: int = 2
+    # A wanted plate must be read this many times within the window, so
+    # one misread can't raise an alert.
+    alpr_reads_required: int = 2
+    alpr_confirm_window_seconds: float = 10.0
+    # One PLATE_MATCH per plate per this many seconds.
+    alpr_match_cooldown_seconds: float = 300.0
+    alpr_max_vehicles_per_view: int = 3
+    # Also read plates on views with no detected vehicle — e.g. a printed
+    # plate held up for a demo, or a car too close to be recognised.
+    alpr_scan_full_view: bool = False
+
     # Pose-based altercation detection (pipeline/pose.py). EXPERIMENTAL,
     # off by default. Rules on YOLO11n-pose keypoints: fast arm movement
     # by people close together, or a fall.

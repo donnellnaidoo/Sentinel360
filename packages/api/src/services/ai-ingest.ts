@@ -13,8 +13,8 @@ import { recordWatchlistSuggestions } from "./ai-watchlist";
 import { EVIDENCE_ENTITY_TYPE, recordCustodyEvent, sha256Hex } from "./chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "./evidence-storage";
 
-// Event types the apps/ai CCTV pipeline can report. PLATE_MATCH is declared
-// now so the payload shape doesn't need to change once ALPR lands.
+// Event types the apps/ai CCTV pipeline can report. PLATE_MATCH is a
+// watchlisted licence plate read by apps/ai plates.py (opt-in).
 // WATCHLIST_MATCH and metadata.watchlistMatches on any event are face-match
 // SUGGESTIONS (apps/ai watchlist.py, opt-in) — stored as entity_match rows
 // for an officer to verify, never treated as an identification.
@@ -311,6 +311,9 @@ async function attachAiEvidence(
 function describeEvent(input: AiEventInput): string {
   if (input.eventType === "PANIC_BUTTON") {
     return `Panic button pressed at camera ${input.cameraId}. The camera view at the moment of the press is attached as evidence.`;
+  }
+  if (input.eventType === "PLATE_MATCH") {
+    return `Possible watchlisted licence plate on camera ${input.cameraId} (read with ${(input.confidence * 100).toFixed(0)}% confidence). This is an automated suggestion: an officer must check the plate and vehicle against the close-up before any action is taken.`;
   }
   if (input.eventType === "WATCHLIST_MATCH") {
     return `Possible watchlist match on camera ${input.cameraId} (face similarity ${(input.confidence * 100).toFixed(0)}%). This is an automated suggestion: an officer must verify the identity before any action is taken.`;

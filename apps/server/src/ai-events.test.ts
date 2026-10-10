@@ -210,7 +210,8 @@ describe("GET /internal/ai/watchlist", () => {
   beforeEach(() => {
     listAiWatchlist.mockClear();
     watchlistItems = [
-      { entityProfileId: "p1", displayName: "One", photoUrl: "https://x/p1.jpg", priorityLevel: "HIGH" },
+      { entityProfileId: "p1", displayName: "One", photoUrl: "https://x/p1.jpg", plates: [], priorityLevel: "HIGH" },
+      { entityProfileId: "v1", displayName: "Car", photoUrl: null, plates: ["CA 123-456"], priorityLevel: null },
     ];
   });
 

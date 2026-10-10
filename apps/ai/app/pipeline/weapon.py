@@ -82,6 +82,9 @@ class WeaponDetector:
     (weapon_person_model_path), and a second ready-made model can add the
     classes the main one lacks (weapon_extra_model_path, e.g. guns). Labels
     from the extra model are lower-cased ("Gun" -> "gun").
+
+    `context_labels` are extra classes reported alongside persons but never
+    alarmed on — vehicles, for plate reading.
     """
 
     def __init__(
@@ -92,6 +95,7 @@ class WeaponDetector:
         person_model_path: str = settings.weapon_person_model_path,
         extra_model_path: str = settings.weapon_extra_model_path,
         extra_labels: list[str] | None = None,
+        context_labels: tuple[str, ...] = (),
     ):
         self._model = YOLO(model_path)
         self.device = resolve_device(device)
@@ -104,13 +108,16 @@ class WeaponDetector:
                 f"{model_path} has none of the alarm classes {sorted(wanted)} (it has: {sorted(names.values())})"
             )
 
+        # Persons (and context classes) come from the COCO person model if
+        # there is one, otherwise from the main model.
+        context = {PERSON_LABEL, *context_labels}
         self._person_model = YOLO(person_model_path) if person_model_path else None
         keep = set(self.alarm_labels)
         if self._person_model is None:
-            keep.add(PERSON_LABEL)
+            keep |= context
         self._class_ids = [class_id for class_id, name in names.items() if name in keep]
         self._person_class_ids = (
-            [class_id for class_id, name in self._person_model.names.items() if name == PERSON_LABEL]
+            [class_id for class_id, name in self._person_model.names.items() if name in context]
             if self._person_model is not None
             else []
         )

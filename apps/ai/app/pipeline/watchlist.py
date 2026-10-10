@@ -160,6 +160,8 @@ class WatchlistMatcher:
         people = []
         errors = []
         for item in items:
+            if not item.get("photoUrl"):
+                continue  # a plates-only entry (plates.py)
             key = (item["entityProfileId"], item["photoUrl"])
             if key not in self._embeddings:
                 try:

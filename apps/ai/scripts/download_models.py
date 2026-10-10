@@ -12,6 +12,8 @@ stays exactly as handed over.
   face_detection_yunet_2023mar.onnx  face crops on every docket
   face_recognition_sface_2021dec.onnx  watchlist matching (only used if FACE_RECOGNITION_ENABLED)
   yolo11n-pose.pt                    fight/fall rules (only used if POSE_ENABLED)
+  licence plate detector + reader    ALPR (only used if ALPR_ENABLED) — fetched by
+                                     fast-alpr into ~/.cache, then checksum-verified
 
 The SlowFast anomaly model (slowfast_ucfcrime_binary.pth) isn't public — it
 comes from the model team's handoff; see README.
@@ -63,6 +65,50 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+# fast-alpr downloads its models into ~/.cache itself (from the authors'
+# GitHub releases); these are the files it should end up with.
+ALPR_FILES: dict[str, str] = {
+    "open-image-models/yolo-v9-t-384-license-plate-end2end/yolo-v9-t-384-license-plates-end2end.onnx":
+        "888397b96d761c89db40bc9c305838e8652660f5e282c2cadebbe8d2951a77a8",
+    "fast-plate-ocr/cct-xs-v2-global-model/cct_xs_v2_global.onnx":
+        "8031afb5fdc6b4d80462c9d542f1284ebd2cfddf5dbacd62609848d7e2855f44",
+    "fast-plate-ocr/cct-xs-v2-global-model/cct_xs_v2_global_plate_config.yaml":
+        "0335c74a305173bb6f393efed0fde03cadeaa0b649ed8e19f431016d8232d0a6",
+}
+
+
+def prefetch_alpr() -> bool:
+    """Loads fast-alpr once so it downloads its models now rather than
+    during a demo, then checks they're the versions that were tested."""
+    sys.path.insert(0, str(MODELS_DIR.parent))
+    from app.config import settings
+    from app.pipeline.plates import PlateReader
+
+    import logging
+
+    for name in ("open_image_models", "fast_plate_ocr", "fast_alpr"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+    print("  ALPR      licence plate models ...", end="", flush=True)
+    try:
+        PlateReader(settings.alpr_detector_model, settings.alpr_ocr_model)
+    except Exception as exc:  # noqa: BLE001
+        print(f" failed: {exc}")
+        return False
+    if (settings.alpr_detector_model, settings.alpr_ocr_model) != (
+        "yolo-v9-t-384-license-plate-end2end",
+        "cct-xs-v2-global-model",
+    ):
+        print(" ready (custom models, not checksum-verified)")
+        return True
+    cache = Path.home() / ".cache"
+    bad = [name for name, expected in ALPR_FILES.items() if not (cache / name).is_file() or sha256(cache / name) != expected]
+    if bad:
+        print(f" checksum mismatch: {', '.join(bad)} — delete them and re-run")
+        return False
+    print(" ready")
+    return True
+
+
 def main() -> int:
     MODELS_DIR.mkdir(exist_ok=True)
     failed = []
@@ -93,6 +139,9 @@ def main() -> int:
             continue
         partial.replace(target)
         print(f" {target.stat().st_size / 1e6:.1f} MB")
+
+    if not prefetch_alpr():
+        failed.append("ALPR models")
 
     if failed:
         print(f"\nCould not install: {', '.join(failed)}")

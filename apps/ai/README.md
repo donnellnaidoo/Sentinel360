@@ -39,6 +39,7 @@ uv run python scripts/download_models.py
 | `models/face_detection_yunet_2023mar.onnx` | `app/pipeline/faces.py` — face crops attached to each docket |
 | `models/face_recognition_sface_2021dec.onnx` | `app/pipeline/watchlist.py` — only if `FACE_RECOGNITION_ENABLED` |
 | `models/yolo11n-pose.pt` | `app/pipeline/pose.py` — only if `POSE_ENABLED` |
+| plate detector + reader (in `~/.cache`) | `app/pipeline/plates.py` — only if `ALPR_ENABLED`. [fast-alpr](https://github.com/ankandrew/fast-alpr) (MIT); fetched and checksum-verified by the script |
 | `models/slowfast_ucfcrime_binary.pth` | SlowFast anomaly detection (experimental, uncalibrated for X3) — **not public**: copy it from the model team's handoff (`sentinal360-AI-model_Integration.zip`, `py-weight/`) |
 
 Any model that's missing is skipped and `/stream/status` says why
@@ -64,7 +65,6 @@ personal information under POPIA), so set `FACE_ENABLED=false` where that
 isn't justified, and treat them under the same retention rules as other
 case evidence.
 
-ALPR (plate matching) is a later phase.
 
 ## Improving accuracy
 
@@ -98,7 +98,30 @@ gun detection, which runs whenever `models/threat_yolov8n.pt` is present.
 | `ANOMALY_VIEW_MODE` | `composite` | `per_view` scores each X3 view at full 224 px instead of four views squashed into one (~3x slower; it just scores less often); `per_view_people` only views with someone in them. |
 | `POSE_ENABLED` | `false` | YOLO11n-pose + rules (fast strikes between people close together, falls) raise `ALTERCATION`. Experimental. |
 | `FACE_RECOGNITION_ENABLED` | `false` | Match faces on each event against wanted persons' photos (fetched from the backend). Matches are suggestions for an officer to verify. |
+| `ALPR_ENABLED` | `false` | Read licence plates on vehicles and raise `PLATE_MATCH` for plates on a wanted profile (`knownPlateNumbers`). See below. |
+| `ALPR_SCAN_FULL_VIEW` | `false` | Also read plates when no vehicle is detected — for a printed plate held up in a demo, or a car too close to be recognised. |
 | `FACE_WATCHLIST_SCAN` | `false` | Also check every 5th frame for watchlisted faces and raise `WATCHLIST_MATCH` (once per person per 5 min). |
+
+### Licence plates (ALPR)
+
+With `ALPR_ENABLED=true`, every 2nd processed frame the vehicles the weapon
+model finds (car, motorcycle, bus, truck) are cropped and their plates read
+by fast-alpr (~12 ms a plate on an M-series Mac). Readings are compared with
+the plates on active wanted profiles (`entity_profile.knownPlateNumbers`,
+via `GET /internal/ai/watchlist`, refreshed every 5 minutes). Spacing and
+punctuation are ignored and look-alike characters (O/0, I/1, B/8, S/5, ...)
+compare equal, so `CA 1O3-456` on a profile matches a reading of `CA103456`.
+
+A wanted plate must be read twice within 10 s before it raises
+`PLATE_MATCH` (once per plate per 5 minutes), with the snapshot and a
+close-up of the vehicle, for an officer to verify. **Every other reading is
+discarded on the spot** — it is never stored, logged or sent, and
+`/stream/status` only counts them. If no profile has a plate, no plates are
+read at all.
+
+Expect it to work on slow or parked vehicles a few metres from the camera.
+A 360° camera gives a distant plate too few pixels to read; for a gate or
+road, point a separate camera (`STREAM_SOURCE`, e.g. a phone) at it.
 
 ### Watchlist matching and POPIA
 

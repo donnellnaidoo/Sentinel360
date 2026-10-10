@@ -408,4 +408,29 @@ describe("ingestAiEvent", () => {
     expect(uploadEvidenceFile).not.toHaveBeenCalled();
     expect(result.evidenceIds).toEqual([]);
   });
+
+  it("records a plate match as a suggestion with a verify-first description", async () => {
+    const inserted = fakeDb();
+    const profileId = "55555555-5555-4555-8555-555555555555";
+
+    await ingestAiEvent(
+      event({
+        eventType: "PLATE_MATCH",
+        confidence: 0.93,
+        summary: "Possible plate match: CA 123-456 (Getaway car) — camera CAM-DEMO-1 (verify)",
+        metadata: {
+          plateRead: "CA123456",
+          plateListed: "CA 123-456",
+          watchlistReview: "required",
+          watchlistMatches: [{ entityProfileId: profileId, similarity: 0.93, plate: "CA 123-456" }],
+        },
+      }),
+    );
+
+    expect(inserted.get(entityMatch)).toEqual([
+      { entityProfileId: profileId, sourceEntityType: "INCIDENT", sourceEntityId: "incident-1", similarityScore: "0.9300" },
+    ]);
+    expect(inserted.get(incident)?.[0]).toMatchObject({ severity: "MEDIUM", incidentType: "PLATE_MATCH" });
+    expect(String(inserted.get(incident)?.[0]?.description)).toContain("check the plate and vehicle");
+  });
 });

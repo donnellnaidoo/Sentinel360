@@ -30,6 +30,7 @@ from app.pipeline.capture import Frame, FrameSource, is_live_source, open_captur
 from app.pipeline.dewarp import ViewSplitter, compose_grid, view_point_to_direction
 from app.pipeline.events import DetectionEvent, EventQueue
 from app.pipeline.faces import YUNET_MODEL_NAME, FaceCrop, FaceDetector, load_face_detector
+from app.pipeline.plates import VEHICLE_LABELS, PlateConfirmer, PlateMatch, PlateReader, PlateWatchlist, load_alpr
 from app.pipeline.pose import AltercationAnalyzer, PoseEstimator, PoseObservation, load_pose_estimator
 from app.pipeline.watchlist import SFACE_MODEL_NAME, WatchlistMatcher, load_watchlist_matcher
 from app.pipeline.weapon import (
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 # BGR
 _PERSON_COLOR = (46, 204, 113)
+_VEHICLE_COLOR = (200, 160, 60)
 _KNIFE_COLOR = (0, 0, 255)
 _POSE_COLOR = (0, 140, 255)
 _NORMAL_COLOR = (0, 200, 0)
@@ -78,7 +80,13 @@ def _draw_view(
     annotated = raw.copy()
     for det in detections:
         x1, y1, x2, y2 = det.bbox
-        color = _PERSON_COLOR if det.label == PERSON_LABEL else _KNIFE_COLOR
+        color = (
+            _PERSON_COLOR
+            if det.label == PERSON_LABEL
+            else _VEHICLE_COLOR
+            if det.label in VEHICLE_LABELS
+            else _KNIFE_COLOR
+        )
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
         _label(annotated, f"{det.label} {det.confidence:.2f}", (x1, y1 - 4), color)
 
@@ -218,8 +226,15 @@ class FrameProcessor:
         watchlist_scan: bool = settings.face_watchlist_scan,
         scan_every_frames: int = settings.face_scan_every_frames,
         watchlist_cooldown_seconds: float = settings.watchlist_match_cooldown_seconds,
+        plate_reader: PlateReader | None = None,
+        plate_watchlist: PlateWatchlist | None = None,
+        alpr_every_frames: int = settings.alpr_every_frames,
     ):
         self.weapon_detector = weapon_detector
+        self.plate_reader = plate_reader
+        self.plate_watchlist = plate_watchlist
+        self.plate_confirmer = PlateConfirmer()
+        self.alpr_every_frames = max(1, alpr_every_frames)
         self.anomaly_detector = anomaly_detector
         self.face_detector = face_detector
         self.pose_estimator = pose_estimator
@@ -292,7 +307,35 @@ class FrameProcessor:
         if self.watchlist_scan and self._frame_counter % self.scan_every_frames == 0:
             self._scan_watchlist(views, display, frame.timestamp)
 
+        if self.plate_reader is not None and self._frame_counter % self.alpr_every_frames == 0:
+            self._read_plates(views, detections, display, frame.timestamp, multi_view)
+
         return display
+
+    def _read_plates(
+        self,
+        views: dict[str, np.ndarray],
+        detections: dict[str, list[ViewDetection]],
+        display: np.ndarray,
+        now: float,
+        multi_view: bool,
+    ) -> None:
+        """Reads plates on the vehicles in view; a wanted plate read often
+        enough becomes a PLATE_MATCH. Other readings go no further than
+        this function (POPIA)."""
+        assert self.plate_reader is not None
+        wanted = self.plate_watchlist.plates if self.plate_watchlist is not None else {}
+        if not wanted:
+            return  # nothing to match against, so don't read anyone's plate
+        vehicles = {
+            view: [d.bbox for d in dets if d.label in VEHICLE_LABELS] for view, dets in detections.items()
+        }
+        reads = self.plate_reader.read_views(views, vehicles)
+        matches = self.plate_confirmer.update(now, reads, wanted)
+        if matches:
+            snapshot = _encode_evidence(display)
+            for match in matches:
+                self._emit_plate(match, views, snapshot, multi_view)
 
     def _frame_panorama(self) -> bytes | None:
         if not self._panorama_encoded:
@@ -443,6 +486,44 @@ class FrameProcessor:
         _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
+    def _emit_plate(
+        self, match: PlateMatch, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
+        read, wanted = match.read, match.wanted
+        who = wanted.display_name or "a watchlisted vehicle"
+        where = f" in {read.view} view" if multi_view else ""
+        logger.warning(
+            "Possible plate match%s: %s (%s, %d reads, conf %.2f)",
+            where,
+            wanted.entity_profile_id,
+            read.text,
+            match.reads,
+            read.confidence,
+        )
+        # Close-up of the vehicle with its plate, or the plate itself.
+        crop_box = read.vehicle_bbox or read.bbox
+        event = DetectionEvent(
+            event_type="PLATE_MATCH",
+            camera_id=self.camera_id,
+            confidence=read.confidence,
+            summary=f"Possible plate match: {wanted.plate} ({who}){where} — camera {self.camera_id} (verify)",
+            metadata={
+                "view": read.view,
+                "bbox": list(read.bbox),
+                "plateRead": read.text,
+                "plateListed": wanted.plate,
+                "reads": match.reads,
+                "model": self.plate_reader.model_name if self.plate_reader else None,
+                "watchlistMatches": [match.describe()],
+                "watchlistReview": "required",
+            },
+            snapshot_jpeg=snapshot,
+            crop_jpeg=_encode_evidence(crop_with_padding(views[read.view], crop_box, padding=0.15)),
+        )
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
+        self.emit(event)
+
     def _emit_anomaly(self, obs: AnomalyObservation, views: dict[str, np.ndarray], snapshot: bytes | None) -> None:
         logger.warning(
             "Confirmed anomalous activity p=%.2f [%d-result persistence]", obs.probability, obs.streak
@@ -509,6 +590,11 @@ class PipelineRunner:
         self._watchlist: WatchlistMatcher | None = None
         self._watchlist_unavailable: str | None = None
         self._pose_unavailable: str | None = None
+        # ALPR: loaded once; its plate list refreshes in the background.
+        self._plate_reader: PlateReader | None = None
+        self._plate_watchlist: PlateWatchlist | None = None
+        self._alpr_unavailable: str | None = None
+        self._alpr_loaded = False
         self._capture: FrameSource | None = None
         # Outlives individual runs so the publisher can keep draining it.
         self.events = EventQueue(maxsize=settings.event_queue_size)
@@ -566,6 +652,17 @@ class PipelineRunner:
                 {"enabled": True, "scan": processor.watchlist_scan if processor else None, **self._watchlist.status()}
                 if self._watchlist is not None
                 else {"enabled": False, "reason": self._watchlist_unavailable}
+            ),
+            "alpr": (
+                {
+                    "enabled": True,
+                    "model": self._plate_reader.model_name,
+                    # A count only: readings that don't match are never kept.
+                    "plates_read": processor.plate_confirmer.reads_seen if processor else 0,
+                    **self._plate_watchlist.status(),
+                }
+                if self._plate_reader is not None and self._plate_watchlist is not None
+                else {"enabled": False, "reason": self._alpr_unavailable}
             ),
             "pose": (
                 {
@@ -672,7 +769,10 @@ class PipelineRunner:
         anomaly_detector: SlowFastAnomalyDetector | None = None
 
         try:
-            weapon_detector = WeaponDetector()
+            if not self._alpr_loaded:
+                self._plate_reader, self._plate_watchlist, self._alpr_unavailable = load_alpr()
+                self._alpr_loaded = True
+            weapon_detector = WeaponDetector(context_labels=VEHICLE_LABELS if self._plate_reader else ())
             anomaly_detector, self._anomaly_unavailable = load_anomaly_detector()
             pose_estimator, self._pose_unavailable = load_pose_estimator()
             if not self._face_loaded:
@@ -686,6 +786,8 @@ class PipelineRunner:
                 face_detector=self._face_detector,
                 pose_estimator=pose_estimator,
                 watchlist=self._watchlist,
+                plate_reader=self._plate_reader,
+                plate_watchlist=self._plate_watchlist,
             )
 
             # With a timed clip window, SlowFast takes frames straight from a
