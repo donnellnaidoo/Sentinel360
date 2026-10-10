@@ -24,3 +24,5 @@ eval/frames/
 eval/report*.json
 eval/labels.json
 runs/
+# Base weights Ultralytics downloads into the working directory (train_weapon.py)
+/*.pt
