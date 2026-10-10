@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useThemeColor } from "heroui-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppTheme } from "@/contexts/app-theme-context";
 import { UserLocationProvider } from "@/contexts/user-location-context";
@@ -8,8 +9,10 @@ import { UserLocationProvider } from "@/contexts/user-location-context";
 export default function TabLayout() {
   const themeColorForeground = useThemeColor("foreground");
   const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const active = colors.brand;
   const inactive = colors.textMuted;
+  const tabPaddingBottom = Math.max(insets.bottom, 10);
 
   return (
     <UserLocationProvider>
@@ -41,8 +44,8 @@ export default function TabLayout() {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 74,
-          paddingBottom: 10,
+          height: 64 + tabPaddingBottom,
+          paddingBottom: tabPaddingBottom,
           paddingTop: 10,
           paddingHorizontal: 10,
         },

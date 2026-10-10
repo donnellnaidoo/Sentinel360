@@ -25,21 +25,7 @@ function Header() {
         borderBottomColor: colors.border,
       }}
     >
-      <Pressable
-        onPress={() => {}}
-        style={({ pressed }) => ({
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <Ionicons name="menu" size={22} color={colors.brand} />
-      </Pressable>
-
-      <Text style={{ flex: 1, marginLeft: 10, fontSize: 20, fontWeight: "900", color: colors.brand }}>
+      <Text style={{ flex: 1, fontSize: 20, fontWeight: "900", color: colors.brand }}>
         Community Safety
       </Text>
     </View>
