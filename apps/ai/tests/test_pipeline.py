@@ -20,6 +20,7 @@ class FakeWeaponDetector:
 
     alarm_labels = ["knife"]
     model_name = "yolov8n-coco"
+    extra_unavailable = None
 
     def __init__(self, knife_view: str | None, confidence: float = 0.6):
         self.knife_view = knife_view

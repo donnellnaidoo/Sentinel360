@@ -24,40 +24,31 @@ cd apps/ai
 uv sync                 # or: bun run setup (from repo root: bun run --filter ai setup)
 ```
 
-Download model weights into `models/` (gitignored — not committed):
+Download the ready-made models into `models/` (gitignored — never commit
+them). One command, pinned versions, checksums verified, and it never
+replaces a file you already have:
 
-Weapon + anomaly models come from the model team's handoff
-(`sentinal360-AI-model_Integration.zip`, `py-weight/`) — copy them into
-`models/` (135 MB, never commit them):
+```bash
+uv run python scripts/download_models.py
+```
 
 | File | Used by |
 |---|---|
-| `models/yolov8n.pt` | `app/pipeline/weapon.py` — knife detection (stock COCO; no firearm class) |
-| `models/slowfast_ucfcrime_binary.pth` | SlowFast anomaly detection (experimental, uncalibrated for X3) |
+| `models/yolov8n.pt` | `app/pipeline/weapon.py` — knives + persons (stock COCO) |
+| `models/threat_yolov8n.pt` | `app/pipeline/weapon.py` — **guns**, via a public YOLOv8n threat model ([Subh775/Threat-Detection-YOLOv8n](https://huggingface.co/Subh775/Threat-Detection-YOLOv8n), MIT). Only its `Gun` class is used; knives stay with `yolov8n.pt`, which scored them better on X3 footage |
 | `models/face_detection_yunet_2023mar.onnx` | `app/pipeline/faces.py` — face crops attached to each docket |
+| `models/face_recognition_sface_2021dec.onnx` | `app/pipeline/watchlist.py` — only if `FACE_RECOGNITION_ENABLED` |
+| `models/yolo11n-pose.pt` | `app/pipeline/pose.py` — only if `POSE_ENABLED` |
+| `models/slowfast_ucfcrime_binary.pth` | SlowFast anomaly detection (experimental, uncalibrated for X3) — **not public**: copy it from the model team's handoff (`sentinal360-AI-model_Integration.zip`, `py-weight/`) |
+
+Any model that's missing is skipped and `/stream/status` says why
+(`weapons.extra_model_unavailable`, `faces.reason`, ...) — the rest of the
+pipeline still runs. The gun model adds ~50 ms per 4-view frame on an
+M-series Mac (X3: ~13 -> ~9 fps uncapped, still above `TARGET_FPS=5`); set
+`WEAPON_EXTRA_MODEL_PATH=` (empty) to run knives only.
 
 `pytorchvideo` is installed from git by `uv sync`, so SlowFast builds
 locally — no `torch.hub` GitHub fetch at runtime.
-
-The face model (230 KB) comes from OpenCV Zoo:
-
-```bash
-curl -L -o models/face_detection_yunet_2023mar.onnx \
-  https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
-```
-
-Without it the pipeline still runs; events just carry no face crops
-(`/stream/status` -> `faces.reason` says why).
-
-Optional models, only needed if you switch the matching stage on:
-
-```bash
-# Watchlist face matching (FACE_RECOGNITION_ENABLED), ~37 MB
-curl -L -o models/face_recognition_sface_2021dec.onnx \
-  https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx
-# Pose-based altercation detection (POSE_ENABLED), ~6 MB
-uv run python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt').save('models/yolo11n-pose.pt')" && rm -f yolo11n-pose.pt
-```
 
 ### Face crops
 
@@ -91,12 +82,14 @@ Measure first, then change one thing at a time — see `eval/README.md`:
    switch to it. The stock `yolov8n.pt` is never touched.
 3. **Switch on the optional rules** below if the evaluation says they help.
 
-Every option below is off (or at its original value) by default, so the
-pipeline behaves exactly as before until you set it.
+Every option below is off (or at its original value) by default, except
+gun detection, which runs whenever `models/threat_yolov8n.pt` is present.
 
 | Setting | Default | What it does |
 |---|---|---|
 | `WEAPON_ALARM_LABELS` | `["knife"]` | Classes that raise a weapon alarm (JSON list). A fine-tuned model adds e.g. `"pistol"`. |
+| `WEAPON_EXTRA_MODEL_PATH` | `models/threat_yolov8n.pt` | Second, ready-made model for classes the main one lacks (guns). Empty = knives only. |
+| `WEAPON_EXTRA_LABELS` | `["Gun"]` | Which of the extra model's classes raise alarms (reported lower-case, e.g. `gun`). |
 | `WEAPON_PERSON_MODEL_PATH` | empty | COCO model for person boxes when the weapon model has no person class (e.g. `models/yolov8n.pt`). |
 | `WEAPON_REQUIRE_PERSON` | `false` | Only alarm on a weapon near a person — knives lying on a counter don't fire. |
 | `KNIFE_WINDOW_FRAMES` | `3` | Alarm when the weapon is in `KNIFE_CONSECUTIVE_REQUIRED` of the last N frames. `5` lets one missed frame through. |

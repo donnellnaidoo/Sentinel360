@@ -474,6 +474,15 @@ class PipelineRunner:
             # pipeline keeps retrying rather than failing).
             "source_warning": self._capture.last_error if self._capture and self.is_running else None,
             "knife_streaks": dict(processor.knife_confirmer.streaks) if processor else {},
+            "weapons": (
+                {
+                    "model": processor.weapon_detector.model_name,
+                    "alarm_labels": processor.weapon_detector.alarm_labels,
+                    "extra_model_unavailable": processor.weapon_detector.extra_unavailable,
+                }
+                if processor
+                else None
+            ),
             "anomaly": anomaly,
             "faces": {"enabled": self._face_detector is not None, "reason": self._face_unavailable},
             "watchlist": (

@@ -21,6 +21,7 @@ its actual class in `label`.
 from __future__ import annotations
 
 import collections
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +30,8 @@ from ultralytics import YOLO
 
 from app.config import settings
 from app.pipeline.device import resolve_device
+
+logger = logging.getLogger(__name__)
 
 BBox = tuple[int, int, int, int]  # (x1, y1, x2, y2) in view pixel coordinates
 
@@ -76,7 +79,10 @@ class WeaponDetector:
     """Reports persons (for the overlay and the near-a-person rule) and the
     weapon_alarm_labels classes. A fine-tuned weapon model without a person
     class can be paired with a COCO model for persons
-    (weapon_person_model_path)."""
+    (weapon_person_model_path), and a second ready-made model can add the
+    classes the main one lacks (weapon_extra_model_path, e.g. guns). Labels
+    from the extra model are lower-cased ("Gun" -> "gun").
+    """
 
     def __init__(
         self,
@@ -84,6 +90,8 @@ class WeaponDetector:
         device: str = settings.weapon_device,
         alarm_labels: list[str] | None = None,
         person_model_path: str = settings.weapon_person_model_path,
+        extra_model_path: str = settings.weapon_extra_model_path,
+        extra_labels: list[str] | None = None,
     ):
         self._model = YOLO(model_path)
         self.device = resolve_device(device)
@@ -107,6 +115,37 @@ class WeaponDetector:
             else []
         )
 
+        self._extra_model: YOLO | None = None
+        self._extra_class_ids: list[int] = []
+        # Why the extra model isn't running (None when it is, or isn't configured).
+        self.extra_unavailable: str | None = None
+        if extra_model_path:
+            self._load_extra(extra_model_path, extra_labels if extra_labels is not None else settings.weapon_extra_labels)
+
+    def _load_extra(self, path: str, labels: list[str]) -> None:
+        """A missing or unsuitable extra model is logged and skipped: the
+        main model must keep working."""
+        if not Path(path).is_file():
+            self.extra_unavailable = f"{path} not found — run scripts/download_models.py"
+            logger.warning("Extra weapon model %s", self.extra_unavailable)
+            return
+        try:
+            model = YOLO(path)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to load extra weapon model %s", path)
+            self.extra_unavailable = f"failed to load: {exc}"
+            return
+        class_ids = [class_id for class_id, name in model.names.items() if name in labels]
+        if not class_ids:
+            self.extra_unavailable = f"{path} has none of {labels} (it has: {sorted(model.names.values())})"
+            logger.warning("Extra weapon model skipped: %s", self.extra_unavailable)
+            return
+        self._extra_model = model
+        self._extra_class_ids = class_ids
+        added = sorted({model.names[i].lower() for i in class_ids})
+        self.alarm_labels = sorted(set(self.alarm_labels) | set(added))
+        self.model_name = f"{self.model_name}+{Path(path).stem}"
+
     def _predict(self, model: YOLO, images: list[np.ndarray], class_ids: list[int]):
         return model.predict(
             images,
@@ -125,21 +164,24 @@ class WeaponDetector:
         images = [views[name] for name in names]
         detections: dict[str, list[ViewDetection]] = {name: [] for name in names}
 
-        passes = [(self._model, self._predict(self._model, images, self._class_ids))]
+        passes = [(self._model, self._predict(self._model, images, self._class_ids), False)]
         if self._person_model is not None:
-            passes.append((self._person_model, self._predict(self._person_model, images, self._person_class_ids)))
+            passes.append((self._person_model, self._predict(self._person_model, images, self._person_class_ids), False))
+        if self._extra_model is not None:
+            passes.append((self._extra_model, self._predict(self._extra_model, images, self._extra_class_ids), True))
 
-        for model, results in passes:
+        for model, results, lower in passes:
             for name, result in zip(names, results):
                 boxes = result.boxes
                 if boxes is None:
                     continue
                 for i in range(len(boxes)):
                     x1, y1, x2, y2 = (int(v) for v in boxes.xyxy[i].tolist())
+                    label = model.names[int(boxes.cls[i])]
                     detections[name].append(
                         ViewDetection(
                             view=name,
-                            label=model.names[int(boxes.cls[i])],
+                            label=label.lower() if lower else label,
                             confidence=float(boxes.conf[i]),
                             bbox=(x1, y1, x2, y2),
                         )

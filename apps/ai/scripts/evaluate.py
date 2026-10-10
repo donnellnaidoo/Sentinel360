@@ -43,6 +43,8 @@ CACHE_DIR = AI_ROOT / "eval" / "cache"
 MODEL_SETTINGS = (
     "weapon_model_path",
     "weapon_person_model_path",
+    "weapon_extra_model_path",
+    "weapon_extra_labels",
     "weapon_alarm_labels",
     "detect_input_size",
     "weapon_display_confidence",
@@ -72,7 +74,13 @@ def _apply_overrides(pairs: list[str]) -> None:
 
 def _cache_path(clip_file: Path, settings) -> Path:
     model_files = {}
-    for key in ("weapon_model_path", "weapon_person_model_path", "slowfast_model_path", "pose_model_path"):
+    for key in (
+        "weapon_model_path",
+        "weapon_person_model_path",
+        "weapon_extra_model_path",
+        "slowfast_model_path",
+        "pose_model_path",
+    ):
         path = AI_ROOT / getattr(settings, key) if getattr(settings, key) else None
         model_files[key] = path.stat().st_mtime if path is not None and path.is_file() else None
     stat = clip_file.stat()

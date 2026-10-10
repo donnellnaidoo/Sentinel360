@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Separate COCO model for person boxes, for a fine-tuned weapon model
     # that has no "person" class. Empty = use the weapon model's persons.
     weapon_person_model_path: str = ""
+    # A second, ready-made model for weapons the main one can't see. The
+    # default is a public YOLOv8n threat model that adds guns
+    # (scripts/download_models.py fetches it). Only its
+    # weapon_extra_labels classes are used — the main model stays in charge
+    # of knives, which it detects better on the X3. Empty path, or the file
+    # missing, = main model only (/stream/status says which).
+    weapon_extra_model_path: str = "models/threat_yolov8n.pt"
+    weapon_extra_labels: list[str] = ["Gun"]
     # auto = cuda > mps > cpu. On an M-series Mac, MPS runs the 4-view X3
     # batch ~2x faster than CPU (106 vs 224 ms) with identical detections.
     weapon_device: str = "auto"

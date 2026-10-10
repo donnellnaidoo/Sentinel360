@@ -159,3 +159,50 @@ def test_require_person_drops_weapons_away_from_people():
 
     ungated = best_knife_per_view({"Front": [on_counter, in_hand, person]}, min_confidence=0.45, alarm_labels=["knife"])
     assert ungated["Front"] == KnifeCandidate(0.7, on_counter.bbox, "knife")
+
+
+# --- extra (ready-made) weapon model -------------------------------------------
+
+from pathlib import Path
+
+import pytest
+
+from app.pipeline.weapon import WeaponDetector
+
+_STOCK = Path("models/yolov8n.pt")
+_THREAT = Path("models/threat_yolov8n.pt")
+
+
+@pytest.mark.skipif(not _STOCK.is_file(), reason="models/yolov8n.pt not downloaded")
+def test_missing_extra_model_leaves_the_main_model_running():
+    detector = WeaponDetector(str(_STOCK), "cpu", alarm_labels=["knife"], extra_model_path="models/does-not-exist.pt")
+    assert detector.alarm_labels == ["knife"]
+    assert "download_models.py" in detector.extra_unavailable
+    assert detector.detect({"Main": np.full((360, 480, 3), 90, np.uint8)}) == {"Main": []}
+
+
+@pytest.mark.skipif(not (_STOCK.is_file() and _THREAT.is_file()), reason="run scripts/download_models.py")
+def test_extra_model_adds_guns_and_only_guns():
+    detector = WeaponDetector(
+        str(_STOCK), "cpu", alarm_labels=["knife"], extra_model_path=str(_THREAT), extra_labels=["Gun"]
+    )
+    assert detector.extra_unavailable is None
+    assert detector.alarm_labels == ["gun", "knife"]
+    assert detector.model_name == "yolov8n-coco+threat_yolov8n"
+
+    import cv2
+
+    # The X3 knife: still reported by the main model, and the threat model's
+    # own (weaker) knife class isn't used.
+    knife = cv2.imread("samples/knife_crop.jpg")
+    labels = {d.label for d in detector.detect({"Main": knife})["Main"]}
+    assert "knife" in labels and "Knife" not in labels
+
+
+@pytest.mark.skipif(not (_STOCK.is_file() and _THREAT.is_file()), reason="run scripts/download_models.py")
+def test_extra_model_without_the_wanted_class_is_skipped():
+    detector = WeaponDetector(
+        str(_STOCK), "cpu", alarm_labels=["knife"], extra_model_path=str(_THREAT), extra_labels=["Bazooka"]
+    )
+    assert "has none of" in detector.extra_unavailable
+    assert detector.alarm_labels == ["knife"]
