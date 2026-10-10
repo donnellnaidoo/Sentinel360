@@ -25,7 +25,13 @@ vi.mock("../services/evidence-storage", () => ({
   deleteEvidenceFile: vi.fn(),
 }));
 
-import { ingestAiEvent, MAX_AI_FACE_BYTES, MAX_AI_MEDIA_BYTES, type AiEventInput } from "../services/ai-ingest";
+import {
+  ingestAiEvent,
+  MAX_AI_FACE_BYTES,
+  MAX_AI_MEDIA_BYTES,
+  MAX_AI_PANORAMA_BYTES,
+  type AiEventInput,
+} from "../services/ai-ingest";
 import { insertCaseWithGeneratedNumber } from "../services/case-number";
 import { recordCustodyEvent } from "../services/chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "../services/evidence-storage";
@@ -366,5 +372,40 @@ describe("ingestAiEvent", () => {
     );
     expect(result.alert).not.toBeNull();
     expect(result.duplicate).toBe(false);
+  });
+
+  it("stores a 360° panorama as its own evidence item, allowing it more bytes than a snapshot", async () => {
+    const inserted = fakeDb();
+    const panorama = Buffer.alloc(MAX_AI_MEDIA_BYTES + 1, 1).toString("base64");
+
+    const result = await ingestAiEvent(
+      event({
+        metadata: { view: "Rear", panoramaTarget: { yaw: 170, pitch: 5 } },
+        media: [
+          { kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: JPEG },
+          { kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: panorama },
+        ],
+      }),
+    );
+
+    expect(result.evidenceIds).toEqual(["media-1", "media-2"]);
+    expect((inserted.get(mediaAsset) ?? [])[1]).toMatchObject({
+      title: "AI 360° panorama — weapon detected",
+      originalFilename: "CAM-DEMO-1-weapon_detected-panorama.jpg",
+      metadata: expect.objectContaining({ kind: "PANORAMA", panoramaTarget: { yaw: 170, pitch: 5 } }),
+    });
+  });
+
+  it("rejects a panorama over its cap before it reaches storage", async () => {
+    fakeDb();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const oversize = Buffer.alloc(MAX_AI_PANORAMA_BYTES + 1).toString("base64");
+
+    const result = await ingestAiEvent(
+      event({ media: [{ kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: oversize }] }),
+    );
+
+    expect(uploadEvidenceFile).not.toHaveBeenCalled();
+    expect(result.evidenceIds).toEqual([]);
   });
 });

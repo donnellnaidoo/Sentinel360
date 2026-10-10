@@ -122,6 +122,8 @@
         "@Sentinel360/api": "workspace:*",
         "@Sentinel360/env": "workspace:*",
         "@Sentinel360/ui": "workspace:*",
+        "@photo-sphere-viewer/core": "5.15.1",
+        "@photo-sphere-viewer/markers-plugin": "5.15.1",
         "@supabase/ssr": "^0.12.0",
         "@supabase/supabase-js": "^2.105.1",
         "@tanstack/react-form": "catalog:",
@@ -137,6 +139,7 @@
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
         "sonner": "catalog:",
+        "three": "0.185.1",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -774,6 +777,10 @@
     "@open-draft/until": ["@open-draft/until@2.1.0", "", {}, "sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.149.0", "", {}, "sha512-Efcc+iF0j3Bf67YjEqIqWXbX5XddXoK/Mw4K1/JuXwRCZ8N16VR7iT23nlCc9XrveFVh/E5Rqs2StT0V8v9LdA=="],
+
+    "@photo-sphere-viewer/core": ["@photo-sphere-viewer/core@5.15.1", "", { "dependencies": { "three": "^0.185.1" } }, "sha512-nhJviczUB1xiAT/I7mGba9iDIw7DvsiK34hbR9t7kIrg9MySG33uA+a4QUk2dEOP5PjcKMj58wod8I/dQ7ePiw=="],
+
+    "@photo-sphere-viewer/markers-plugin": ["@photo-sphere-viewer/markers-plugin@5.15.1", "", { "peerDependencies": { "@photo-sphere-viewer/core": "5.15.1" } }, "sha512-57WiHy8fcQfwid9x07ADiQJGxzcFxclbR2yIqeggzfPDguwJlCKwX5tj8brTRqwouUiHpkb80QWxHByxt45LcA=="],
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
@@ -2240,6 +2247,8 @@
     "terser": ["terser@5.51.2", "", { "dependencies": { "@jridgewell/source-map": "^0.3.3", "acorn": "^8.15.0", "commander": "^2.20.0", "source-map-support": "~0.5.20" }, "bin": { "terser": "bin/terser" } }, "sha512-bWnjSNscmuI+GJze6ZupnHP8G/cTcsJF+bXCeQknk2SHQsgbNJnLrqiH9jZ2W4STPVXH2mDKKRX3iwPhc9Cn/Q=="],
 
     "test-exclude": ["test-exclude@6.0.0", "", { "dependencies": { "@istanbuljs/schema": "^0.1.2", "glob": "^7.1.4", "minimatch": "^3.0.4" } }, "sha512-cAGWPIyOHU6zlmg88jwm7VRyXnMN7iV68OGAbYDk/Mh/xC/pzVPlQtY6ngoIH/5/tciuhGfvESU8GrHrcxD56w=="],
+
+    "three": ["three@0.185.1", "", {}, "sha512-5aojFCXKwnjBRZvUnt3WFfEcvUJgkN5LlijRFN95hMy8WVkG4I0QNcJE+OuWvuJ0bOdStrbfXn0pkd6/QyiAlg=="],
 
     "throat": ["throat@5.0.0", "", {}, "sha512-fcwX4mndzpLQKBS1DVYhGAcYaYt7vsHNIvQV+WXMvnow5cgjPphq5CaayLaGsjRdSCKZFNGt7/GYAuXaNOiYCA=="],
 

@@ -9,7 +9,7 @@ from app.pipeline.anomaly import AnomalyResult, clip_frame
 from app.pipeline.capture import Frame
 from app.pipeline.events import DetectionEvent
 from app.pipeline.faces import FaceCrop
-from app.pipeline.pipeline import FrameProcessor
+from app.pipeline.pipeline import FrameProcessor, _encode_panorama
 from app.pipeline.weapon import ViewDetection
 
 KNIFE_BOX = (100, 100, 160, 140)
@@ -97,6 +97,39 @@ def test_x3_knife_confirmed_after_three_frames_emits_one_event_with_evidence():
     assert event.crop_jpeg and event.crop_jpeg.startswith(b"\xff\xd8")
 
 
+def test_panoramic_event_carries_the_clean_360_frame_and_where_the_detection_is():
+    processor, events = _processor(FakeWeaponDetector(knife_view="Right"))
+    for i in range(3):
+        processor.process(_panorama_frame(i))
+
+    (event,) = events
+    import cv2
+
+    panorama = cv2.imdecode(np.frombuffer(event.panorama_jpeg, np.uint8), cv2.IMREAD_COLOR)
+    assert panorama.shape == (480, 960, 3)
+    assert abs(int(panorama.mean()) - 90) <= 2  # clean: no boxes or labels
+    # KNIFE_BOX sits left of and above the Right view's centre (yaw 90).
+    target = event.metadata["panoramaTarget"]
+    assert 45 < target["yaw"] < 90 and target["pitch"] > 0
+
+
+def test_single_view_source_has_no_panorama():
+    processor, events = _processor(FakeWeaponDetector(knife_view="Main", confidence=0.9))
+    processor.process(Frame(image=np.full((480, 640, 3), 90, dtype=np.uint8), frame_index=0, timestamp=0.0))
+    assert events[0].panorama_jpeg is None
+    assert "panoramaTarget" not in events[0].metadata
+
+
+def test_panorama_is_shrunk_to_fit_the_byte_cap():
+    noise = np.random.default_rng(0).integers(0, 256, (960, 1920, 3), dtype=np.uint8)
+    encoded = _encode_panorama(noise, max_width=1920, max_bytes=200 * 1024)
+    assert encoded is not None and len(encoded) <= 200 * 1024
+    import cv2
+
+    width = cv2.imdecode(np.frombuffer(encoded, np.uint8), cv2.IMREAD_COLOR).shape[1]
+    assert width < 1920  # noise doesn't compress, so it had to be resized
+
+
 def test_detector_and_crop_see_clean_views():
     weapon = FakeWeaponDetector(knife_view="Rear")
     processor, events = _processor(weapon)
@@ -158,8 +191,11 @@ def test_events_carry_faces_from_every_clean_view():
     for image in faces.seen[0].values():
         assert image.min() == image.max() == 90  # no overlays
     assert event.face_jpegs == [b"face-Front", b"face-Left", b"face-Rear", b"face-Right"]
-    assert event.metadata["faces"][0] == {"view": "Front", "bbox": [1, 2, 30, 40], "confidence": 0.9}
+    first = event.metadata["faces"][0]
+    assert {k: first[k] for k in ("view", "bbox", "confidence")} == {"view": "Front", "bbox": [1, 2, 30, 40], "confidence": 0.9}
     assert event.metadata["faceModel"] == "yunet-2023mar"
+    # Top-left of the Front view: left of centre and above the horizon.
+    assert first["panoramaDirection"]["yaw"] < 0 < first["panoramaDirection"]["pitch"]
 
 
 def test_anomaly_event_carries_faces():
@@ -369,3 +405,21 @@ def test_matcher_refresh_keeps_gallery_and_skips_bad_photos():
     matcher.refresh()
     assert [p.entity_profile_id for p in matcher.people] == ["p1"]
     assert matcher.last_error.startswith("fetch failed")
+
+
+def test_evidence_images_are_shrunk_to_the_backend_cap():
+    from app.pipeline.pipeline import _encode_evidence
+
+    # Pure noise barely compresses: ~790 KB at 960x720, over the 768 KB cap.
+    noise = np.random.default_rng(1).integers(0, 256, (720, 960, 3), dtype=np.uint8)
+    encoded = _encode_evidence(noise, max_bytes=760 * 1024)
+    assert encoded is not None and len(encoded) <= 760 * 1024
+
+    tiny_cap = _encode_evidence(noise, max_bytes=20 * 1024)
+    assert tiny_cap is not None and len(tiny_cap) <= 20 * 1024
+
+    flat = np.full((720, 960, 3), 90, np.uint8)
+    import cv2
+
+    assert cv2.imdecode(np.frombuffer(_encode_evidence(flat), np.uint8), cv2.IMREAD_COLOR).shape == flat.shape
+    assert _encode_evidence(None) is None

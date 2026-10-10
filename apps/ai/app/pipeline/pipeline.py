@@ -27,7 +27,7 @@ import numpy as np
 from app.config import settings
 from app.pipeline.anomaly import AnomalyConfirmer, AnomalyObservation, SlowFastAnomalyDetector
 from app.pipeline.capture import Frame, FrameSource, is_live_source, open_capture
-from app.pipeline.dewarp import ViewSplitter, compose_grid
+from app.pipeline.dewarp import ViewSplitter, compose_grid, view_point_to_direction
 from app.pipeline.events import DetectionEvent, EventQueue
 from app.pipeline.faces import YUNET_MODEL_NAME, FaceCrop, FaceDetector, load_face_detector
 from app.pipeline.pose import AltercationAnalyzer, PoseEstimator, PoseObservation, load_pose_estimator
@@ -101,6 +101,66 @@ def _encode_jpeg(image: np.ndarray | None) -> bytes | None:
         return None
     ok, buffer = cv2.imencode(".jpg", image)
     return buffer.tobytes() if ok else None
+
+
+def _encode_evidence(image: np.ndarray | None, max_bytes: int = settings.evidence_image_max_bytes) -> bytes | None:
+    """A snapshot/crop JPEG under the backend's per-image cap: the backend
+    rejects a whole event over one oversized image, so a frame that
+    doesn't compress (dense texture, sensor noise) is re-encoded at lower
+    quality, then at half size, rather than losing the docket."""
+    if image is None:
+        return None
+    while True:
+        for quality in (95, 85, 75, 60):
+            ok, buffer = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            if ok and len(buffer) <= max_bytes:
+                return buffer.tobytes()
+        if min(image.shape[:2]) < 64:
+            return None
+        image = cv2.resize(image, (image.shape[1] // 2, image.shape[0] // 2), interpolation=cv2.INTER_AREA)
+
+
+def _encode_panorama(
+    image: np.ndarray,
+    max_width: int = settings.panorama_max_width,
+    max_bytes: int = settings.panorama_max_bytes,
+) -> bytes | None:
+    """The clean equirectangular frame as a JPEG under `max_bytes`: lowers
+    quality first, then halves the size. None if it can't be made to fit."""
+    if image.shape[1] > max_width:
+        scale = max_width / image.shape[1]
+        image = cv2.resize(image, (max_width, round(image.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+    while image.shape[1] >= 480:
+        for quality in (90, 80, 70):
+            ok, buffer = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            if ok and len(buffer) <= max_bytes:
+                return buffer.tobytes()
+        image = cv2.resize(image, (image.shape[1] // 2, image.shape[0] // 2), interpolation=cv2.INTER_AREA)
+    return None
+
+
+def _box_direction(view: object, bbox: object) -> dict[str, float] | None:
+    """Centre of a view's box as a panorama direction for the 360° viewer."""
+    if not isinstance(view, str) or not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+        return None
+    x1, y1, x2, y2 = bbox
+    direction = view_point_to_direction(view, (x1 + x2) / 2, (y1 + y2) / 2)
+    return None if direction is None else {"yaw": direction[0], "pitch": direction[1]}
+
+
+def _attach_panorama(event: DetectionEvent, panorama_jpeg: bytes | None) -> None:
+    """Adds the 360° frame and, for the viewer's markers, where the detection
+    and each face sit in it. Call after the faces are attached."""
+    if panorama_jpeg is None:
+        return
+    event.panorama_jpeg = panorama_jpeg
+    target = _box_direction(event.metadata.get("view"), event.metadata.get("bbox"))
+    if target is not None:
+        event.metadata["panoramaTarget"] = target
+    for face in event.metadata.get("faces") or []:
+        direction = _box_direction(face.get("view"), face.get("bbox"))
+        if direction is not None:
+            face["panoramaDirection"] = direction
 
 
 def _set_faces(event: DetectionEvent, crops: list[FaceCrop], watchlist: WatchlistMatcher | None, views) -> None:
@@ -178,13 +238,20 @@ class FrameProcessor:
         self._last_watchlist_alert: dict[str, float] = {}
         self._frame_counter = 0
         self._alarm_until = 0.0
-        # Unannotated views of the most recent frame, for the panic button.
+        # Unannotated views (and the 360° frame, for a panoramic source) of
+        # the most recent frame, for the panic button.
         self.latest_views: dict[str, np.ndarray] | None = None
+        self.latest_panorama: np.ndarray | None = None
+        # The current frame's panorama JPEG, encoded at most once per frame.
+        self._panorama_jpeg: bytes | None = None
+        self._panorama_encoded = False
 
     def process(self, frame: Frame) -> np.ndarray:
         views = self.splitter.split(frame)
         multi_view = len(views) > 1
+        self.latest_panorama = frame.image if frame.panoramic and settings.panorama_evidence_enabled else None
         self.latest_views = views
+        self._panorama_encoded = False
 
         detections = self.weapon_detector.detect(views)
         candidates = best_knife_per_view(detections, alarm_labels=self.weapon_detector.alarm_labels)
@@ -214,7 +281,7 @@ class FrameProcessor:
         self._draw_status(display, frame.timestamp)
 
         if fired_knives or anomaly_fired is not None or fired_poses:
-            snapshot = _encode_jpeg(display)
+            snapshot = _encode_evidence(display)
             for obs in fired_knives:
                 self._emit_weapon(obs, views, snapshot, multi_view)
             if anomaly_fired is not None:
@@ -226,6 +293,12 @@ class FrameProcessor:
             self._scan_watchlist(views, display, frame.timestamp)
 
         return display
+
+    def _frame_panorama(self) -> bytes | None:
+        if not self._panorama_encoded:
+            self._panorama_jpeg = None if self.latest_panorama is None else _encode_panorama(self.latest_panorama)
+            self._panorama_encoded = True
+        return self._panorama_jpeg
 
     def _update_pose(
         self, views: dict[str, np.ndarray], now: float, people_views: set[str]
@@ -257,7 +330,7 @@ class FrameProcessor:
                 continue
             self._last_watchlist_alert[top.entity_profile_id] = now
             if snapshot is None:
-                snapshot = _encode_jpeg(display)
+                snapshot = _encode_evidence(display)
             self._emit_watchlist(top, crop, views, snapshot, multi_view=len(views) > 1)
 
     def _update_anomaly(
@@ -318,9 +391,10 @@ class FrameProcessor:
                 "model": self.weapon_detector.model_name,
             },
             snapshot_jpeg=snapshot,
-            crop_jpeg=_encode_jpeg(crop_with_padding(views[obs.view], obs.bbox)),
+            crop_jpeg=_encode_evidence(crop_with_padding(views[obs.view], obs.bbox)),
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
     def _emit_altercation(
@@ -344,9 +418,10 @@ class FrameProcessor:
                 "modelStatus": "experimental",
             },
             snapshot_jpeg=snapshot,
-            crop_jpeg=_encode_jpeg(crop_with_padding(views[obs.view], obs.bbox)),
+            crop_jpeg=_encode_evidence(crop_with_padding(views[obs.view], obs.bbox)),
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
     def _emit_watchlist(
@@ -365,6 +440,7 @@ class FrameProcessor:
         )
         # The matched face is face 1; its match list is all this event is about.
         _set_faces(event, [crop], self.watchlist, views)
+        _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
     def _emit_anomaly(self, obs: AnomalyObservation, views: dict[str, np.ndarray], snapshot: bytes | None) -> None:
@@ -388,6 +464,7 @@ class FrameProcessor:
             snapshot_jpeg=snapshot,
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
 
@@ -551,7 +628,9 @@ class PipelineRunner:
             pressed_at = datetime.now(timezone.utc)
             self.start()
             views = self._wait_for_views(wait_seconds)
-            snapshot = _encode_jpeg(compose_grid(views))
+            # Read straight after the views; at worst one frame newer.
+            panorama = self._processor.latest_panorama if self._processor else None
+            snapshot = _encode_evidence(compose_grid(views))
             if snapshot is None:
                 raise PanicCaptureError("Could not encode the camera frame")
 
@@ -565,6 +644,7 @@ class PipelineRunner:
                 occurred_at=pressed_at,
             )
             _attach_faces(event, self._face_detector, views, self._watchlist)
+            _attach_panorama(event, None if panorama is None else _encode_panorama(panorama))
             logger.warning("Panic button pressed — queued %s", event.event_id)
             self._record_event(event)
             self._last_panic = event

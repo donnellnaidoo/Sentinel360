@@ -60,13 +60,17 @@ const AI_ALERT_RECIPIENT_ROLE_CODES = [
 
 // FACE: every face in view when the event fired (apps/ai pipeline/faces.py).
 // Detection only — no identity is attached, the crops are just evidence.
-export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE"] as const;
+// PANORAMA: the full 360° equirectangular frame from a panoramic camera,
+// shown in the docket's interactive 360° viewer.
+export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE", "PANORAMA"] as const;
 export type AiMediaKind = (typeof AI_MEDIA_KINDS)[number];
 export const AI_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 // Every image base64-encoded (4/3 overhead) plus the JSON envelope must fit
-// Vercel's 4.5 MB request-body cap: 2 x 1.33 MB + 5 x 171 KB + 64 KB
-// ~= 3.6 MB. Real snapshots are 10-200 KB; face crops (<= 256 px) ~10-30 KB.
-export const MAX_AI_MEDIA_BYTES = 1024 * 1024;
+// Vercel's 4.5 MB request-body cap: 2 x 1.05 MB + 1.4 MB + 5 x 171 KB +
+// 64 KB ~= 4.43 MB. Real snapshots are 10-200 KB; face crops (<= 256 px)
+// ~10-30 KB; apps/ai shrinks a panorama until it fits MAX_AI_PANORAMA_BYTES.
+export const MAX_AI_MEDIA_BYTES = 768 * 1024;
+export const MAX_AI_PANORAMA_BYTES = 1024 * 1024;
 export const MAX_AI_FACE_BYTES = 128 * 1024;
 // Must stay >= face_max_per_event in apps/ai/app/config.py.
 export const MAX_AI_FACES = 5;
@@ -74,6 +78,7 @@ export const AI_MEDIA_LIMITS: Record<AiMediaKind, { maxCount: number; maxBytes: 
   SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   FACE: { maxCount: MAX_AI_FACES, maxBytes: MAX_AI_FACE_BYTES },
+  PANORAMA: { maxCount: 1, maxBytes: MAX_AI_PANORAMA_BYTES },
 };
 const AI_EVIDENCE_SOURCE = "AI_PIPELINE";
 
@@ -87,6 +92,7 @@ const MEDIA_TITLE: Record<AiMediaKind, string> = {
   SNAPSHOT: "AI snapshot",
   CROP: "AI detection close-up",
   FACE: "AI face capture",
+  PANORAMA: "AI 360° panorama",
 };
 
 export interface AiEventMedia {

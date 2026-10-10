@@ -11,6 +11,8 @@
     "@Sentinel360/api": "workspace:*",
     "@Sentinel360/env": "workspace:*",
     "@Sentinel360/ui": "workspace:*",
+    "@photo-sphere-viewer/core": "5.15.1",
+    "@photo-sphere-viewer/markers-plugin": "5.15.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-form": "catalog:",
@@ -26,6 +28,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "sonner": "catalog:",
+    "three": "0.185.1",
     "zod": "catalog:"
   },
   "devDependencies": {

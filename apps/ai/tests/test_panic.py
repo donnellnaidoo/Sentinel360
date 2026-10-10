@@ -26,9 +26,11 @@ class _StubRunner(PipelineRunner):
         pass
 
 
-def _running_runner(views: dict[str, np.ndarray] | None) -> PipelineRunner:
+def _running_runner(
+    views: dict[str, np.ndarray] | None, panorama: np.ndarray | None = None
+) -> PipelineRunner:
     runner = _StubRunner()
-    runner._processor = SimpleNamespace(latest_views=views)
+    runner._processor = SimpleNamespace(latest_views=views, latest_panorama=panorama)
     return runner
 
 
@@ -44,6 +46,17 @@ def test_panic_queues_event_with_clean_snapshot():
     assert event.crop_jpeg is None
     decoded = cv2.imdecode(np.frombuffer(event.snapshot_jpeg, np.uint8), cv2.IMREAD_COLOR)
     assert decoded.shape == view.shape
+    assert runner.events.get(timeout=0) is event
+
+
+def test_panic_from_a_360_camera_attaches_the_panorama():
+    panorama = np.full((480, 960, 3), 120, dtype=np.uint8)
+    runner = _running_runner({"Front": np.zeros((36, 48, 3), dtype=np.uint8)}, panorama)
+
+    event, _ = runner.panic()
+
+    decoded = cv2.imdecode(np.frombuffer(event.panorama_jpeg, np.uint8), cv2.IMREAD_COLOR)
+    assert decoded.shape == panorama.shape
     assert runner.events.get(timeout=0) is event
 
 

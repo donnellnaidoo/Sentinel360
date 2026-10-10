@@ -100,6 +100,17 @@ class Settings(BaseSettings):
     # Keeps each crop well under the backend's per-face size cap.
     face_crop_max_side: int = 256
 
+    # Full 360° frame attached to every event from a panoramic source, for
+    # the docket's 360° viewer. Shrunk until it fits the byte cap, which must
+    # stay <= MAX_AI_PANORAMA_BYTES in packages/api/src/services/ai-ingest.ts.
+    panorama_evidence_enabled: bool = True
+    panorama_max_width: int = 3840
+    panorama_max_bytes: int = 1000 * 1024
+    # Snapshots and close-ups are re-encoded smaller if needed to stay
+    # under this; must stay <= MAX_AI_MEDIA_BYTES (768 KB) in ai-ingest.ts,
+    # which rejects the whole event over one oversized image.
+    evidence_image_max_bytes: int = 760 * 1024
+
     # Watchlist face matching (pipeline/watchlist.py). OFF by default:
     # biometric matching against wanted persons needs a POPIA basis. A
     # match is only a suggestion attached to the alert for an officer to

@@ -44,6 +44,8 @@ def build_payload(event: DetectionEvent, location: dict[str, Any] | None = None)
         media.append({"kind": "CROP", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(event.crop_jpeg).decode()})
     for face in event.face_jpegs:
         media.append({"kind": "FACE", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(face).decode()})
+    if event.panorama_jpeg:
+        media.append({"kind": "PANORAMA", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(event.panorama_jpeg).decode()})
 
     payload: dict[str, Any] = {
         "eventId": event.event_id,
