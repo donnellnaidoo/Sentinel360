@@ -4,7 +4,8 @@ cv2 capture/inference loop doesn't block FastAPI's event loop.
 capture -> views (X3 dewarp or single view) -> batched YOLO (person/knife)
 -> KnifeConfirmer -> SlowFast clip buffer (background thread)
 -> AnomalyConfirmer -> overlays -> latest JPEG for MJPEG
--> confirmed detections onto the EventQueue for the backend publisher.
+-> confirmed detections (plus face crops from that frame) onto the
+EventQueue for the backend publisher.
 
 Overlays are drawn on copies only: the raw views must stay clean because
 the evidence crops and the SlowFast input are taken from them.
@@ -17,6 +18,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 import cv2
 import numpy as np
@@ -26,6 +28,7 @@ from app.pipeline.anomaly import AnomalyConfirmer, AnomalyObservation, SlowFastA
 from app.pipeline.capture import Frame, FrameSource, open_capture
 from app.pipeline.dewarp import ViewSplitter, compose_grid
 from app.pipeline.events import DetectionEvent, EventQueue
+from app.pipeline.faces import YUNET_MODEL_NAME, FaceDetector, load_face_detector
 from app.pipeline.weapon import (
     KnifeConfirmer,
     KnifeObservation,
@@ -47,6 +50,10 @@ SLOWFAST_CELL_SIZE = (224, 224)
 ALARM_BANNER_SECONDS = 3.0
 WEAPON_MODEL_NAME = "yolov8n-coco"
 ANOMALY_MODEL_NAME = "slowfast_r50-ucfcrime-binary"
+
+
+class PanicCaptureError(Exception):
+    pass
 
 
 def _label(image: np.ndarray, text: str, origin: tuple[int, int], color: tuple[int, int, int]) -> None:
@@ -87,6 +94,18 @@ def _encode_jpeg(image: np.ndarray | None) -> bytes | None:
     return buffer.tobytes() if ok else None
 
 
+def _attach_faces(event: DetectionEvent, detector: FaceDetector | None, views: dict[str, np.ndarray]) -> None:
+    """Adds every face in the clean views to the event's evidence."""
+    if detector is None:
+        return
+    crops = detector.crops(views)
+    event.face_jpegs = [crop.jpeg for crop in crops]
+    event.metadata["faces"] = [
+        {"view": crop.view, "bbox": list(crop.bbox), "confidence": round(crop.confidence, 4)} for crop in crops
+    ]
+    event.metadata["faceModel"] = YUNET_MODEL_NAME
+
+
 class FrameProcessor:
     """Everything that happens to one captured frame. Owns the stateful
     confirmers, so one instance per pipeline run.
@@ -98,9 +117,11 @@ class FrameProcessor:
         anomaly_detector: SlowFastAnomalyDetector | None,
         emit: Callable[[DetectionEvent], None],
         camera_id: str = settings.camera_id,
+        face_detector: FaceDetector | None = None,
     ):
         self.weapon_detector = weapon_detector
         self.anomaly_detector = anomaly_detector
+        self.face_detector = face_detector
         self.emit = emit
         self.camera_id = camera_id
         self.splitter = ViewSplitter()
@@ -108,10 +129,13 @@ class FrameProcessor:
         self.anomaly_confirmer = AnomalyConfirmer()
         self.last_anomaly: AnomalyObservation | None = None
         self._alarm_until = 0.0
+        # Unannotated views of the most recent frame, for the panic button.
+        self.latest_views: dict[str, np.ndarray] | None = None
 
     def process(self, frame: Frame) -> np.ndarray:
         views = self.splitter.split(frame)
         multi_view = len(views) > 1
+        self.latest_views = views
 
         detections = self.weapon_detector.detect(views)
         knife_observations = self.knife_confirmer.update(best_knife_per_view(detections), now=frame.timestamp)
@@ -134,9 +158,9 @@ class FrameProcessor:
         if fired_knives or anomaly_fired is not None:
             snapshot = _encode_jpeg(display)
             for obs in fired_knives:
-                self._emit_weapon(obs, views[obs.view], snapshot, multi_view)
+                self._emit_weapon(obs, views, snapshot, multi_view)
             if anomaly_fired is not None:
-                self._emit_anomaly(anomaly_fired, snapshot)
+                self._emit_anomaly(anomaly_fired, views, snapshot)
 
         return display
 
@@ -172,7 +196,9 @@ class FrameProcessor:
         if now < self._alarm_until:
             cv2.rectangle(display, (0, 0), (display.shape[1] - 1, display.shape[0] - 1), _KNIFE_COLOR, 6)
 
-    def _emit_weapon(self, obs: KnifeObservation, raw_view: np.ndarray, snapshot: bytes | None, multi_view: bool) -> None:
+    def _emit_weapon(
+        self, obs: KnifeObservation, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
         where = f" in {obs.view} view" if multi_view else ""
         logger.warning(
             "Confirmed knife%s conf=%.2f bbox=%s [%s]", where, obs.confidence, obs.bbox, obs.confirmation_method
@@ -190,11 +216,12 @@ class FrameProcessor:
                 "model": WEAPON_MODEL_NAME,
             },
             snapshot_jpeg=snapshot,
-            crop_jpeg=_encode_jpeg(crop_with_padding(raw_view, obs.bbox)),
+            crop_jpeg=_encode_jpeg(crop_with_padding(views[obs.view], obs.bbox)),
         )
+        _attach_faces(event, self.face_detector, views)
         self.emit(event)
 
-    def _emit_anomaly(self, obs: AnomalyObservation, snapshot: bytes | None) -> None:
+    def _emit_anomaly(self, obs: AnomalyObservation, views: dict[str, np.ndarray], snapshot: bytes | None) -> None:
         logger.warning(
             "Confirmed anomalous activity p=%.2f [%d-result persistence]", obs.probability, obs.streak
         )
@@ -213,6 +240,7 @@ class FrameProcessor:
             },
             snapshot_jpeg=snapshot,
         )
+        _attach_faces(event, self.face_detector, views)
         self.emit(event)
 
 
@@ -248,10 +276,17 @@ class PipelineRunner:
         self._error: str | None = None
         self._processor: FrameProcessor | None = None
         self._anomaly_unavailable: str | None = None
+        # Loaded once (it's tiny) and shared with each run's FrameProcessor
+        # and with panic presses.
+        self._face_detector: FaceDetector | None = None
+        self._face_unavailable: str | None = None
+        self._face_loaded = False
         self._capture: FrameSource | None = None
         # Outlives individual runs so the publisher can keep draining it.
         self.events = EventQueue(maxsize=settings.event_queue_size)
         self._recent_events: collections.deque[dict] = collections.deque(maxlen=20)
+        self._panic_lock = threading.Lock()
+        self._last_panic: DetectionEvent | None = None
 
     @property
     def is_running(self) -> bool:
@@ -286,6 +321,7 @@ class PipelineRunner:
             "source_warning": self._capture.last_error if self._capture and self.is_running else None,
             "knife_streaks": dict(processor.knife_confirmer.streaks) if processor else {},
             "anomaly": anomaly,
+            "faces": {"enabled": self._face_detector is not None, "reason": self._face_unavailable},
             "events": {
                 "queued": self.events.qsize(),
                 "dropped": self.events.dropped,
@@ -305,6 +341,8 @@ class PipelineRunner:
         # revived when this one clears it.
         self._stop_event = threading.Event()
         self._error = None
+        # Dropped so a panic press can't pick up a previous run's last frame.
+        self._processor = None
         self._started_at = time.time()
         self._thread = threading.Thread(
             target=self._run, args=(self._stop_event,), name="pipeline-capture", daemon=True
@@ -317,6 +355,55 @@ class PipelineRunner:
             self._thread.join(timeout=5)
         self._thread = None
 
+    def panic(self, *, wait_seconds: float = settings.panic_frame_wait_seconds) -> tuple[DetectionEvent, bool]:
+        """Queues a PANIC_BUTTON event with the camera's current (clean)
+        view as evidence. Returns (event, repeated): a press within the
+        cooldown returns the previous event rather than opening a second
+        docket. Starts the pipeline if needed — the camera can only be
+        opened once, so the frame has to come from the capture thread.
+        """
+        with self._panic_lock:
+            last = self._last_panic
+            if last is not None:
+                age = (datetime.now(timezone.utc) - last.occurred_at).total_seconds()
+                if age < settings.panic_cooldown_seconds:
+                    return last, True
+
+            pressed_at = datetime.now(timezone.utc)
+            self.start()
+            views = self._wait_for_views(wait_seconds)
+            snapshot = _encode_jpeg(compose_grid(views))
+            if snapshot is None:
+                raise PanicCaptureError("Could not encode the camera frame")
+
+            event = DetectionEvent(
+                event_type="PANIC_BUTTON",
+                camera_id=settings.camera_id,
+                confidence=1.0,
+                summary=f"Panic button pressed — camera {settings.camera_id}",
+                metadata={"trigger": "panic_button", "views": sorted(views)},
+                snapshot_jpeg=snapshot,
+                occurred_at=pressed_at,
+            )
+            _attach_faces(event, self._face_detector, views)
+            logger.warning("Panic button pressed — queued %s", event.event_id)
+            self._record_event(event)
+            self._last_panic = event
+            return event, False
+
+    def _wait_for_views(self, wait_seconds: float) -> dict[str, np.ndarray]:
+        deadline = time.time() + wait_seconds
+        while True:
+            processor = self._processor
+            if processor is not None and processor.latest_views is not None:
+                return processor.latest_views
+            if not self.is_running:
+                raise PanicCaptureError(f"Pipeline stopped before a frame arrived: {self._error or 'unknown error'}")
+            if time.time() >= deadline:
+                warning = self._capture.last_error if self._capture else None
+                raise PanicCaptureError(f"No camera frame within {wait_seconds:.0f}s" + (f": {warning}" if warning else ""))
+            time.sleep(0.1)
+
     def _record_event(self, event: DetectionEvent) -> None:
         self._recent_events.appendleft(event.describe())
         self.events.put(event)
@@ -328,7 +415,12 @@ class PipelineRunner:
         try:
             weapon_detector = WeaponDetector()
             anomaly_detector, self._anomaly_unavailable = load_anomaly_detector()
-            self._processor = FrameProcessor(weapon_detector, anomaly_detector, emit=self._record_event)
+            if not self._face_loaded:
+                self._face_detector, self._face_unavailable = load_face_detector()
+                self._face_loaded = True
+            self._processor = FrameProcessor(
+                weapon_detector, anomaly_detector, emit=self._record_event, face_detector=self._face_detector
+            )
 
             with open_capture(
                 settings.stream_source,

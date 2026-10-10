@@ -40,12 +40,37 @@ Weapon + anomaly models come from the model team's handoff
 |---|---|
 | `models/yolov8n.pt` | `app/pipeline/weapon.py` — knife detection (stock COCO; no firearm class) |
 | `models/slowfast_ucfcrime_binary.pth` | SlowFast anomaly detection (experimental, uncalibrated for X3) |
+| `models/face_detection_yunet_2023mar.onnx` | `app/pipeline/faces.py` — face crops attached to each docket |
 
 `pytorchvideo` is installed from git by `uv sync`, so SlowFast builds
 locally — no `torch.hub` GitHub fetch at runtime.
 
-Face recognition (buffalo_s) and ALPR (PaddleOCR mobile models) are added in
-later phases.
+The face model (230 KB) comes from OpenCV Zoo:
+
+```bash
+curl -L -o models/face_detection_yunet_2023mar.onnx \
+  https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+```
+
+Without it the pipeline still runs; events just carry no face crops
+(`/stream/status` -> `faces.reason` says why).
+
+### Face crops
+
+When an event fires (knife, anomaly or panic button), YuNet runs on the clean
+views of that frame and every face it finds — in every view, largest first,
+up to `FACE_MAX_PER_EVENT` (5) — is sent as `FACE` media. The backend stores
+each one as evidence on the event's case ("AI face capture 1", "2", ...), with
+its view, box and score in `metadata.faces` / `metadata.faceNumber`.
+
+This is detection only: no embeddings, no identity, nothing linked across
+cases. It also captures bystanders. These are biometric images (special
+personal information under POPIA), so set `FACE_ENABLED=false` where that
+isn't justified, and treat them under the same retention rules as other
+case evidence.
+
+Face recognition (watchlist matching) and ALPR (PaddleOCR mobile models) are
+added in later phases.
 
 ## Configuration
 

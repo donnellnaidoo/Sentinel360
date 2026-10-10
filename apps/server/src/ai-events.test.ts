@@ -8,15 +8,22 @@ process.env.AI_SERVICE_API_KEY = API_KEY;
 process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 process.env.CORS_ORIGIN ??= "http://localhost:3001";
 
-const MAX_AI_MEDIA_BYTES = 1.5 * 1024 * 1024;
+const MAX_AI_MEDIA_BYTES = 1024 * 1024;
+const MAX_AI_FACE_BYTES = 128 * 1024;
+const AI_MEDIA_LIMITS = {
+  SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
+  CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
+  FACE: { maxCount: 5, maxBytes: MAX_AI_FACE_BYTES },
+};
+const base64Length = (bytes: number) => Math.ceil(bytes / 3) * 4;
 let ingestResult: Record<string, unknown> = {};
 const ingestAiEvent = mock(async (_input: unknown) => ingestResult);
 
 mock.module("@Sentinel360/api/services/ai-ingest", () => ({
-  AI_EVENT_TYPES: ["WEAPON_DETECTED", "ANOMALY_DETECTED", "ALTERCATION", "WATCHLIST_MATCH", "PLATE_MATCH"],
-  AI_MEDIA_KINDS: ["SNAPSHOT", "CROP"],
+  AI_EVENT_TYPES: ["WEAPON_DETECTED", "ANOMALY_DETECTED", "PANIC_BUTTON", "ALTERCATION", "WATCHLIST_MATCH", "PLATE_MATCH"],
+  AI_MEDIA_KINDS: ["SNAPSHOT", "CROP", "FACE"],
+  AI_MEDIA_LIMITS,
   AI_MEDIA_MIME_TYPES: ["image/jpeg", "image/png", "image/webp"],
-  MAX_AI_MEDIA_BYTES,
   ingestAiEvent,
 }));
 
@@ -98,6 +105,10 @@ describe("POST /internal/ai/events", () => {
     expect((await post(event({ eventType: "ANOMALY_DETECTED", media: [] }))).status).toBe(201);
   });
 
+  it("accepts PANIC_BUTTON", async () => {
+    expect((await post(event({ eventType: "PANIC_BUTTON", confidence: 1 }))).status).toBe(201);
+  });
+
   it.each([
     ["unknown event type", { eventType: "FIRE" }],
     ["confidence above 1", { confidence: 1.2 }],
@@ -105,22 +116,52 @@ describe("POST /internal/ai/events", () => {
     ["unsupported media kind", { media: [{ kind: "VIDEO", mimeType: "image/jpeg", dataBase64: "AA" }] }],
     ["unsupported mime type", { media: [{ kind: "SNAPSHOT", mimeType: "image/gif", dataBase64: "AA" }] }],
     [
-      "more than two images",
-      { media: Array.from({ length: 3 }, () => ({ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: "AA" })) },
+      "two snapshots",
+      { media: Array.from({ length: 2 }, () => ({ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: "AA" })) },
+    ],
+    [
+      "more than five faces",
+      { media: Array.from({ length: 6 }, () => ({ kind: "FACE", mimeType: "image/jpeg", dataBase64: "AA" })) },
     ],
   ])("rejects %s with 400", async (_name, overrides) => {
     expect((await post(event(overrides))).status).toBe(400);
     expect(ingestAiEvent).not.toHaveBeenCalled();
   });
 
-  it("keeps the largest valid body under Vercel's 4.5 MB request cap", () => {
-    const maxBase64 = Math.ceil(MAX_AI_MEDIA_BYTES / 3) * 4;
-    expect(2 * maxBase64 + 64 * 1024).toBeLessThan(4.5 * 1024 * 1024);
+  it("accepts a snapshot, a crop and five faces", async () => {
+    const media = [
+      { kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
+      { kind: "CROP", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
+      ...Array.from({ length: 5 }, () => ({ kind: "FACE", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" })),
+    ];
+    expect((await post(event({ media }))).status).toBe(201);
+    expect((ingestAiEvent.mock.calls[0]?.[0] as { media: unknown[] }).media).toHaveLength(7);
   });
 
-  it("rejects a single image over 1.5 MB with 400", async () => {
-    const tooBig = "A".repeat(Math.ceil(MAX_AI_MEDIA_BYTES / 3) * 4 + 4);
+  it("keeps the largest valid body under Vercel's 4.5 MB request cap", async () => {
+    const media = [
+      { kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: "A".repeat(base64Length(MAX_AI_MEDIA_BYTES)) },
+      { kind: "CROP", mimeType: "image/jpeg", dataBase64: "A".repeat(base64Length(MAX_AI_MEDIA_BYTES)) },
+      ...Array.from({ length: 5 }, () => ({
+        kind: "FACE",
+        mimeType: "image/jpeg",
+        dataBase64: "A".repeat(base64Length(MAX_AI_FACE_BYTES)),
+      })),
+    ];
+    const body = JSON.stringify(event({ media }));
+    expect(body.length).toBeLessThan(4.5 * 1024 * 1024);
+    expect((await post(body)).status).toBe(201);
+  });
+
+  it("rejects a snapshot over 1 MB with 400", async () => {
+    const tooBig = "A".repeat(base64Length(MAX_AI_MEDIA_BYTES) + 4);
     const response = await post(event({ media: [{ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: tooBig }] }));
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a face over 128 KB with 400", async () => {
+    const tooBig = "A".repeat(base64Length(MAX_AI_FACE_BYTES) + 4);
+    const response = await post(event({ media: [{ kind: "FACE", mimeType: "image/jpeg", dataBase64: tooBig }] }));
     expect(response.status).toBe(400);
   });
 

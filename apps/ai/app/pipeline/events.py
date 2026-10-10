@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 # Must stay in sync with AI_EVENT_TYPES in packages/api/src/services/ai-ingest.ts.
-EventType = Literal["WEAPON_DETECTED", "ANOMALY_DETECTED"]
+EventType = Literal["WEAPON_DETECTED", "ANOMALY_DETECTED", "PANIC_BUTTON"]
 
 
 @dataclass
@@ -28,6 +28,8 @@ class DetectionEvent:
     snapshot_jpeg: bytes | None = None
     # Clean close-up from the unannotated view (weapon events only).
     crop_jpeg: bytes | None = None
+    # Every face in view at that moment (pipeline/faces.py), largest first.
+    face_jpegs: list[bytes] = field(default_factory=list)
     # Sent as metadata.eventId so the backend can drop retried duplicates.
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -43,6 +45,7 @@ class DetectionEvent:
             "metadata": self.metadata,
             "has_snapshot": self.snapshot_jpeg is not None,
             "has_crop": self.crop_jpeg is not None,
+            "face_count": len(self.face_jpegs),
         }
 
 

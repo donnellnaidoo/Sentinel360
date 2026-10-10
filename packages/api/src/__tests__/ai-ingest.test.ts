@@ -24,7 +24,7 @@ vi.mock("../services/evidence-storage", () => ({
   deleteEvidenceFile: vi.fn(),
 }));
 
-import { ingestAiEvent, MAX_AI_MEDIA_BYTES, type AiEventInput } from "../services/ai-ingest";
+import { ingestAiEvent, MAX_AI_FACE_BYTES, MAX_AI_MEDIA_BYTES, type AiEventInput } from "../services/ai-ingest";
 import { insertCaseWithGeneratedNumber } from "../services/case-number";
 import { recordCustodyEvent } from "../services/chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "../services/evidence-storage";
@@ -209,6 +209,15 @@ describe("ingestAiEvent", () => {
     expect(inserted.get(alert)?.[0]?.metadata).toMatchObject({ modelStatus: "experimental" });
   });
 
+  it("raises panic button presses as CRITICAL with a human-initiated description", async () => {
+    const inserted = fakeDb();
+    await ingestAiEvent(event({ eventType: "PANIC_BUTTON", confidence: 1 }));
+
+    expect(inserted.get(incident)?.[0]).toMatchObject({ severity: "CRITICAL", incidentType: "PANIC_BUTTON" });
+    expect(inserted.get(incident)?.[0]?.description).toMatch(/^Panic button pressed at camera/);
+    expect(vi.mocked(insertCaseWithGeneratedNumber).mock.calls[0]?.[0]).toMatchObject({ priority: "CRITICAL" });
+  });
+
   it("returns the original docket for a retried eventId without writing anything new", async () => {
     const existingIncident = { id: "incident-1", incidentNumber: `INC-AI-${EVENT_ID}` };
     const existingCase = { id: "case-1", caseNumber: "S360-2026-00001" };
@@ -267,6 +276,50 @@ describe("ingestAiEvent", () => {
     const oversize = Buffer.alloc(MAX_AI_MEDIA_BYTES + 1).toString("base64");
 
     const result = await ingestAiEvent(event({ media: [{ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: oversize }] }));
+
+    expect(uploadEvidenceFile).not.toHaveBeenCalled();
+    expect(result.evidenceIds).toEqual([]);
+  });
+
+  it("stores each face as numbered AI evidence on the case", async () => {
+    const inserted = fakeDb();
+    const faces = [
+      { view: "Front", bbox: [10, 10, 60, 70], confidence: 0.93 },
+      { view: "Rear", bbox: [5, 5, 40, 50], confidence: 0.88 },
+    ];
+
+    const result = await ingestAiEvent(
+      event({
+        metadata: { view: "Rear", faces },
+        media: [
+          { kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: JPEG },
+          { kind: "FACE", mimeType: "image/jpeg", dataBase64: JPEG },
+          { kind: "FACE", mimeType: "image/jpeg", dataBase64: JPEG },
+        ],
+      }),
+    );
+
+    expect(result.evidenceIds).toEqual(["media-1", "media-2", "media-3"]);
+    const media = inserted.get(mediaAsset) ?? [];
+    expect(media[1]).toMatchObject({
+      title: "AI face capture 1 — weapon detected",
+      originalFilename: "CAM-DEMO-1-weapon_detected-face-1.jpg",
+      metadata: expect.objectContaining({ kind: "FACE", faceNumber: 1, faces }),
+    });
+    expect(media[2]).toMatchObject({
+      title: "AI face capture 2 — weapon detected",
+      metadata: expect.objectContaining({ kind: "FACE", faceNumber: 2 }),
+    });
+    expect(media[0]?.metadata).not.toHaveProperty("faceNumber");
+    expect(inserted.get(caseEvidence)).toHaveLength(3);
+  });
+
+  it("rejects a face over the face size cap before it reaches storage", async () => {
+    fakeDb();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const oversize = Buffer.alloc(MAX_AI_FACE_BYTES + 1).toString("base64");
+
+    const result = await ingestAiEvent(event({ media: [{ kind: "FACE", mimeType: "image/jpeg", dataBase64: oversize }] }));
 
     expect(uploadEvidenceFile).not.toHaveBeenCalled();
     expect(result.evidenceIds).toEqual([]);

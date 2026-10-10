@@ -6,8 +6,8 @@ import { appRouter } from "@Sentinel360/api/routers/index";
 import {
   AI_EVENT_TYPES,
   AI_MEDIA_KINDS,
+  AI_MEDIA_LIMITS,
   AI_MEDIA_MIME_TYPES,
-  MAX_AI_MEDIA_BYTES,
   ingestAiEvent,
 } from "@Sentinel360/api/services/ai-ingest";
 import { env } from "@Sentinel360/env/server";
@@ -51,7 +51,8 @@ app.get("/", (c) => {
 // there is no user session on this path — just a trusted service
 // authenticated with a shared secret (see ingestAiEvent's doc comment).
 // base64 is 4/3 the size of the bytes it encodes.
-const MAX_AI_MEDIA_BASE64_LENGTH = Math.ceil(MAX_AI_MEDIA_BYTES / 3) * 4;
+const base64Length = (bytes: number) => Math.ceil(bytes / 3) * 4;
+const MAX_AI_MEDIA_COUNT = AI_MEDIA_KINDS.reduce((sum, kind) => sum + AI_MEDIA_LIMITS[kind].maxCount, 0);
 
 const aiEventSchema = z.object({
   cameraId: z.string().min(1),
@@ -64,16 +65,30 @@ const aiEventSchema = z.object({
   // Optional for backwards compatibility; apps/ai always sends one so its
   // retries can't open duplicate dockets (see ingestAiEvent).
   eventId: z.string().uuid().optional(),
-  // Snapshot / clean crop, attached to the docket as evidence.
+  // Snapshot / clean crop / face crops, attached to the docket as evidence.
+  // Size and count are limited per kind (AI_MEDIA_LIMITS).
   media: z
     .array(
-      z.object({
-        kind: z.enum(AI_MEDIA_KINDS),
-        mimeType: z.enum(AI_MEDIA_MIME_TYPES),
-        dataBase64: z.string().min(1).max(MAX_AI_MEDIA_BASE64_LENGTH),
-      }),
+      z
+        .object({
+          kind: z.enum(AI_MEDIA_KINDS),
+          mimeType: z.enum(AI_MEDIA_MIME_TYPES),
+          dataBase64: z.string().min(1),
+        })
+        .refine((item) => item.dataBase64.length <= base64Length(AI_MEDIA_LIMITS[item.kind].maxBytes), {
+          message: "Image too large for its kind",
+          path: ["dataBase64"],
+        }),
     )
-    .max(AI_MEDIA_KINDS.length)
+    .max(MAX_AI_MEDIA_COUNT)
+    .superRefine((media, ctx) => {
+      for (const kind of AI_MEDIA_KINDS) {
+        const count = media.filter((item) => item.kind === kind).length;
+        if (count > AI_MEDIA_LIMITS[kind].maxCount) {
+          ctx.addIssue({ code: "custom", message: `At most ${AI_MEDIA_LIMITS[kind].maxCount} ${kind} image(s)` });
+        }
+      }
+    })
     .optional(),
 });
 
@@ -84,9 +99,15 @@ function isValidInternalApiKey(provided: string | undefined): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-// Room for two max-size base64 images plus the JSON envelope.
+// Room for every max-size base64 image plus the JSON envelope.
+const AI_EVENT_MAX_BODY_BYTES =
+  AI_MEDIA_KINDS.reduce(
+    (sum, kind) => sum + AI_MEDIA_LIMITS[kind].maxCount * base64Length(AI_MEDIA_LIMITS[kind].maxBytes),
+    0,
+  ) +
+  64 * 1024;
 const aiEventBodyLimit = bodyLimit({
-  maxSize: AI_MEDIA_KINDS.length * MAX_AI_MEDIA_BASE64_LENGTH + 64 * 1024,
+  maxSize: AI_EVENT_MAX_BODY_BYTES,
   onError: (c) => c.json({ error: "Payload too large" }, 413),
 });
 

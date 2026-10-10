@@ -34,6 +34,7 @@
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
     "dev:ai": "turbo -F ai dev",
+    "dev:panic": "turbo -F panic dev",
     "db:push": "turbo -F @Sentinel360/db db:push",
     "db:studio": "turbo -F @Sentinel360/db db:studio",
     "db:generate": "turbo -F @Sentinel360/db db:generate",

@@ -56,6 +56,25 @@ class Settings(BaseSettings):
     # pass is still running, so slow hardware just scores less often.
     anomaly_inference_stride: int = 8
 
+    # Face crops attached to every event's docket (pipeline/faces.py).
+    # Detection only, no identity. All faces in all views, largest first.
+    face_enabled: bool = True
+    face_model_path: str = "models/face_detection_yunet_2023mar.onnx"
+    face_confidence: float = 0.7
+    face_min_size: int = 20
+    # Must stay <= MAX_AI_FACES in packages/api/src/services/ai-ingest.ts.
+    face_max_per_event: int = 5
+    face_crop_padding: float = 0.35
+    # Keeps each crop well under the backend's per-face size cap.
+    face_crop_max_side: int = 256
+
+    # Panic button (apps/panic -> POST /stream/panic). If the pipeline is
+    # stopped, a press starts it and waits this long for the first frame
+    # (the X3 stitcher can take a while). Presses within the cooldown return
+    # the docket already being opened instead of opening another.
+    panic_frame_wait_seconds: float = 20.0
+    panic_cooldown_seconds: float = 10.0
+
     # Confirmed detections wait here for the backend publisher; oldest are
     # dropped if the backend is unreachable for long enough to fill it.
     event_queue_size: int = 50

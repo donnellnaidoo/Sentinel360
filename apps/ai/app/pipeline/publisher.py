@@ -15,6 +15,7 @@ import base64
 import logging
 import threading
 import time
+from collections import OrderedDict
 from typing import Any
 
 import httpx
@@ -30,6 +31,9 @@ INGEST_PATH = "/internal/ai/events"
 # payload too large). 408/429 are retried like server errors.
 _PERMANENT_STATUS = {400, 401, 403, 404, 413, 422}
 
+# Outcomes kept for result_for() (the panic app polls its own event).
+_RESULTS_KEPT = 50
+
 
 def build_payload(event: DetectionEvent, location: dict[str, Any] | None = None) -> dict[str, Any]:
     """JSON body matching aiEventSchema in apps/server/src/index.ts."""
@@ -38,6 +42,8 @@ def build_payload(event: DetectionEvent, location: dict[str, Any] | None = None)
         media.append({"kind": "SNAPSHOT", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(event.snapshot_jpeg).decode()})
     if event.crop_jpeg:
         media.append({"kind": "CROP", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(event.crop_jpeg).decode()})
+    for face in event.face_jpegs:
+        media.append({"kind": "FACE", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(face).decode()})
 
     payload: dict[str, Any] = {
         "eventId": event.event_id,
@@ -93,6 +99,20 @@ class EventPublisher:
         self.failed = 0
         self.last_error: str | None = None
         self.last_result: dict[str, Any] | None = None
+        self._results: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._results_lock = threading.Lock()
+
+    def result_for(self, event_id: str) -> dict[str, Any] | None:
+        """{"state": "sent", ...backend response} or {"state": "failed",
+        "error": ...}; None while the event is still queued or retrying."""
+        with self._results_lock:
+            return self._results.get(event_id)
+
+    def _remember(self, event_id: str, outcome: dict[str, Any]) -> None:
+        with self._results_lock:
+            self._results[event_id] = outcome
+            while len(self._results) > _RESULTS_KEPT:
+                self._results.popitem(last=False)
 
     def status(self) -> dict[str, Any]:
         return {
@@ -148,6 +168,7 @@ class EventPublisher:
             except PermanentPublishError as exc:
                 self.failed += 1
                 self.last_error = str(exc)
+                self._remember(event.event_id, {"state": "failed", "error": str(exc)})
                 logger.error("Dropping %s %s: %s", event.event_type, event.event_id, exc)
                 return False
             except httpx.HTTPError as exc:
@@ -170,6 +191,7 @@ class EventPublisher:
 
             self.last_error = None
             self.last_result = {"event_id": event.event_id, **result}
+            self._remember(event.event_id, {"state": "sent", **result})
             # A duplicate on a retry means one of OUR earlier attempts landed
             # (e.g. the response timed out after the backend committed), so
             # it counts as sent. A duplicate on attempt 1 came from elsewhere.
