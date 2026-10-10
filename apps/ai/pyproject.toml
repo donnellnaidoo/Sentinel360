@@ -21,6 +21,7 @@ dependencies = [
   "pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git",
   "fvcore>=0.1.5",
   "iopath>=0.1.10",
+  "fast-alpr[onnx]>=0.4.0",
 ]
 
 [tool.hatch.metadata]

@@ -3,6 +3,7 @@ import { caseEvidence } from "@Sentinel360/db/schema/cases";
 import { mediaAsset } from "@Sentinel360/db/schema/evidence";
 import { TRPCError } from "@trpc/server";
 import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { z } from "zod";
 
 import { requirePermission, router } from "../index";
 import {
@@ -178,7 +179,9 @@ export const evidenceRouter = router({
     }),
 
   getDownloadUrl: requirePermission("evidence:read")
-    .input(idSchema)
+    // VIEW_360: the docket's 360° viewer loads the file in the browser —
+    // still an access, so it's logged with its own reason.
+    .input(idSchema.extend({ purpose: z.enum(["DOWNLOAD", "VIEW_360"]).default("DOWNLOAD") }))
     .mutation(async ({ ctx, input }) => {
       const evidence = await getEvidenceOrThrow(input.id);
       const url = await getEvidenceSignedUrl(evidence.storageUrl);
@@ -189,7 +192,7 @@ export const evidenceRouter = router({
         evidenceEntityId: evidence.id,
         action: "ACCESSED",
         evidenceHash: evidence.fileHash,
-        reason: "Download URL requested",
+        reason: input.purpose === "VIEW_360" ? "Opened in 360° viewer" : "Download URL requested",
         toUserId: ctx.session.user.id,
       });
 

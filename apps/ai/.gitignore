@@ -16,3 +16,13 @@ tmp/
 samples/demo.mp4
 samples/knife_demo.mp4
 camera_previews/
+
+# Evaluation clips, model caches, exported frames, training runs (scripts/)
+eval/clips/
+eval/cache/
+eval/frames/
+eval/report*.json
+eval/labels.json
+runs/
+# Base weights Ultralytics downloads into the working directory (train_weapon.py)
+/*.pt

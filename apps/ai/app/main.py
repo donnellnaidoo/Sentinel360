@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.pipeline.pipeline import runner
+from app.pipeline.pipeline import PanicCaptureError, runner
 from app.pipeline.publisher import EventPublisher
 
 publisher = EventPublisher(runner.events)
@@ -93,6 +93,28 @@ def stream_mjpeg() -> StreamingResponse:
         _mjpeg_generator(),
         media_type=f"multipart/x-mixed-replace; boundary={MJPEG_BOUNDARY}",
     )
+
+
+def _panic_status(event_id: str, repeated: bool = False) -> dict:
+    outcome = publisher.result_for(event_id) or {"state": "queued"}
+    return {"event_id": event_id, "repeated": repeated, **outcome}
+
+
+@stream.post("/panic")
+def press_panic() -> dict:
+    """apps/panic's button. Blocks until a frame is captured (starting the
+    pipeline if needed); the docket itself is opened by the publisher, so
+    the app polls GET /stream/panic/{event_id} for the case number."""
+    try:
+        event, repeated = runner.panic()
+    except PanicCaptureError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return _panic_status(event.event_id, repeated)
+
+
+@stream.get("/panic/{event_id}")
+def panic_status(event_id: str) -> dict:
+    return _panic_status(event_id)
 
 
 app.include_router(stream)

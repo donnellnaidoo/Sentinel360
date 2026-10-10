@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,6 +18,12 @@ import { QueryState, SectionEmpty } from "./ui/SectionState";
 // bucket rejects anything else, so check before encoding and uploading.
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
+
+// three.js + the viewer are only downloaded when someone opens a 360° item.
+const PanoramaViewer = dynamic(() => import("./PanoramaViewer"), {
+  ssr: false,
+  loading: () => <div className="h-[min(60vh,480px)] w-full animate-pulse rounded-lg bg-surface-container" />,
+});
 
 const FRIENDLY_TYPE: Record<string, string> = {
   "image/jpeg": "JPEG image",
@@ -177,7 +184,13 @@ function UploadForm({ caseId }: { caseId: string }) {
 function AiProvenance({ cameraId, metadata }: { cameraId: string | null; metadata: unknown }) {
   const meta = (metadata ?? {}) as Record<string, unknown>;
   const details = [
-    meta.kind === "CROP" ? "Close-up (clean crop)" : meta.kind === "SNAPSHOT" ? "Annotated snapshot" : null,
+    meta.kind === "CROP"
+      ? "Close-up (clean crop)"
+      : meta.kind === "SNAPSHOT"
+        ? "Annotated snapshot"
+        : meta.kind === "PANORAMA"
+          ? "Full 360° frame (clean)"
+          : null,
     cameraId ? `Camera ${cameraId}` : null,
     typeof meta.view === "string" && meta.view !== "Main" ? `${meta.view} view` : null,
     typeof meta.confidence === "number" ? `${Math.round(meta.confidence * 100)}% confidence` : null,
@@ -242,6 +255,8 @@ function EvidenceItem({
 }) {
   const [result, setResult] = useState<IntegrityResult | null>(null);
   const [showChain, setShowChain] = useState(false);
+  const [panoramaUrl, setPanoramaUrl] = useState<string | null>(null);
+  const isPanorama = item.source === "AI_PIPELINE" && (item.metadata as { kind?: unknown } | null)?.kind === "PANORAMA";
 
   const verify = useMutation(
     trpc.evidence.verifyIntegrity.mutationOptions({ onSuccess: (r) => setResult(r) }),
@@ -251,7 +266,11 @@ function EvidenceItem({
       onSuccess: (r) => window.open(r.url, "_blank", "noopener,noreferrer"),
     }),
   );
-  const error = verify.error ?? download.error;
+  // Separate from download so viewing is logged as its own custody access.
+  const view360 = useMutation(
+    trpc.evidence.getDownloadUrl.mutationOptions({ onSuccess: (r) => setPanoramaUrl(r.url) }),
+  );
+  const error = verify.error ?? download.error ?? view360.error;
 
   return (
     <li className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
@@ -269,6 +288,27 @@ function EvidenceItem({
           {item.description && <p className="text-xs text-on-surface mt-1">{item.description}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {isPanorama && (
+            <SubmitButton
+              type="button"
+              variant="secondary"
+              pending={view360.isPending}
+              pendingLabel="Opening…"
+              onClick={() => {
+                if (panoramaUrl) {
+                  setPanoramaUrl(null);
+                  view360.reset();
+                } else {
+                  view360.mutate({ id: item.id, purpose: "VIEW_360" });
+                }
+              }}
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">
+                {panoramaUrl ? "close" : "360"}
+              </span>
+              {panoramaUrl ? "Close 360° view" : "View in 360°"}
+            </SubmitButton>
+          )}
           <SubmitButton
             type="button"
             variant="secondary"
@@ -298,6 +338,15 @@ function EvidenceItem({
           </SubmitButton>
         </div>
       </div>
+
+      {panoramaUrl && (
+        <div className="mt-3">
+          <PanoramaViewer url={panoramaUrl} title={item.title} metadata={item.metadata} />
+          <p className="mt-1.5 text-[11px] text-on-surface-variant">
+            Drag to look around, scroll or pinch to zoom. Red ring: the detection. Yellow rings: faces.
+          </p>
+        </div>
+      )}
 
       <div aria-live="polite">
         {result && (

@@ -53,6 +53,12 @@ def test_payload_matches_backend_schema():
     json.dumps(payload)  # must be JSON-serialisable as-is
 
 
+def test_faces_are_sent_as_face_media_after_snapshot_and_crop():
+    payload = build_payload(_event(face_jpegs=[b"\xff\xd8f1", b"\xff\xd8f2"]))
+    assert [m["kind"] for m in payload["media"]] == ["SNAPSHOT", "CROP", "FACE", "FACE"]
+    assert base64.b64decode(payload["media"][3]["dataBase64"]) == b"\xff\xd8f2"
+
+
 def test_anomaly_payload_has_snapshot_only():
     payload = build_payload(_event(event_type="ANOMALY_DETECTED", crop_jpeg=None))
     assert [m["kind"] for m in payload["media"]] == ["SNAPSHOT"]
@@ -147,3 +153,9 @@ def test_duplicate_after_own_timeout_counts_as_sent():
     publisher = _publisher(handler)
     assert publisher.publish(_event())
     assert (publisher.sent, publisher.duplicates) == (1, 0)
+
+
+def test_panorama_is_sent_last_as_panorama_media():
+    payload = build_payload(_event(face_jpegs=[b"\xff\xd8f1"], panorama_jpeg=b"\xff\xd8pano"))
+    assert [m["kind"] for m in payload["media"]] == ["SNAPSHOT", "CROP", "FACE", "PANORAMA"]
+    assert base64.b64decode(payload["media"][3]["dataBase64"]) == b"\xff\xd8pano"

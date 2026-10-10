@@ -1,10 +1,12 @@
 """Per-frame orchestration, running in a background thread so the blocking
 cv2 capture/inference loop doesn't block FastAPI's event loop.
 
-capture -> views (X3 dewarp or single view) -> batched YOLO (person/knife)
--> KnifeConfirmer -> SlowFast clip buffer (background thread)
--> AnomalyConfirmer -> overlays -> latest JPEG for MJPEG
--> confirmed detections onto the EventQueue for the backend publisher.
+capture -> views (X3 dewarp or single view) -> batched YOLO (person/weapon)
+-> KnifeConfirmer -> [pose rules] -> SlowFast clip buffer (background
+thread) -> AnomalyConfirmer -> overlays -> latest JPEG for MJPEG
+-> confirmed detections (plus face crops from that frame, and any
+watchlist suggestions) onto the EventQueue for the backend publisher.
+Stages in [] and watchlist matching are off unless enabled in config.py.
 
 Overlays are drawn on copies only: the raw views must stay clean because
 the evidence crops and the SlowFast input are taken from them.
@@ -17,19 +19,25 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 import cv2
 import numpy as np
 
 from app.config import settings
 from app.pipeline.anomaly import AnomalyConfirmer, AnomalyObservation, SlowFastAnomalyDetector
-from app.pipeline.capture import Frame, FrameSource, open_capture
-from app.pipeline.dewarp import ViewSplitter, compose_grid
+from app.pipeline.capture import Frame, FrameSource, is_live_source, open_capture
+from app.pipeline.dewarp import ViewSplitter, compose_grid, view_point_to_direction
 from app.pipeline.events import DetectionEvent, EventQueue
+from app.pipeline.faces import YUNET_MODEL_NAME, FaceCrop, FaceDetector, load_face_detector
+from app.pipeline.plates import VEHICLE_LABELS, PlateConfirmer, PlateMatch, PlateReader, PlateWatchlist, load_alpr
+from app.pipeline.pose import AltercationAnalyzer, PoseEstimator, PoseObservation, load_pose_estimator
+from app.pipeline.watchlist import SFACE_MODEL_NAME, WatchlistMatcher, load_watchlist_matcher
 from app.pipeline.weapon import (
     KnifeConfirmer,
     KnifeObservation,
     ViewDetection,
+    PERSON_LABEL,
     WeaponDetector,
     best_knife_per_view,
     crop_with_padding,
@@ -39,14 +47,18 @@ logger = logging.getLogger(__name__)
 
 # BGR
 _PERSON_COLOR = (46, 204, 113)
+_VEHICLE_COLOR = (200, 160, 60)
 _KNIFE_COLOR = (0, 0, 255)
+_POSE_COLOR = (0, 140, 255)
 _NORMAL_COLOR = (0, 200, 0)
 _TEXT_COLOR = (255, 255, 255)
 
-SLOWFAST_CELL_SIZE = (224, 224)
 ALARM_BANNER_SECONDS = 3.0
-WEAPON_MODEL_NAME = "yolov8n-coco"
 ANOMALY_MODEL_NAME = "slowfast_r50-ucfcrime-binary"
+
+
+class PanicCaptureError(Exception):
+    pass
 
 
 def _label(image: np.ndarray, text: str, origin: tuple[int, int], color: tuple[int, int, int]) -> None:
@@ -63,17 +75,29 @@ def _draw_view(
     detections: list[ViewDetection],
     knife: KnifeObservation | None,
     show_view_name: bool,
+    pose: PoseObservation | None = None,
 ) -> np.ndarray:
     annotated = raw.copy()
     for det in detections:
         x1, y1, x2, y2 = det.bbox
-        color = _KNIFE_COLOR if det.label == "knife" else _PERSON_COLOR
+        color = (
+            _PERSON_COLOR
+            if det.label == PERSON_LABEL
+            else _VEHICLE_COLOR
+            if det.label in VEHICLE_LABELS
+            else _KNIFE_COLOR
+        )
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
         _label(annotated, f"{det.label} {det.confidence:.2f}", (x1, y1 - 4), color)
 
     if knife is not None and knife.confirmed:
         x1, y1, x2, y2 = knife.bbox
         cv2.rectangle(annotated, (x1 - 3, y1 - 3), (x2 + 3, y2 + 3), _KNIFE_COLOR, 4)
+
+    if pose is not None and pose.confirmed:
+        x1, y1, x2, y2 = pose.bbox
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), _POSE_COLOR, 3)
+        _label(annotated, f"{pose.reason} (experimental)", (x1, y2 + 16), _POSE_COLOR)
 
     if show_view_name:
         _label(annotated, view, (10, 24), (40, 40, 40))
@@ -87,6 +111,103 @@ def _encode_jpeg(image: np.ndarray | None) -> bytes | None:
     return buffer.tobytes() if ok else None
 
 
+def _encode_evidence(image: np.ndarray | None, max_bytes: int = settings.evidence_image_max_bytes) -> bytes | None:
+    """A snapshot/crop JPEG under the backend's per-image cap: the backend
+    rejects a whole event over one oversized image, so a frame that
+    doesn't compress (dense texture, sensor noise) is re-encoded at lower
+    quality, then at half size, rather than losing the docket."""
+    if image is None:
+        return None
+    while True:
+        for quality in (95, 85, 75, 60):
+            ok, buffer = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            if ok and len(buffer) <= max_bytes:
+                return buffer.tobytes()
+        if min(image.shape[:2]) < 64:
+            return None
+        image = cv2.resize(image, (image.shape[1] // 2, image.shape[0] // 2), interpolation=cv2.INTER_AREA)
+
+
+def _encode_panorama(
+    image: np.ndarray,
+    max_width: int = settings.panorama_max_width,
+    max_bytes: int = settings.panorama_max_bytes,
+) -> bytes | None:
+    """The clean equirectangular frame as a JPEG under `max_bytes`: lowers
+    quality first, then halves the size. None if it can't be made to fit."""
+    if image.shape[1] > max_width:
+        scale = max_width / image.shape[1]
+        image = cv2.resize(image, (max_width, round(image.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+    while image.shape[1] >= 480:
+        for quality in (90, 80, 70):
+            ok, buffer = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            if ok and len(buffer) <= max_bytes:
+                return buffer.tobytes()
+        image = cv2.resize(image, (image.shape[1] // 2, image.shape[0] // 2), interpolation=cv2.INTER_AREA)
+    return None
+
+
+def _box_direction(view: object, bbox: object) -> dict[str, float] | None:
+    """Centre of a view's box as a panorama direction for the 360° viewer."""
+    if not isinstance(view, str) or not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+        return None
+    x1, y1, x2, y2 = bbox
+    direction = view_point_to_direction(view, (x1 + x2) / 2, (y1 + y2) / 2)
+    return None if direction is None else {"yaw": direction[0], "pitch": direction[1]}
+
+
+def _attach_panorama(event: DetectionEvent, panorama_jpeg: bytes | None) -> None:
+    """Adds the 360° frame and, for the viewer's markers, where the detection
+    and each face sit in it. Call after the faces are attached."""
+    if panorama_jpeg is None:
+        return
+    event.panorama_jpeg = panorama_jpeg
+    target = _box_direction(event.metadata.get("view"), event.metadata.get("bbox"))
+    if target is not None:
+        event.metadata["panoramaTarget"] = target
+    for face in event.metadata.get("faces") or []:
+        direction = _box_direction(face.get("view"), face.get("bbox"))
+        if direction is not None:
+            face["panoramaDirection"] = direction
+
+
+def _set_faces(event: DetectionEvent, crops: list[FaceCrop], watchlist: WatchlistMatcher | None, views) -> None:
+    event.face_jpegs = [crop.jpeg for crop in crops]
+    faces = [{"view": crop.view, "bbox": list(crop.bbox), "confidence": round(crop.confidence, 4)} for crop in crops]
+    event.metadata["faces"] = faces
+    event.metadata["faceModel"] = YUNET_MODEL_NAME
+    if watchlist is None or not crops:
+        return
+
+    # Suggestions only: an officer must confirm any identity.
+    best: dict[str, dict] = {}
+    for number, (face, matches) in enumerate(zip(faces, watchlist.match_crops(views, crops)), start=1):
+        if not matches:
+            continue
+        face["watchlistMatches"] = [m.describe() for m in matches]
+        for match in matches:
+            current = best.get(match.entity_profile_id)
+            if current is None or match.similarity > current["similarity"]:
+                best[match.entity_profile_id] = {**match.describe(), "faceNumber": number}
+    if best:
+        event.metadata["watchlistMatches"] = sorted(best.values(), key=lambda m: -m["similarity"])
+        event.metadata["watchlistReview"] = "required"
+        event.metadata["faceMatchModel"] = SFACE_MODEL_NAME
+
+
+def _attach_faces(
+    event: DetectionEvent,
+    detector: FaceDetector | None,
+    views: dict[str, np.ndarray],
+    watchlist: WatchlistMatcher | None = None,
+) -> None:
+    """Adds every face in the clean views to the event's evidence, with
+    watchlist suggestions if matching is on."""
+    if detector is None:
+        return
+    _set_faces(event, detector.crops(views), watchlist, views)
+
+
 class FrameProcessor:
     """Everything that happens to one captured frame. Owns the stateful
     confirmers, so one instance per pipeline run.
@@ -98,57 +219,172 @@ class FrameProcessor:
         anomaly_detector: SlowFastAnomalyDetector | None,
         emit: Callable[[DetectionEvent], None],
         camera_id: str = settings.camera_id,
+        face_detector: FaceDetector | None = None,
+        pose_estimator: PoseEstimator | None = None,
+        watchlist: WatchlistMatcher | None = None,
+        *,
+        watchlist_scan: bool = settings.face_watchlist_scan,
+        scan_every_frames: int = settings.face_scan_every_frames,
+        watchlist_cooldown_seconds: float = settings.watchlist_match_cooldown_seconds,
+        plate_reader: PlateReader | None = None,
+        plate_watchlist: PlateWatchlist | None = None,
+        alpr_every_frames: int = settings.alpr_every_frames,
     ):
         self.weapon_detector = weapon_detector
+        self.plate_reader = plate_reader
+        self.plate_watchlist = plate_watchlist
+        self.plate_confirmer = PlateConfirmer()
+        self.alpr_every_frames = max(1, alpr_every_frames)
         self.anomaly_detector = anomaly_detector
+        self.face_detector = face_detector
+        self.pose_estimator = pose_estimator
+        self.watchlist = watchlist
         self.emit = emit
         self.camera_id = camera_id
         self.splitter = ViewSplitter()
         self.knife_confirmer = KnifeConfirmer()
         self.anomaly_confirmer = AnomalyConfirmer()
+        self.pose_analyzer = AltercationAnalyzer()
         self.last_anomaly: AnomalyObservation | None = None
+        self.last_pose: list[PoseObservation] = []
+        self.watchlist_scan = watchlist_scan and watchlist is not None and face_detector is not None
+        self.scan_every_frames = max(1, scan_every_frames)
+        self.watchlist_cooldown_seconds = watchlist_cooldown_seconds
+        self._last_watchlist_alert: dict[str, float] = {}
+        self._frame_counter = 0
         self._alarm_until = 0.0
+        # Unannotated views (and the 360° frame, for a panoramic source) of
+        # the most recent frame, for the panic button.
+        self.latest_views: dict[str, np.ndarray] | None = None
+        self.latest_panorama: np.ndarray | None = None
+        # The current frame's panorama JPEG, encoded at most once per frame.
+        self._panorama_jpeg: bytes | None = None
+        self._panorama_encoded = False
 
     def process(self, frame: Frame) -> np.ndarray:
         views = self.splitter.split(frame)
         multi_view = len(views) > 1
+        self.latest_panorama = frame.image if frame.panoramic and settings.panorama_evidence_enabled else None
+        self.latest_views = views
+        self._panorama_encoded = False
 
         detections = self.weapon_detector.detect(views)
-        knife_observations = self.knife_confirmer.update(best_knife_per_view(detections), now=frame.timestamp)
+        candidates = best_knife_per_view(detections, alarm_labels=self.weapon_detector.alarm_labels)
+        knife_observations = self.knife_confirmer.update(candidates, now=frame.timestamp)
         knife_by_view = {obs.view: obs for obs in knife_observations}
+        self._frame_counter += 1
+
+        people_views = {name for name, dets in detections.items() if any(d.label == PERSON_LABEL for d in dets)}
+        pose_observations = self._update_pose(views, frame.timestamp, people_views)
+        pose_by_view = {obs.view: obs for obs in pose_observations}
 
         display = compose_grid(
             {
-                name: _draw_view(raw, name, detections[name], knife_by_view.get(name), multi_view)
+                name: _draw_view(
+                    raw, name, detections[name], knife_by_view.get(name), multi_view, pose_by_view.get(name)
+                )
                 for name, raw in views.items()
             }
         )
 
-        anomaly_fired = self._update_anomaly(views, multi_view)
+        anomaly_fired = self._update_anomaly(views, frame.video_time, people_views)
         fired_knives = [obs for obs in knife_observations if obs.alarm_fired]
-        if fired_knives or anomaly_fired is not None:
+        fired_poses = [obs for obs in pose_observations if obs.alarm_fired]
+        if fired_knives or anomaly_fired is not None or fired_poses:
             self._alarm_until = frame.timestamp + ALARM_BANNER_SECONDS
 
         self._draw_status(display, frame.timestamp)
 
-        if fired_knives or anomaly_fired is not None:
-            snapshot = _encode_jpeg(display)
+        if fired_knives or anomaly_fired is not None or fired_poses:
+            snapshot = _encode_evidence(display)
             for obs in fired_knives:
-                self._emit_weapon(obs, views[obs.view], snapshot, multi_view)
+                self._emit_weapon(obs, views, snapshot, multi_view)
             if anomaly_fired is not None:
-                self._emit_anomaly(anomaly_fired, snapshot)
+                self._emit_anomaly(anomaly_fired, views, snapshot)
+            for obs in fired_poses:
+                self._emit_altercation(obs, views, snapshot, multi_view)
+
+        if self.watchlist_scan and self._frame_counter % self.scan_every_frames == 0:
+            self._scan_watchlist(views, display, frame.timestamp)
+
+        if self.plate_reader is not None and self._frame_counter % self.alpr_every_frames == 0:
+            self._read_plates(views, detections, display, frame.timestamp, multi_view)
 
         return display
 
-    def _update_anomaly(self, views: dict[str, np.ndarray], multi_view: bool) -> AnomalyObservation | None:
-        """Feeds SlowFast; returns the observation only if it fired an alarm."""
+    def _read_plates(
+        self,
+        views: dict[str, np.ndarray],
+        detections: dict[str, list[ViewDetection]],
+        display: np.ndarray,
+        now: float,
+        multi_view: bool,
+    ) -> None:
+        """Reads plates on the vehicles in view; a wanted plate read often
+        enough becomes a PLATE_MATCH. Other readings go no further than
+        this function (POPIA)."""
+        assert self.plate_reader is not None
+        wanted = self.plate_watchlist.plates if self.plate_watchlist is not None else {}
+        if not wanted:
+            return  # nothing to match against, so don't read anyone's plate
+        vehicles = {
+            view: [d.bbox for d in dets if d.label in VEHICLE_LABELS] for view, dets in detections.items()
+        }
+        reads = self.plate_reader.read_views(views, vehicles)
+        matches = self.plate_confirmer.update(now, reads, wanted)
+        if matches:
+            snapshot = _encode_evidence(display)
+            for match in matches:
+                self._emit_plate(match, views, snapshot, multi_view)
+
+    def _frame_panorama(self) -> bytes | None:
+        if not self._panorama_encoded:
+            self._panorama_jpeg = None if self.latest_panorama is None else _encode_panorama(self.latest_panorama)
+            self._panorama_encoded = True
+        return self._panorama_jpeg
+
+    def _update_pose(
+        self, views: dict[str, np.ndarray], now: float, people_views: set[str]
+    ) -> list[PoseObservation]:
+        """Pose rules on the views with people in them (the weapon model
+        already found the persons, so empty views cost nothing)."""
+        if self.pose_estimator is None:
+            return []
+        poses = self.pose_estimator.estimate({name: views[name] for name in sorted(people_views)})
+        self.last_pose = self.pose_analyzer.update(now, poses)
+        return self.last_pose
+
+    def _scan_watchlist(self, views: dict[str, np.ndarray], display: np.ndarray, now: float) -> None:
+        """Looks for watchlisted faces on an ordinary frame; each new
+        suggestion becomes a WATCHLIST_MATCH for an officer to verify."""
+        assert self.face_detector is not None and self.watchlist is not None
+        if not self.watchlist.people:
+            return
+        crops = self.face_detector.crops(views)
+        if not crops:
+            return
+        snapshot: bytes | None = None
+        for crop, matches in zip(crops, self.watchlist.match_crops(views, crops)):
+            if not matches:
+                continue
+            top = matches[0]
+            last = self._last_watchlist_alert.get(top.entity_profile_id)
+            if last is not None and now - last < self.watchlist_cooldown_seconds:
+                continue
+            self._last_watchlist_alert[top.entity_profile_id] = now
+            if snapshot is None:
+                snapshot = _encode_evidence(display)
+            self._emit_watchlist(top, crop, views, snapshot, multi_view=len(views) > 1)
+
+    def _update_anomaly(
+        self, views: dict[str, np.ndarray], video_time: float, people_views: set[str]
+    ) -> AnomalyObservation | None:
+        """Feeds SlowFast; returns the observation only if it fired an alarm.
+        The detector copies what it keeps from the clean views."""
         if self.anomaly_detector is None:
             return None
 
-        # Clean input: a fresh 2x2 composite of raw views (X3), or a copy
-        # of the single raw view.
-        clip_frame = compose_grid(views, cell_size=SLOWFAST_CELL_SIZE) if multi_view else next(iter(views.values())).copy()
-        result = self.anomaly_detector.update(clip_frame)
+        result = self.anomaly_detector.update(views, video_time, people_views)
         if result is None:
             return None
 
@@ -172,29 +408,123 @@ class FrameProcessor:
         if now < self._alarm_until:
             cv2.rectangle(display, (0, 0), (display.shape[1] - 1, display.shape[0] - 1), _KNIFE_COLOR, 6)
 
-    def _emit_weapon(self, obs: KnifeObservation, raw_view: np.ndarray, snapshot: bytes | None, multi_view: bool) -> None:
+    def _emit_weapon(
+        self, obs: KnifeObservation, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
         where = f" in {obs.view} view" if multi_view else ""
         logger.warning(
-            "Confirmed knife%s conf=%.2f bbox=%s [%s]", where, obs.confidence, obs.bbox, obs.confirmation_method
+            "Confirmed %s%s conf=%.2f bbox=%s [%s]",
+            obs.label,
+            where,
+            obs.confidence,
+            obs.bbox,
+            obs.confirmation_method,
         )
         event = DetectionEvent(
             event_type="WEAPON_DETECTED",
             camera_id=self.camera_id,
             confidence=obs.confidence,
-            summary=f"Knife detected{where} — camera {self.camera_id}",
+            summary=f"{obs.label.capitalize()} detected{where} — camera {self.camera_id}",
             metadata={
                 "view": obs.view,
                 "bbox": list(obs.bbox),
+                "weaponClass": obs.label,
                 "confirmationMethod": obs.confirmation_method,
                 "streak": obs.streak,
-                "model": WEAPON_MODEL_NAME,
+                "model": self.weapon_detector.model_name,
             },
             snapshot_jpeg=snapshot,
-            crop_jpeg=_encode_jpeg(crop_with_padding(raw_view, obs.bbox)),
+            crop_jpeg=_encode_evidence(crop_with_padding(views[obs.view], obs.bbox)),
         )
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
-    def _emit_anomaly(self, obs: AnomalyObservation, snapshot: bytes | None) -> None:
+    def _emit_altercation(
+        self, obs: PoseObservation, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
+        where = f" in {obs.view} view" if multi_view else ""
+        what = "Possible fight" if obs.reason == "strike" else "Possible fall"
+        logger.warning("Confirmed %s%s [%d frames, %d people]", obs.reason, where, obs.hits, obs.people)
+        event = DetectionEvent(
+            event_type="ALTERCATION",
+            camera_id=self.camera_id,
+            confidence=min(1.0, obs.hits / self.pose_analyzer.window_frames),
+            summary=f"{what}{where} — camera {self.camera_id}",
+            metadata={
+                "view": obs.view,
+                "bbox": list(obs.bbox),
+                "reason": obs.reason,
+                "people": obs.people,
+                "framesWithSignal": obs.hits,
+                "model": self.pose_estimator.model_name if self.pose_estimator else None,
+                "modelStatus": "experimental",
+            },
+            snapshot_jpeg=snapshot,
+            crop_jpeg=_encode_evidence(crop_with_padding(views[obs.view], obs.bbox)),
+        )
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
+        self.emit(event)
+
+    def _emit_watchlist(
+        self, match, crop: FaceCrop, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
+        who = match.display_name or "a watchlisted person"
+        where = f" in {crop.view} view" if multi_view else ""
+        logger.warning("Possible watchlist match%s: %s (similarity %.2f)", where, match.entity_profile_id, match.similarity)
+        event = DetectionEvent(
+            event_type="WATCHLIST_MATCH",
+            camera_id=self.camera_id,
+            confidence=match.similarity,
+            summary=f"Possible match: {who}{where} — camera {self.camera_id} (verify)",
+            metadata={"view": crop.view},
+            snapshot_jpeg=snapshot,
+        )
+        # The matched face is face 1; its match list is all this event is about.
+        _set_faces(event, [crop], self.watchlist, views)
+        _attach_panorama(event, self._frame_panorama())
+        self.emit(event)
+
+    def _emit_plate(
+        self, match: PlateMatch, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
+    ) -> None:
+        read, wanted = match.read, match.wanted
+        who = wanted.display_name or "a watchlisted vehicle"
+        where = f" in {read.view} view" if multi_view else ""
+        logger.warning(
+            "Possible plate match%s: %s (%s, %d reads, conf %.2f)",
+            where,
+            wanted.entity_profile_id,
+            read.text,
+            match.reads,
+            read.confidence,
+        )
+        # Close-up of the vehicle with its plate, or the plate itself.
+        crop_box = read.vehicle_bbox or read.bbox
+        event = DetectionEvent(
+            event_type="PLATE_MATCH",
+            camera_id=self.camera_id,
+            confidence=read.confidence,
+            summary=f"Possible plate match: {wanted.plate} ({who}){where} — camera {self.camera_id} (verify)",
+            metadata={
+                "view": read.view,
+                "bbox": list(read.bbox),
+                "plateRead": read.text,
+                "plateListed": wanted.plate,
+                "reads": match.reads,
+                "model": self.plate_reader.model_name if self.plate_reader else None,
+                "watchlistMatches": [match.describe()],
+                "watchlistReview": "required",
+            },
+            snapshot_jpeg=snapshot,
+            crop_jpeg=_encode_evidence(crop_with_padding(views[read.view], crop_box, padding=0.15)),
+        )
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
+        self.emit(event)
+
+    def _emit_anomaly(self, obs: AnomalyObservation, views: dict[str, np.ndarray], snapshot: bytes | None) -> None:
         logger.warning(
             "Confirmed anomalous activity p=%.2f [%d-result persistence]", obs.probability, obs.streak
         )
@@ -206,6 +536,7 @@ class FrameProcessor:
             metadata={
                 "streak": obs.streak,
                 "threshold": self.anomaly_confirmer.threshold,
+                **({"view": obs.view} if obs.view else {}),
                 "model": ANOMALY_MODEL_NAME,
                 # Model team: not calibrated for X3 footage. Surfaced in the
                 # UI so investigators weigh these alerts accordingly.
@@ -213,6 +544,8 @@ class FrameProcessor:
             },
             snapshot_jpeg=snapshot,
         )
+        _attach_faces(event, self.face_detector, views, self.watchlist)
+        _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
 
@@ -248,10 +581,26 @@ class PipelineRunner:
         self._error: str | None = None
         self._processor: FrameProcessor | None = None
         self._anomaly_unavailable: str | None = None
+        # Loaded once (it's tiny) and shared with each run's FrameProcessor
+        # and with panic presses.
+        self._face_detector: FaceDetector | None = None
+        self._face_unavailable: str | None = None
+        self._face_loaded = False
+        # Also once: its gallery refreshes in the background across runs.
+        self._watchlist: WatchlistMatcher | None = None
+        self._watchlist_unavailable: str | None = None
+        self._pose_unavailable: str | None = None
+        # ALPR: loaded once; its plate list refreshes in the background.
+        self._plate_reader: PlateReader | None = None
+        self._plate_watchlist: PlateWatchlist | None = None
+        self._alpr_unavailable: str | None = None
+        self._alpr_loaded = False
         self._capture: FrameSource | None = None
         # Outlives individual runs so the publisher can keep draining it.
         self.events = EventQueue(maxsize=settings.event_queue_size)
         self._recent_events: collections.deque[dict] = collections.deque(maxlen=20)
+        self._panic_lock = threading.Lock()
+        self._last_panic: DetectionEvent | None = None
 
     @property
     def is_running(self) -> bool:
@@ -267,7 +616,10 @@ class PipelineRunner:
                 "enabled": True,
                 "device": detector.device,
                 "threshold": processor.anomaly_confirmer.threshold,
+                "clip_seconds": detector.clip_seconds,
+                "view_mode": detector.view_mode,
                 "last_probability": round(last.probability, 4) if last else None,
+                "last_view": last.view if last else None,
                 "streak": processor.anomaly_confirmer.streak,
                 "event_active": processor.anomaly_confirmer.event_active,
                 "last_error": detector.last_error,
@@ -285,7 +637,44 @@ class PipelineRunner:
             # pipeline keeps retrying rather than failing).
             "source_warning": self._capture.last_error if self._capture and self.is_running else None,
             "knife_streaks": dict(processor.knife_confirmer.streaks) if processor else {},
+            "weapons": (
+                {
+                    "model": processor.weapon_detector.model_name,
+                    "alarm_labels": processor.weapon_detector.alarm_labels,
+                    "extra_model_unavailable": processor.weapon_detector.extra_unavailable,
+                }
+                if processor
+                else None
+            ),
             "anomaly": anomaly,
+            "faces": {"enabled": self._face_detector is not None, "reason": self._face_unavailable},
+            "watchlist": (
+                {"enabled": True, "scan": processor.watchlist_scan if processor else None, **self._watchlist.status()}
+                if self._watchlist is not None
+                else {"enabled": False, "reason": self._watchlist_unavailable}
+            ),
+            "alpr": (
+                {
+                    "enabled": True,
+                    "model": self._plate_reader.model_name,
+                    # A count only: readings that don't match are never kept.
+                    "plates_read": processor.plate_confirmer.reads_seen if processor else 0,
+                    **self._plate_watchlist.status(),
+                }
+                if self._plate_reader is not None and self._plate_watchlist is not None
+                else {"enabled": False, "reason": self._alpr_unavailable}
+            ),
+            "pose": (
+                {
+                    "enabled": True,
+                    "recent": [
+                        {"view": o.view, "reason": o.reason, "hits": o.hits, "confirmed": o.confirmed}
+                        for o in processor.last_pose
+                    ],
+                }
+                if processor is not None and processor.pose_estimator is not None
+                else {"enabled": False, "reason": self._pose_unavailable}
+            ),
             "events": {
                 "queued": self.events.qsize(),
                 "dropped": self.events.dropped,
@@ -305,6 +694,8 @@ class PipelineRunner:
         # revived when this one clears it.
         self._stop_event = threading.Event()
         self._error = None
+        # Dropped so a panic press can't pick up a previous run's last frame.
+        self._processor = None
         self._started_at = time.time()
         self._thread = threading.Thread(
             target=self._run, args=(self._stop_event,), name="pipeline-capture", daemon=True
@@ -317,6 +708,58 @@ class PipelineRunner:
             self._thread.join(timeout=5)
         self._thread = None
 
+    def panic(self, *, wait_seconds: float = settings.panic_frame_wait_seconds) -> tuple[DetectionEvent, bool]:
+        """Queues a PANIC_BUTTON event with the camera's current (clean)
+        view as evidence. Returns (event, repeated): a press within the
+        cooldown returns the previous event rather than opening a second
+        docket. Starts the pipeline if needed — the camera can only be
+        opened once, so the frame has to come from the capture thread.
+        """
+        with self._panic_lock:
+            last = self._last_panic
+            if last is not None:
+                age = (datetime.now(timezone.utc) - last.occurred_at).total_seconds()
+                if age < settings.panic_cooldown_seconds:
+                    return last, True
+
+            pressed_at = datetime.now(timezone.utc)
+            self.start()
+            views = self._wait_for_views(wait_seconds)
+            # Read straight after the views; at worst one frame newer.
+            panorama = self._processor.latest_panorama if self._processor else None
+            snapshot = _encode_evidence(compose_grid(views))
+            if snapshot is None:
+                raise PanicCaptureError("Could not encode the camera frame")
+
+            event = DetectionEvent(
+                event_type="PANIC_BUTTON",
+                camera_id=settings.camera_id,
+                confidence=1.0,
+                summary=f"Panic button pressed — camera {settings.camera_id}",
+                metadata={"trigger": "panic_button", "views": sorted(views)},
+                snapshot_jpeg=snapshot,
+                occurred_at=pressed_at,
+            )
+            _attach_faces(event, self._face_detector, views, self._watchlist)
+            _attach_panorama(event, None if panorama is None else _encode_panorama(panorama))
+            logger.warning("Panic button pressed — queued %s", event.event_id)
+            self._record_event(event)
+            self._last_panic = event
+            return event, False
+
+    def _wait_for_views(self, wait_seconds: float) -> dict[str, np.ndarray]:
+        deadline = time.time() + wait_seconds
+        while True:
+            processor = self._processor
+            if processor is not None and processor.latest_views is not None:
+                return processor.latest_views
+            if not self.is_running:
+                raise PanicCaptureError(f"Pipeline stopped before a frame arrived: {self._error or 'unknown error'}")
+            if time.time() >= deadline:
+                warning = self._capture.last_error if self._capture else None
+                raise PanicCaptureError(f"No camera frame within {wait_seconds:.0f}s" + (f": {warning}" if warning else ""))
+            time.sleep(0.1)
+
     def _record_event(self, event: DetectionEvent) -> None:
         self._recent_events.appendleft(event.describe())
         self.events.put(event)
@@ -326,15 +769,45 @@ class PipelineRunner:
         anomaly_detector: SlowFastAnomalyDetector | None = None
 
         try:
-            weapon_detector = WeaponDetector()
+            if not self._alpr_loaded:
+                self._plate_reader, self._plate_watchlist, self._alpr_unavailable = load_alpr()
+                self._alpr_loaded = True
+            weapon_detector = WeaponDetector(context_labels=VEHICLE_LABELS if self._plate_reader else ())
             anomaly_detector, self._anomaly_unavailable = load_anomaly_detector()
-            self._processor = FrameProcessor(weapon_detector, anomaly_detector, emit=self._record_event)
+            pose_estimator, self._pose_unavailable = load_pose_estimator()
+            if not self._face_loaded:
+                self._face_detector, self._face_unavailable = load_face_detector()
+                self._watchlist, self._watchlist_unavailable = load_watchlist_matcher(self._face_detector)
+                self._face_loaded = True
+            self._processor = FrameProcessor(
+                weapon_detector,
+                anomaly_detector,
+                emit=self._record_event,
+                face_detector=self._face_detector,
+                pose_estimator=pose_estimator,
+                watchlist=self._watchlist,
+                plate_reader=self._plate_reader,
+                plate_watchlist=self._plate_watchlist,
+            )
+
+            # With a timed clip window, SlowFast takes frames straight from a
+            # live camera at its own rate instead of the ~5 fps processed
+            # ones. A file's every frame reaches the pipeline anyway.
+            tap = None
+            if (
+                anomaly_detector is not None
+                and anomaly_detector.clip_seconds > 0
+                and is_live_source(settings.stream_source)
+            ):
+                anomaly_detector.attach_feed()
+                tap = anomaly_detector.feed
 
             with open_capture(
                 settings.stream_source,
                 loop=settings.stream_loop,
                 stop_event=stop_event,
                 panoramic=settings.stream_panoramic,
+                tap=tap,
             ) as capture:
                 self._capture = capture
                 last_frame_at = time.time()

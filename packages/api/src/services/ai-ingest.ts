@@ -9,18 +9,24 @@ import { and, eq, inArray } from "drizzle-orm";
 import { insertCaseWithGeneratedNumber } from "./case-number";
 import { recordCaseEvent } from "./case-timeline";
 import { recordAuditEvent } from "./audit-log";
+import { recordWatchlistSuggestions } from "./ai-watchlist";
 import { EVIDENCE_ENTITY_TYPE, recordCustodyEvent, sha256Hex } from "./chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "./evidence-storage";
 
-// Event types the apps/ai CCTV pipeline can report. WATCHLIST_MATCH and
-// PLATE_MATCH are declared now so the payload shape doesn't need to change
-// once face/ALPR matching lands (see tasks #9/#10) — ingestAiEvent already
-// handles them, it just has nothing extra to attach to the case yet.
+// Event types the apps/ai CCTV pipeline can report. PLATE_MATCH is a
+// watchlisted licence plate read by apps/ai plates.py (opt-in).
+// WATCHLIST_MATCH and metadata.watchlistMatches on any event are face-match
+// SUGGESTIONS (apps/ai watchlist.py, opt-in) — stored as entity_match rows
+// for an officer to verify, never treated as an identification.
+// ALTERCATION comes from the experimental pose rules (apps/ai pose.py).
 // ANOMALY_DETECTED comes from the SlowFast model, which the model team flags
 // as uncalibrated — apps/ai sends metadata.modelStatus = "experimental".
+// PANIC_BUTTON is a person pressing apps/panic at the camera, not a model
+// detection: apps/ai attaches whatever the camera saw at that moment.
 export const AI_EVENT_TYPES = [
   "WEAPON_DETECTED",
   "ANOMALY_DETECTED",
+  "PANIC_BUTTON",
   "ALTERCATION",
   "WATCHLIST_MATCH",
   "PLATE_MATCH",
@@ -34,6 +40,8 @@ const SEVERITY_BY_EVENT_TYPE: Record<AiEventType, Severity> = {
   // HIGH rather than CRITICAL: the anomaly model has a known false-positive
   // rate, so it shouldn't outrank a confirmed weapon in the queue.
   ANOMALY_DETECTED: "HIGH",
+  // A human asking for help outranks everything the models can report.
+  PANIC_BUTTON: "CRITICAL",
   ALTERCATION: "HIGH",
   WATCHLIST_MATCH: "HIGH",
   PLATE_MATCH: "MEDIUM",
@@ -50,12 +58,28 @@ const AI_ALERT_RECIPIENT_ROLE_CODES = [
   "super_admin",
 ];
 
-export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP"] as const;
+// FACE: every face in view when the event fired (apps/ai pipeline/faces.py).
+// Detection only — no identity is attached, the crops are just evidence.
+// PANORAMA: the full 360° equirectangular frame from a panoramic camera,
+// shown in the docket's interactive 360° viewer.
+export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE", "PANORAMA"] as const;
+export type AiMediaKind = (typeof AI_MEDIA_KINDS)[number];
 export const AI_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-// Two images base64-encoded (4/3 overhead) plus the JSON envelope must fit
-// Vercel's 4.5 MB request-body cap: 2 x 2 MB base64 + 64 KB ~= 4.06 MB.
-// Real snapshots are 10-200 KB.
-export const MAX_AI_MEDIA_BYTES = 1.5 * 1024 * 1024;
+// Every image base64-encoded (4/3 overhead) plus the JSON envelope must fit
+// Vercel's 4.5 MB request-body cap: 2 x 1.05 MB + 1.4 MB + 5 x 171 KB +
+// 64 KB ~= 4.43 MB. Real snapshots are 10-200 KB; face crops (<= 256 px)
+// ~10-30 KB; apps/ai shrinks a panorama until it fits MAX_AI_PANORAMA_BYTES.
+export const MAX_AI_MEDIA_BYTES = 768 * 1024;
+export const MAX_AI_PANORAMA_BYTES = 1024 * 1024;
+export const MAX_AI_FACE_BYTES = 128 * 1024;
+// Must stay >= face_max_per_event in apps/ai/app/config.py.
+export const MAX_AI_FACES = 5;
+export const AI_MEDIA_LIMITS: Record<AiMediaKind, { maxCount: number; maxBytes: number }> = {
+  SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
+  CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
+  FACE: { maxCount: MAX_AI_FACES, maxBytes: MAX_AI_FACE_BYTES },
+  PANORAMA: { maxCount: 1, maxBytes: MAX_AI_PANORAMA_BYTES },
+};
 const AI_EVIDENCE_SOURCE = "AI_PIPELINE";
 
 const MEDIA_EXTENSION: Record<(typeof AI_MEDIA_MIME_TYPES)[number], string> = {
@@ -64,13 +88,15 @@ const MEDIA_EXTENSION: Record<(typeof AI_MEDIA_MIME_TYPES)[number], string> = {
   "image/webp": "webp",
 };
 
-const MEDIA_TITLE: Record<(typeof AI_MEDIA_KINDS)[number], string> = {
+const MEDIA_TITLE: Record<AiMediaKind, string> = {
   SNAPSHOT: "AI snapshot",
   CROP: "AI detection close-up",
+  FACE: "AI face capture",
+  PANORAMA: "AI 360° panorama",
 };
 
 export interface AiEventMedia {
-  kind: (typeof AI_MEDIA_KINDS)[number];
+  kind: AiMediaKind;
   mimeType: (typeof AI_MEDIA_MIME_TYPES)[number];
   dataBase64: string;
 }
@@ -151,22 +177,30 @@ async function findCaseEvidenceIds(caseId: string): Promise<string[]> {
 
 interface UploadedAiMedia {
   item: AiEventMedia;
+  // 1-based position among FACE items (matches metadata.faces); null otherwise.
+  faceNumber: number | null;
   fileBytes: Buffer;
   fileHash: string;
   originalFilename: string;
   storagePath: string;
 }
 
-async function uploadAiMedia(item: AiEventMedia, input: AiEventInput): Promise<UploadedAiMedia> {
+async function uploadAiMedia(
+  item: AiEventMedia,
+  input: AiEventInput,
+  faceNumber: number | null,
+): Promise<UploadedAiMedia> {
   const fileBytes = Buffer.from(item.dataBase64, "base64");
+  const { maxBytes } = AI_MEDIA_LIMITS[item.kind];
   // Validated before upload: uploadEvidenceFile checks size/type only
   // after the bytes are already in the bucket.
-  if (fileBytes.length === 0 || fileBytes.length > MAX_AI_MEDIA_BYTES) {
-    throw new Error(`${item.kind} is ${fileBytes.length} bytes (max ${MAX_AI_MEDIA_BYTES})`);
+  if (fileBytes.length === 0 || fileBytes.length > maxBytes) {
+    throw new Error(`${item.kind} is ${fileBytes.length} bytes (max ${maxBytes})`);
   }
-  const originalFilename = `${input.cameraId}-${input.eventType.toLowerCase()}-${item.kind.toLowerCase()}.${MEDIA_EXTENSION[item.mimeType]}`;
+  const suffix = faceNumber === null ? "" : `-${faceNumber}`;
+  const originalFilename = `${input.cameraId}-${input.eventType.toLowerCase()}-${item.kind.toLowerCase()}${suffix}.${MEDIA_EXTENSION[item.mimeType]}`;
   const { storagePath } = await uploadEvidenceFile(fileBytes, originalFilename, item.mimeType);
-  return { item, fileBytes, fileHash: sha256Hex(fileBytes), originalFilename, storagePath };
+  return { item, faceNumber, fileBytes, fileHash: sha256Hex(fileBytes), originalFilename, storagePath };
 }
 
 /**
@@ -187,7 +221,11 @@ async function attachAiEvidence(
   incidentId: string,
 ): Promise<string[]> {
   const media = input.media ?? [];
-  const uploads = await Promise.allSettled(media.map((item) => uploadAiMedia(item, input)));
+  let faces = 0;
+  const faceNumbers = media.map((item) => (item.kind === "FACE" ? ++faces : null));
+  const uploads = await Promise.allSettled(
+    media.map((item, index) => uploadAiMedia(item, input, faceNumbers[index] ?? null)),
+  );
   const evidenceIds: string[] = [];
 
   for (const [index, upload] of uploads.entries()) {
@@ -195,7 +233,8 @@ async function attachAiEvidence(
       console.error(`Failed to upload AI ${media[index]?.kind} evidence for case ${caseId}`, upload.reason);
       continue;
     }
-    const { item, fileBytes, fileHash, originalFilename, storagePath } = upload.value;
+    const { item, faceNumber, fileBytes, fileHash, originalFilename, storagePath } = upload.value;
+    const mediaTitle = faceNumber === null ? MEDIA_TITLE[item.kind] : `${MEDIA_TITLE[item.kind]} ${faceNumber}`;
     let recorded = false;
 
     try {
@@ -203,7 +242,7 @@ async function attachAiEvidence(
         .insert(mediaAsset)
         .values({
           type: "IMAGE",
-          title: `${MEDIA_TITLE[item.kind]} — ${input.eventType.replace(/_/g, " ").toLowerCase()}`,
+          title: `${mediaTitle} — ${input.eventType.replace(/_/g, " ").toLowerCase()}`,
           description: `Auto-captured by the AI monitoring pipeline on camera ${input.cameraId} at ${input.occurredAt.toISOString()}.`,
           source: AI_EVIDENCE_SOURCE,
           sourceCameraId: input.cameraId,
@@ -220,6 +259,7 @@ async function attachAiEvidence(
             confidence: input.confidence,
             incidentId,
             ...input.metadata,
+            ...(faceNumber === null ? {} : { faceNumber }),
           },
           createdByUserId: null,
         })
@@ -242,7 +282,7 @@ async function attachAiEvidence(
         caseId,
         evidenceEntityType: EVIDENCE_ENTITY_TYPE,
         evidenceEntityId: created.id,
-        relationshipDescription: `${MEDIA_TITLE[item.kind]} from AI detection`,
+        relationshipDescription: `${mediaTitle} from AI detection`,
         createdByUserId: null,
       });
 
@@ -268,6 +308,19 @@ async function attachAiEvidence(
   return evidenceIds;
 }
 
+function describeEvent(input: AiEventInput): string {
+  if (input.eventType === "PANIC_BUTTON") {
+    return `Panic button pressed at camera ${input.cameraId}. The camera view at the moment of the press is attached as evidence.`;
+  }
+  if (input.eventType === "PLATE_MATCH") {
+    return `Possible watchlisted licence plate on camera ${input.cameraId} (read with ${(input.confidence * 100).toFixed(0)}% confidence). This is an automated suggestion: an officer must check the plate and vehicle against the close-up before any action is taken.`;
+  }
+  if (input.eventType === "WATCHLIST_MATCH") {
+    return `Possible watchlist match on camera ${input.cameraId} (face similarity ${(input.confidence * 100).toFixed(0)}%). This is an automated suggestion: an officer must verify the identity before any action is taken.`;
+  }
+  return `Automatically detected by the AI monitoring pipeline on camera ${input.cameraId} (${(input.confidence * 100).toFixed(0)}% confidence).`;
+}
+
 /**
  * Entry point for apps/ai's POST /internal/ai/events. Writes an incident,
  * auto-opens a case (docket) for it, attaches any snapshot/crop images as
@@ -284,7 +337,7 @@ async function attachAiEvidence(
 export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult> {
   const severity = SEVERITY_BY_EVENT_TYPE[input.eventType];
   const title = input.summary ?? `${input.eventType.replace(/_/g, " ")} — camera ${input.cameraId}`;
-  const description = `Automatically detected by the AI monitoring pipeline on camera ${input.cameraId} (${(input.confidence * 100).toFixed(0)}% confidence).`;
+  const description = describeEvent(input);
   const incidentNumber = incidentNumberFor(input.eventId);
 
   const [insertedIncident] = await db
@@ -399,6 +452,7 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
   // After the alert, not before: operators are notified as soon as the
   // docket exists, and the images land on it moments later.
   const evidenceIds = await attachAiEvidence(createdCase.id, input, createdIncident.id);
+  const watchlistSuggestions = await recordWatchlistSuggestions(createdIncident.id, input.metadata);
 
   await recordAuditEvent({
     eventType: "ai.event_ingested",
@@ -415,6 +469,7 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
       incidentId: createdIncident.id,
       alertId: createdAlert.id,
       evidenceIds,
+      watchlistSuggestions,
     },
   });
 

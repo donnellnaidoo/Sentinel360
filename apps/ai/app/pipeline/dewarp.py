@@ -76,6 +76,34 @@ def create_perspective_map(
     return map_x.astype(np.float32), map_y.astype(np.float32)
 
 
+def view_point_to_direction(
+    view: str,
+    x: float,
+    y: float,
+    fov: float = settings.x3_view_fov,
+    out_width: int = settings.x3_view_width,
+    out_height: int = settings.x3_view_height,
+) -> tuple[float, float] | None:
+    """Where a pixel of one perspective view points in the panorama, as
+    (yaw, pitch) in degrees: yaw 0 is the panorama's centre column and grows
+    to the right, pitch grows upwards. Same math as create_perspective_map
+    for a single point, so a detection box can be marked in the 360° viewer.
+    None for a view that isn't one of the X3 virtual cameras.
+    """
+    yaw_by_view = dict(X3_VIEWS)
+    if view not in yaw_by_view:
+        return None
+    focal_length = (out_width / 2.0) / np.tan(np.deg2rad(fov) / 2.0)
+    vx, vy, vz = x - out_width / 2.0, out_height / 2.0 - y, focal_length
+
+    yaw_rad = np.deg2rad(yaw_by_view[view])
+    vx, vz = vx * np.cos(yaw_rad) + vz * np.sin(yaw_rad), -vx * np.sin(yaw_rad) + vz * np.cos(yaw_rad)
+
+    longitude = np.degrees(np.arctan2(vx, vz))
+    latitude = np.degrees(np.arctan2(vy, np.hypot(vx, vz)))
+    return round(float(longitude), 2), round(float(latitude), 2)
+
+
 class ViewSplitter:
     """Turns a captured Frame into named, unannotated views.
 
