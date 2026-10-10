@@ -27,6 +27,10 @@ mock.module("@Sentinel360/api/services/ai-ingest", () => ({
   ingestAiEvent,
 }));
 
+let watchlistItems: unknown[] = [];
+const listAiWatchlist = mock(async () => watchlistItems);
+mock.module("@Sentinel360/api/services/ai-watchlist", () => ({ listAiWatchlist }));
+
 const { default: app } = await import("./index");
 
 const EVENT_ID = "33333333-3333-4333-8333-333333333333";
@@ -186,5 +190,40 @@ describe("POST /internal/ai/events", () => {
     } finally {
       console.error = original;
     }
+  });
+});
+
+describe("GET /internal/ai/watchlist", () => {
+  const get = (key: string | null = API_KEY) =>
+    app.request("/internal/ai/watchlist", { headers: key === null ? {} : { "X-Internal-Api-Key": key } });
+
+  beforeEach(() => {
+    listAiWatchlist.mockClear();
+    watchlistItems = [
+      { entityProfileId: "p1", displayName: "One", photoUrl: "https://x/p1.jpg", priorityLevel: "HIGH" },
+    ];
+  });
+
+  it("requires the internal key", async () => {
+    expect((await get(null)).status).toBe(401);
+    expect((await get("wrong-key")).status).toBe(401);
+    expect(listAiWatchlist).not.toHaveBeenCalled();
+  });
+
+  it("returns the wanted persons with photos", async () => {
+    const res = await get();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ items: watchlistItems });
+  });
+
+  it("returns 500 when the lookup fails", async () => {
+    listAiWatchlist.mockImplementationOnce(async () => {
+      throw new Error("db down");
+    });
+    const spy = console.error;
+    console.error = () => {};
+    const res = await get();
+    console.error = spy;
+    expect(res.status).toBe(500);
   });
 });

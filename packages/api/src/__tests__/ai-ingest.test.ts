@@ -4,6 +4,7 @@ import { db } from "@Sentinel360/db";
 import { alert, notification } from "@Sentinel360/db/schema/alerts";
 import { user } from "@Sentinel360/db/schema/auth";
 import { caseEvidence, caseIncident, incident, investigationCase } from "@Sentinel360/db/schema/cases";
+import { entityMatch } from "@Sentinel360/db/schema/entities";
 import { mediaAsset } from "@Sentinel360/db/schema/evidence";
 
 vi.mock("../services/case-number", () => ({
@@ -323,5 +324,47 @@ describe("ingestAiEvent", () => {
 
     expect(uploadEvidenceFile).not.toHaveBeenCalled();
     expect(result.evidenceIds).toEqual([]);
+  });
+
+  it("records watchlist suggestions as entity matches for review, skipping malformed ones", async () => {
+    const inserted = fakeDb();
+    const profileId = "44444444-4444-4444-8444-444444444444";
+
+    await ingestAiEvent(
+      event({
+        eventType: "WATCHLIST_MATCH",
+        confidence: 0.71,
+        metadata: {
+          watchlistReview: "required",
+          watchlistMatches: [
+            { entityProfileId: profileId, similarity: 0.71, faceNumber: 1 },
+            { entityProfileId: "not-a-uuid", similarity: 0.9 },
+            { entityProfileId: profileId, similarity: "high" },
+          ],
+        },
+      }),
+    );
+
+    expect(inserted.get(entityMatch)).toEqual([
+      { entityProfileId: profileId, sourceEntityType: "INCIDENT", sourceEntityId: "incident-1", similarityScore: "0.7100" },
+    ]);
+    expect(inserted.get(incident)?.[0]).toMatchObject({ severity: "HIGH" });
+    expect(String(inserted.get(incident)?.[0]?.description)).toContain("an officer must verify the identity");
+  });
+
+  it("writes no entity matches for an event without suggestions", async () => {
+    const inserted = fakeDb();
+    await ingestAiEvent(event());
+    expect(inserted.get(entityMatch)).toBeUndefined();
+  });
+
+  it("keeps the docket if recording suggestions fails", async () => {
+    fakeDb({ failInsertInto: entityMatch });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await ingestAiEvent(
+      event({ metadata: { watchlistMatches: [{ entityProfileId: "44444444-4444-4444-8444-444444444444", similarity: 0.5 }] } }),
+    );
+    expect(result.alert).not.toBeNull();
+    expect(result.duplicate).toBe(false);
   });
 });

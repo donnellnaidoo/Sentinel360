@@ -9,13 +9,16 @@ import { and, eq, inArray } from "drizzle-orm";
 import { insertCaseWithGeneratedNumber } from "./case-number";
 import { recordCaseEvent } from "./case-timeline";
 import { recordAuditEvent } from "./audit-log";
+import { recordWatchlistSuggestions } from "./ai-watchlist";
 import { EVIDENCE_ENTITY_TYPE, recordCustodyEvent, sha256Hex } from "./chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "./evidence-storage";
 
-// Event types the apps/ai CCTV pipeline can report. WATCHLIST_MATCH and
-// PLATE_MATCH are declared now so the payload shape doesn't need to change
-// once face/ALPR matching lands (see tasks #9/#10) — ingestAiEvent already
-// handles them, it just has nothing extra to attach to the case yet.
+// Event types the apps/ai CCTV pipeline can report. PLATE_MATCH is declared
+// now so the payload shape doesn't need to change once ALPR lands.
+// WATCHLIST_MATCH and metadata.watchlistMatches on any event are face-match
+// SUGGESTIONS (apps/ai watchlist.py, opt-in) — stored as entity_match rows
+// for an officer to verify, never treated as an identification.
+// ALTERCATION comes from the experimental pose rules (apps/ai pose.py).
 // ANOMALY_DETECTED comes from the SlowFast model, which the model team flags
 // as uncalibrated — apps/ai sends metadata.modelStatus = "experimental".
 // PANIC_BUTTON is a person pressing apps/panic at the camera, not a model
@@ -299,6 +302,16 @@ async function attachAiEvidence(
   return evidenceIds;
 }
 
+function describeEvent(input: AiEventInput): string {
+  if (input.eventType === "PANIC_BUTTON") {
+    return `Panic button pressed at camera ${input.cameraId}. The camera view at the moment of the press is attached as evidence.`;
+  }
+  if (input.eventType === "WATCHLIST_MATCH") {
+    return `Possible watchlist match on camera ${input.cameraId} (face similarity ${(input.confidence * 100).toFixed(0)}%). This is an automated suggestion: an officer must verify the identity before any action is taken.`;
+  }
+  return `Automatically detected by the AI monitoring pipeline on camera ${input.cameraId} (${(input.confidence * 100).toFixed(0)}% confidence).`;
+}
+
 /**
  * Entry point for apps/ai's POST /internal/ai/events. Writes an incident,
  * auto-opens a case (docket) for it, attaches any snapshot/crop images as
@@ -315,10 +328,7 @@ async function attachAiEvidence(
 export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult> {
   const severity = SEVERITY_BY_EVENT_TYPE[input.eventType];
   const title = input.summary ?? `${input.eventType.replace(/_/g, " ")} — camera ${input.cameraId}`;
-  const description =
-    input.eventType === "PANIC_BUTTON"
-      ? `Panic button pressed at camera ${input.cameraId}. The camera view at the moment of the press is attached as evidence.`
-      : `Automatically detected by the AI monitoring pipeline on camera ${input.cameraId} (${(input.confidence * 100).toFixed(0)}% confidence).`;
+  const description = describeEvent(input);
   const incidentNumber = incidentNumberFor(input.eventId);
 
   const [insertedIncident] = await db
@@ -433,6 +443,7 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
   // After the alert, not before: operators are notified as soon as the
   // docket exists, and the images land on it moments later.
   const evidenceIds = await attachAiEvidence(createdCase.id, input, createdIncident.id);
+  const watchlistSuggestions = await recordWatchlistSuggestions(createdIncident.id, input.metadata);
 
   await recordAuditEvent({
     eventType: "ai.event_ingested",
@@ -449,6 +460,7 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
       incidentId: createdIncident.id,
       alertId: createdAlert.id,
       evidenceIds,
+      watchlistSuggestions,
     },
   });
 

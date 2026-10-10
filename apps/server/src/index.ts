@@ -10,6 +10,7 @@ import {
   AI_MEDIA_MIME_TYPES,
   ingestAiEvent,
 } from "@Sentinel360/api/services/ai-ingest";
+import { listAiWatchlist } from "@Sentinel360/api/services/ai-watchlist";
 import { env } from "@Sentinel360/env/server";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -139,6 +140,20 @@ app.post("/internal/ai/events", aiEventBodyLimit, async (c) => {
   } catch (error) {
     console.error("Failed to ingest AI event", error);
     return c.json({ error: "Failed to ingest event" }, 500);
+  }
+});
+
+// apps/ai's watchlist face matching (opt-in) fetches the wanted persons'
+// photos here. Same shared-secret auth as /internal/ai/events.
+app.get("/internal/ai/watchlist", async (c) => {
+  if (!isValidInternalApiKey(c.req.header("X-Internal-Api-Key"))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  try {
+    return c.json({ items: await listAiWatchlist() });
+  } catch (error) {
+    console.error("Failed to list the AI watchlist", error);
+    return c.json({ error: "Failed to list watchlist" }, 500);
   }
 });
 
