@@ -184,7 +184,7 @@ export const evidenceRouter = router({
     .input(idSchema.extend({ purpose: z.enum(["DOWNLOAD", "VIEW_360"]).default("DOWNLOAD") }))
     .mutation(async ({ ctx, input }) => {
       const evidence = await getEvidenceOrThrow(input.id);
-      const url = await getEvidenceSignedUrl(evidence.storageUrl);
+      const url = await getEvidenceSignedUrl(evidence.storageUrl, 300, input.purpose === "DOWNLOAD");
 
       // Every access must be logged — this is not optional telemetry, it's
       // the chain-of-custody record that makes the evidence admissible.

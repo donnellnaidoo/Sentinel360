@@ -168,13 +168,16 @@ export async function downloadEvidenceFile(storagePath: string): Promise<Buffer>
   return Buffer.from(await data.arrayBuffer());
 }
 
+// asAttachment: the URL is served with Content-Disposition: attachment, so
+// opening it saves the file instead of navigating to it.
 export async function getEvidenceSignedUrl(
   storagePath: string,
   expiresInSeconds = 300,
+  asAttachment = false,
 ): Promise<string> {
   const { data, error } = await supabaseAdmin.storage
     .from(EVIDENCE_BUCKET)
-    .createSignedUrl(storagePath, expiresInSeconds);
+    .createSignedUrl(storagePath, expiresInSeconds, asAttachment ? { download: true } : undefined);
 
   if (error || !data) {
     throw new TRPCError({

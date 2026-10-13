@@ -263,7 +263,9 @@ function EvidenceItem({
   );
   const download = useMutation(
     trpc.evidence.getDownloadUrl.mutationOptions({
-      onSuccess: (r) => window.open(r.url, "_blank", "noopener,noreferrer"),
+      // Not window.open: after the await it's no longer a click, so popup
+      // blockers drop it. The URL is an attachment, so this page stays put.
+      onSuccess: (r) => window.location.assign(r.url),
     }),
   );
   // Separate from download so viewing is logged as its own custody access.

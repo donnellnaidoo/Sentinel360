@@ -204,7 +204,8 @@ export default function EvidencePage() {
                 <button
                   onClick={async () => {
                     const result = await getDownloadUrl.mutateAsync({ id: item.id });
-                    window.open(result.url, "_blank", "noopener,noreferrer");
+                    // An attachment URL: saves the file, no popup to block.
+                    window.location.assign(result.url);
                   }}
                   className="flex-1 px-3 py-1.5 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container transition-colors"
                 >
