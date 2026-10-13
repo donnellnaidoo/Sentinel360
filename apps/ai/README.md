@@ -93,6 +93,7 @@ gun detection, which runs whenever `models/threat_yolov8n.pt` is present.
 | `WEAPON_PERSON_MODEL_PATH` | empty | COCO model for person boxes when the weapon model has no person class (e.g. `models/yolov8n.pt`). |
 | `WEAPON_REQUIRE_PERSON` | `false` | Only alarm on a weapon near a person — knives lying on a counter don't fire. |
 | `KNIFE_WINDOW_FRAMES` | `3` | Alarm when the weapon is in `KNIFE_CONSECUTIVE_REQUIRED` of the last N frames. `5` lets one missed frame through. |
+| `WEAPON_DISPLAY_CONFIDENCE` | `0.10` | Live monitor boxes from this confidence. Alarms need 0.45 (`KNIFE_ALARM_CONFIDENCE`), so `0.45` shows only boxes that can be logged. |
 | `DETECT_INPUT_SIZE` | `640` | YOLO input size. `960` finds smaller knives, ~2x slower. |
 | `ANOMALY_CLIP_SECONDS` | `0` | SlowFast clip length in real seconds. `0` = last 32 processed frames (~6.4 s at 5 fps, vs ~1 s in training). `1.5` takes frames straight from the camera at its own rate. |
 | `ANOMALY_VIEW_MODE` | `composite` | `per_view` scores each X3 view at full 224 px instead of four views squashed into one (~3x slower; it just scores less often); `per_view_people` only views with someone in them. |

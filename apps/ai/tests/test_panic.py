@@ -1,4 +1,4 @@
-"""Panic button: PipelineRunner.panic captures the current clean view,
+"""Panic button: PipelineRunner.panic captures the current (annotated) view,
 debounces repeat presses, and POST/GET /stream/panic report delivery."""
 
 from types import SimpleNamespace
@@ -47,6 +47,18 @@ def test_panic_queues_event_with_clean_snapshot():
     decoded = cv2.imdecode(np.frombuffer(event.snapshot_jpeg, np.uint8), cv2.IMREAD_COLOR)
     assert decoded.shape == view.shape
     assert runner.events.get(timeout=0) is event
+
+
+def test_panic_snapshot_is_the_annotated_monitor_view():
+    view = np.full((60, 80, 3), 120, dtype=np.uint8)
+    display = np.zeros((60, 160, 3), dtype=np.uint8)  # what the live monitor drew
+    runner = _running_runner({"Single": view})
+    runner._processor.latest_display = display
+
+    event, _ = runner.panic()
+
+    decoded = cv2.imdecode(np.frombuffer(event.snapshot_jpeg, np.uint8), cv2.IMREAD_COLOR)
+    assert decoded.shape == display.shape
 
 
 def test_panic_from_a_360_camera_attaches_the_panorama():

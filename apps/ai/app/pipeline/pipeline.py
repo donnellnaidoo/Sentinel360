@@ -257,6 +257,9 @@ class FrameProcessor:
         # the most recent frame, for the panic button.
         self.latest_views: dict[str, np.ndarray] | None = None
         self.latest_panorama: np.ndarray | None = None
+        # The last annotated grid (boxes as on the live monitor), the panic
+        # snapshot. Faces are still cropped from latest_views.
+        self.latest_display: np.ndarray | None = None
         # The current frame's panorama JPEG, encoded at most once per frame.
         self._panorama_jpeg: bytes | None = None
         self._panorama_encoded = False
@@ -310,6 +313,7 @@ class FrameProcessor:
         if self.plate_reader is not None and self._frame_counter % self.alpr_every_frames == 0:
             self._read_plates(views, detections, display, frame.timestamp, multi_view)
 
+        self.latest_display = display
         return display
 
     def _read_plates(
@@ -709,8 +713,8 @@ class PipelineRunner:
         self._thread = None
 
     def panic(self, *, wait_seconds: float = settings.panic_frame_wait_seconds) -> tuple[DetectionEvent, bool]:
-        """Queues a PANIC_BUTTON event with the camera's current (clean)
-        view as evidence. Returns (event, repeated): a press within the
+        """Queues a PANIC_BUTTON event with the camera's current view, boxes
+        drawn as on the live monitor, as evidence. Returns (event, repeated): a press within the
         cooldown returns the previous event rather than opening a second
         docket. Starts the pipeline if needed — the camera can only be
         opened once, so the frame has to come from the capture thread.
@@ -727,7 +731,8 @@ class PipelineRunner:
             views = self._wait_for_views(wait_seconds)
             # Read straight after the views; at worst one frame newer.
             panorama = self._processor.latest_panorama if self._processor else None
-            snapshot = _encode_evidence(compose_grid(views))
+            display = getattr(self._processor, "latest_display", None)
+            snapshot = _encode_evidence(display if display is not None else compose_grid(views))
             if snapshot is None:
                 raise PanicCaptureError("Could not encode the camera frame")
 
