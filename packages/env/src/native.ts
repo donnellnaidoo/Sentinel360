@@ -9,6 +9,13 @@ export const env = createEnv({
     EXPO_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
     EXPO_PUBLIC_TOMTOM_API_KEY: z.string().min(1).optional(),
   },
-  runtimeEnv: process.env,
+  // Each variable must be read by name. A release APK only keeps
+  // process.env.EXPO_PUBLIC_* when the code mentions that exact name.
+  runtimeEnv: {
+    EXPO_PUBLIC_SERVER_URL: process.env.EXPO_PUBLIC_SERVER_URL,
+    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    EXPO_PUBLIC_TOMTOM_API_KEY: process.env.EXPO_PUBLIC_TOMTOM_API_KEY,
+  },
   emptyStringAsUndefined: true,
 });

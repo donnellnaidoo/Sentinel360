@@ -8,6 +8,12 @@
     },
     "name": "Sentinel360",
     "slug": "Sentinel360",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1f22"
+    },
     "plugins": [
       "expo-font",
       [
@@ -27,6 +33,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f6e7334a-6b78-4792-bdba-83ad6fde7bdd"
+      }
+    },
+    "owner": "serati-shai",
+    "android": {
+      "package": "com.seratishai.Sentinel360",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     }
   }
 }

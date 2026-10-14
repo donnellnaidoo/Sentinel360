@@ -6,6 +6,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "heroui-native";
 import { useForm } from "@tanstack/react-form";
+import { BrandMark } from "@/components/brand-mark";
 import { supabase } from "@/lib/auth-client";
 import { useAppTheme } from "@/contexts/app-theme-context";
 import { queryClient } from "@/utils/trpc";
@@ -309,17 +310,10 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
         extraKeyboardSpace={24}
       >
         <View style={{ alignItems: "center", paddingTop: 6, paddingBottom: 10 }}>
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 14,
-              backgroundColor: "rgba(14,109,122,0.12)",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ color: HERO_ACCENT, fontWeight: "900", fontSize: 18 }}>S</Text>
+          <BrandMark size={64} color={colors.text} />
+          <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 8, gap: 6 }}>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: "800" }}>Sentinel</Text>
+            <Text style={{ color: "#d98e2b", fontSize: 15, fontWeight: "700" }}>360</Text>
           </View>
 
           <Text style={{ marginTop: 12, fontSize: 28, fontWeight: "800", color: colors.text }}>

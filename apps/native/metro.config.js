@@ -23,4 +23,33 @@ const uniwindConfig = withUniwindConfig(wrapWithReanimatedMetroConfig(config), {
   dtsFile: "./uniwind-types.d.ts",
 });
 
+// Uniwind rewrites `import "react-native"` to its own component wrapper.
+// That wrapper reads NativeModules by importing "react-native" again. On
+// Windows the wrapper is not recognized as internal, so the import points
+// back at itself and NativeModules recurses until the app crashes at startup.
+const uniwindRoot = `${path
+  .resolve(path.dirname(require.resolve("uniwind/package.json")))
+  .replaceAll("/", path.sep)
+  .toLowerCase()}${path.sep}`;
+const realReactNativePath = require.resolve("react-native/index.js", {
+  paths: [projectRoot],
+});
+const resolveBeforeUniwindFix = uniwindConfig.resolver.resolveRequest;
+
+uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  const origin = context.originModulePath
+    ? path.resolve(context.originModulePath).replaceAll("/", path.sep).toLowerCase()
+    : "";
+
+  if (moduleName === "react-native" && origin.startsWith(uniwindRoot)) {
+    return { type: "sourceFile", filePath: realReactNativePath };
+  }
+
+  if (typeof resolveBeforeUniwindFix === "function") {
+    return resolveBeforeUniwindFix(context, moduleName, platform);
+  }
+
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = uniwindConfig;
