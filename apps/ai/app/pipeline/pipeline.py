@@ -4,8 +4,9 @@ cv2 capture/inference loop doesn't block FastAPI's event loop.
 capture -> views (X3 dewarp or single view) -> batched YOLO (person/weapon)
 -> KnifeConfirmer -> [pose rules] -> SlowFast clip buffer (background
 thread) -> AnomalyConfirmer -> overlays -> latest JPEG for MJPEG
--> confirmed detections (plus face crops from that frame, and any
-watchlist suggestions) onto the EventQueue for the backend publisher.
+-> confirmed detections (plus face crops and weapon/person close-ups from
+that frame, and any watchlist suggestions) onto the EventQueue for the
+backend publisher.
 Stages in [] and watchlist matching are off unless enabled in config.py.
 
 Overlays are drawn on copies only: the raw views must stay clean because
@@ -30,6 +31,7 @@ from app.pipeline.capture import Frame, FrameSource, is_live_source, open_captur
 from app.pipeline.dewarp import ViewSplitter, compose_grid, view_point_to_direction
 from app.pipeline.events import DetectionEvent, EventQueue
 from app.pipeline.faces import YUNET_MODEL_NAME, FaceCrop, FaceDetector, load_face_detector
+from app.pipeline.objects import crop_objects
 from app.pipeline.plates import VEHICLE_LABELS, PlateConfirmer, PlateMatch, PlateReader, PlateWatchlist, load_alpr
 from app.pipeline.pose import AltercationAnalyzer, PoseEstimator, PoseObservation, load_pose_estimator
 from app.pipeline.watchlist import SFACE_MODEL_NAME, WatchlistMatcher, load_watchlist_matcher
@@ -165,10 +167,10 @@ def _attach_panorama(event: DetectionEvent, panorama_jpeg: bytes | None) -> None
     target = _box_direction(event.metadata.get("view"), event.metadata.get("bbox"))
     if target is not None:
         event.metadata["panoramaTarget"] = target
-    for face in event.metadata.get("faces") or []:
-        direction = _box_direction(face.get("view"), face.get("bbox"))
+    for item in [*(event.metadata.get("faces") or []), *(event.metadata.get("objects") or [])]:
+        direction = _box_direction(item.get("view"), item.get("bbox"))
         if direction is not None:
-            face["panoramaDirection"] = direction
+            item["panoramaDirection"] = direction
 
 
 def _set_faces(event: DetectionEvent, crops: list[FaceCrop], watchlist: WatchlistMatcher | None, views) -> None:
@@ -193,6 +195,23 @@ def _set_faces(event: DetectionEvent, crops: list[FaceCrop], watchlist: Watchlis
         event.metadata["watchlistMatches"] = sorted(best.values(), key=lambda m: -m["similarity"])
         event.metadata["watchlistReview"] = "required"
         event.metadata["faceMatchModel"] = SFACE_MODEL_NAME
+
+
+def _attach_objects(
+    event: DetectionEvent,
+    views: dict[str, np.ndarray],
+    detections: dict[str, list[ViewDetection]] | None,
+    weapon_labels: list[str],
+) -> None:
+    """Adds a close-up of every weapon and person in the frame ("Knife 1",
+    "Person 1", ...) to the event's evidence."""
+    if not settings.object_evidence_enabled or not detections:
+        return
+    crops = crop_objects(views, detections, weapon_labels)
+    if not crops:
+        return
+    event.object_jpegs = [crop.jpeg for crop in crops]
+    event.metadata["objects"] = [crop.describe() for crop in crops]
 
 
 def _attach_faces(
@@ -256,6 +275,10 @@ class FrameProcessor:
         # Unannotated views (and the 360° frame, for a panoramic source) of
         # the most recent frame, for the panic button.
         self.latest_views: dict[str, np.ndarray] | None = None
+        # Detections in latest_views, for the panic button's object crops.
+        self.latest_detections: dict[str, list[ViewDetection]] | None = None
+        # Detections in the frame being processed, for the emitters.
+        self._detections: dict[str, list[ViewDetection]] | None = None
         self.latest_panorama: np.ndarray | None = None
         # The last annotated grid (boxes as on the live monitor), the panic
         # snapshot. Faces are still cropped from latest_views.
@@ -268,10 +291,13 @@ class FrameProcessor:
         views = self.splitter.split(frame)
         multi_view = len(views) > 1
         self.latest_panorama = frame.image if frame.panoramic and settings.panorama_evidence_enabled else None
-        self.latest_views = views
         self._panorama_encoded = False
 
         detections = self.weapon_detector.detect(views)
+        self._detections = detections
+        # Together, so a panic press never pairs these views with another
+        # frame's boxes.
+        self.latest_views, self.latest_detections = views, detections
         candidates = best_knife_per_view(detections, alarm_labels=self.weapon_detector.alarm_labels)
         knife_observations = self.knife_confirmer.update(candidates, now=frame.timestamp)
         knife_by_view = {obs.view: obs for obs in knife_observations}
@@ -412,6 +438,9 @@ class FrameProcessor:
         if now < self._alarm_until:
             cv2.rectangle(display, (0, 0), (display.shape[1] - 1, display.shape[0] - 1), _KNIFE_COLOR, 6)
 
+    def _attach_objects(self, event: DetectionEvent, views: dict[str, np.ndarray]) -> None:
+        _attach_objects(event, views, self._detections, self.weapon_detector.alarm_labels)
+
     def _emit_weapon(
         self, obs: KnifeObservation, views: dict[str, np.ndarray], snapshot: bytes | None, multi_view: bool
     ) -> None:
@@ -441,6 +470,7 @@ class FrameProcessor:
             crop_jpeg=_encode_evidence(crop_with_padding(views[obs.view], obs.bbox)),
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        self._attach_objects(event, views)
         _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
@@ -468,6 +498,7 @@ class FrameProcessor:
             crop_jpeg=_encode_evidence(crop_with_padding(views[obs.view], obs.bbox)),
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        self._attach_objects(event, views)
         _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
@@ -487,6 +518,7 @@ class FrameProcessor:
         )
         # The matched face is face 1; its match list is all this event is about.
         _set_faces(event, [crop], self.watchlist, views)
+        self._attach_objects(event, views)
         _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
@@ -525,6 +557,7 @@ class FrameProcessor:
             crop_jpeg=_encode_evidence(crop_with_padding(views[read.view], crop_box, padding=0.15)),
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        self._attach_objects(event, views)
         _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
@@ -549,6 +582,7 @@ class FrameProcessor:
             snapshot_jpeg=snapshot,
         )
         _attach_faces(event, self.face_detector, views, self.watchlist)
+        self._attach_objects(event, views)
         _attach_panorama(event, self._frame_panorama())
         self.emit(event)
 
@@ -731,6 +765,13 @@ class PipelineRunner:
             views = self._wait_for_views(wait_seconds)
             # Read straight after the views; at worst one frame newer.
             panorama = self._processor.latest_panorama if self._processor else None
+            # Only this frame's boxes: a newer frame may have landed since.
+            detections = (
+                getattr(self._processor, "latest_detections", None)
+                if getattr(self._processor, "latest_views", None) is views
+                else None
+            )
+            detector = getattr(self._processor, "weapon_detector", None)
             display = getattr(self._processor, "latest_display", None)
             snapshot = _encode_evidence(display if display is not None else compose_grid(views))
             if snapshot is None:
@@ -746,6 +787,8 @@ class PipelineRunner:
                 occurred_at=pressed_at,
             )
             _attach_faces(event, self._face_detector, views, self._watchlist)
+            if detector is not None:
+                _attach_objects(event, views, detections, detector.alarm_labels)
             _attach_panorama(event, None if panorama is None else _encode_panorama(panorama))
             logger.warning("Panic button pressed — queued %s", event.event_id)
             self._record_event(event)

@@ -30,6 +30,9 @@ class DetectionEvent:
     crop_jpeg: bytes | None = None
     # Every face in view at that moment (pipeline/faces.py), largest first.
     face_jpegs: list[bytes] = field(default_factory=list)
+    # Close-ups of each weapon and person in the frame (pipeline/objects.py),
+    # in the order of metadata.objects.
+    object_jpegs: list[bytes] = field(default_factory=list)
     # Full clean 360° frame for the docket's 360° viewer (panoramic sources only).
     panorama_jpeg: bytes | None = None
     # Sent as metadata.eventId so the backend can drop retried duplicates.
@@ -48,6 +51,7 @@ class DetectionEvent:
             "has_snapshot": self.snapshot_jpeg is not None,
             "has_crop": self.crop_jpeg is not None,
             "face_count": len(self.face_jpegs),
+            "object_count": len(self.object_jpegs),
             "has_panorama": self.panorama_jpeg is not None,
         }
 

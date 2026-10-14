@@ -65,6 +65,18 @@ personal information under POPIA), so set `FACE_ENABLED=false` where that
 isn't justified, and treat them under the same retention rules as other
 case evidence.
 
+### Weapon and person close-ups
+
+Every event (including the panic button) also gets a close-up of each
+weapon and person the detector found in that frame, as `OBJECT` media:
+weapons at alarm confidence first (up to `OBJECT_MAX_WEAPONS`, 3), then
+people from `OBJECT_PERSON_CONFIDENCE` (0.40), largest first (up to
+`OBJECT_MAX_PEOPLE`, 10). The case shows them as "AI capture: Knife 1",
+"AI capture: Person 1", "AI capture: Person 2", ..., described in
+`metadata.objects`. No extra model runs: these are the boxes the frame
+already has. People include bystanders, as with faces; set
+`OBJECT_EVIDENCE_ENABLED=false` to turn it off. Vehicles and plates are not
+cropped (plate readings stay limited to watchlist matches, below).
 
 ## Improving accuracy
 

@@ -8,14 +8,16 @@ process.env.AI_SERVICE_API_KEY = API_KEY;
 process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 process.env.CORS_ORIGIN ??= "http://localhost:3001";
 
-const MAX_AI_MEDIA_BYTES = 768 * 1024;
+const MAX_AI_MEDIA_BYTES = 512 * 1024;
 const MAX_AI_FACE_BYTES = 128 * 1024;
 const MAX_AI_PANORAMA_BYTES = 1024 * 1024;
+const MAX_AI_OBJECT_BYTES = 40 * 1024;
 const AI_MEDIA_LIMITS = {
   SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   FACE: { maxCount: 5, maxBytes: MAX_AI_FACE_BYTES },
   PANORAMA: { maxCount: 1, maxBytes: MAX_AI_PANORAMA_BYTES },
+  OBJECT: { maxCount: 13, maxBytes: MAX_AI_OBJECT_BYTES },
 };
 const base64Length = (bytes: number) => Math.ceil(bytes / 3) * 4;
 let ingestResult: Record<string, unknown> = {};
@@ -23,7 +25,7 @@ const ingestAiEvent = mock(async (_input: unknown) => ingestResult);
 
 mock.module("@Sentinel360/api/services/ai-ingest", () => ({
   AI_EVENT_TYPES: ["WEAPON_DETECTED", "ANOMALY_DETECTED", "PANIC_BUTTON", "ALTERCATION", "WATCHLIST_MATCH", "PLATE_MATCH"],
-  AI_MEDIA_KINDS: ["SNAPSHOT", "CROP", "FACE", "PANORAMA"],
+  AI_MEDIA_KINDS: ["SNAPSHOT", "CROP", "FACE", "PANORAMA", "OBJECT"],
   AI_MEDIA_LIMITS,
   AI_MEDIA_MIME_TYPES: ["image/jpeg", "image/png", "image/webp"],
   ingestAiEvent,
@@ -129,20 +131,25 @@ describe("POST /internal/ai/events", () => {
       "more than five faces",
       { media: Array.from({ length: 6 }, () => ({ kind: "FACE", mimeType: "image/jpeg", dataBase64: "AA" })) },
     ],
+    [
+      "more than thirteen objects",
+      { media: Array.from({ length: 14 }, () => ({ kind: "OBJECT", mimeType: "image/jpeg", dataBase64: "AA" })) },
+    ],
   ])("rejects %s with 400", async (_name, overrides) => {
     expect((await post(event(overrides))).status).toBe(400);
     expect(ingestAiEvent).not.toHaveBeenCalled();
   });
 
-  it("accepts a snapshot, a crop, five faces and a panorama", async () => {
+  it("accepts a snapshot, a crop, five faces, a panorama and thirteen objects", async () => {
     const media = [
       { kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
       { kind: "CROP", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
       ...Array.from({ length: 5 }, () => ({ kind: "FACE", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" })),
       { kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
+      ...Array.from({ length: 13 }, () => ({ kind: "OBJECT", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" })),
     ];
     expect((await post(event({ media }))).status).toBe(201);
-    expect((ingestAiEvent.mock.calls[0]?.[0] as { media: unknown[] }).media).toHaveLength(8);
+    expect((ingestAiEvent.mock.calls[0]?.[0] as { media: unknown[] }).media).toHaveLength(21);
   });
 
   it("keeps the largest valid body under Vercel's 4.5 MB request cap", async () => {
@@ -155,13 +162,18 @@ describe("POST /internal/ai/events", () => {
         dataBase64: "A".repeat(base64Length(MAX_AI_FACE_BYTES)),
       })),
       { kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: "A".repeat(base64Length(MAX_AI_PANORAMA_BYTES)) },
+      ...Array.from({ length: 13 }, () => ({
+        kind: "OBJECT",
+        mimeType: "image/jpeg",
+        dataBase64: "A".repeat(base64Length(MAX_AI_OBJECT_BYTES)),
+      })),
     ];
     const body = JSON.stringify(event({ media }));
     expect(body.length).toBeLessThan(4.5 * 1024 * 1024);
     expect((await post(body)).status).toBe(201);
   });
 
-  it("rejects a snapshot over 768 KB with 400", async () => {
+  it("rejects a snapshot over 512 KB with 400", async () => {
     const tooBig = "A".repeat(base64Length(MAX_AI_MEDIA_BYTES) + 4);
     const response = await post(event({ media: [{ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: tooBig }] }));
     expect(response.status).toBe(400);
@@ -170,6 +182,12 @@ describe("POST /internal/ai/events", () => {
   it("rejects a panorama over 1 MB with 400", async () => {
     const tooBig = "A".repeat(base64Length(MAX_AI_PANORAMA_BYTES) + 4);
     const response = await post(event({ media: [{ kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: tooBig }] }));
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects an object close-up over 40 KB with 400", async () => {
+    const tooBig = "A".repeat(base64Length(MAX_AI_OBJECT_BYTES) + 4);
+    const response = await post(event({ media: [{ kind: "OBJECT", mimeType: "image/jpeg", dataBase64: tooBig }] }));
     expect(response.status).toBe(400);
   });
 

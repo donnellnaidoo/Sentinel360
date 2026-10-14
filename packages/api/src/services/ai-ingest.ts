@@ -62,23 +62,31 @@ const AI_ALERT_RECIPIENT_ROLE_CODES = [
 // Detection only — no identity is attached, the crops are just evidence.
 // PANORAMA: the full 360° equirectangular frame from a panoramic camera,
 // shown in the docket's interactive 360° viewer.
-export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE", "PANORAMA"] as const;
+// OBJECT: a close-up of each weapon and person in the frame (apps/ai
+// pipeline/objects.py), described in the same order by metadata.objects
+// ({ label, number, name: "Person 1", view, bbox, confidence }).
+export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE", "PANORAMA", "OBJECT"] as const;
 export type AiMediaKind = (typeof AI_MEDIA_KINDS)[number];
 export const AI_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 // Every image base64-encoded (4/3 overhead) plus the JSON envelope must fit
-// Vercel's 4.5 MB request-body cap: 2 x 1.05 MB + 1.4 MB + 5 x 171 KB +
-// 64 KB ~= 4.43 MB. Real snapshots are 10-200 KB; face crops (<= 256 px)
-// ~10-30 KB; apps/ai shrinks a panorama until it fits MAX_AI_PANORAMA_BYTES.
-export const MAX_AI_MEDIA_BYTES = 768 * 1024;
+// Vercel's 4.5 MB request-body cap: 2 x 683 KB + 1.37 MB + 5 x 171 KB +
+// 13 x 53 KB + 64 KB ~= 4.45 MB. Real snapshots are 10-350 KB; face crops
+// (<= 256 px) ~10-30 KB; object crops (<= 320 px) ~10-30 KB; apps/ai
+// shrinks a panorama until it fits MAX_AI_PANORAMA_BYTES.
+export const MAX_AI_MEDIA_BYTES = 512 * 1024;
 export const MAX_AI_PANORAMA_BYTES = 1024 * 1024;
 export const MAX_AI_FACE_BYTES = 128 * 1024;
 // Must stay >= face_max_per_event in apps/ai/app/config.py.
 export const MAX_AI_FACES = 5;
+export const MAX_AI_OBJECT_BYTES = 40 * 1024;
+// Must stay >= object_max_weapons + object_max_people in apps/ai/app/config.py.
+export const MAX_AI_OBJECTS = 13;
 export const AI_MEDIA_LIMITS: Record<AiMediaKind, { maxCount: number; maxBytes: number }> = {
   SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   FACE: { maxCount: MAX_AI_FACES, maxBytes: MAX_AI_FACE_BYTES },
   PANORAMA: { maxCount: 1, maxBytes: MAX_AI_PANORAMA_BYTES },
+  OBJECT: { maxCount: MAX_AI_OBJECTS, maxBytes: MAX_AI_OBJECT_BYTES },
 };
 const AI_EVIDENCE_SOURCE = "AI_PIPELINE";
 
@@ -93,6 +101,7 @@ const MEDIA_TITLE: Record<AiMediaKind, string> = {
   CROP: "AI detection close-up",
   FACE: "AI face capture",
   PANORAMA: "AI 360° panorama",
+  OBJECT: "AI capture",
 };
 
 export interface AiEventMedia {
@@ -175,20 +184,62 @@ async function findCaseEvidenceIds(caseId: string): Promise<string[]> {
   return links.map((link) => link.id);
 }
 
+// What one image shows, for its title and filename: "Face 2", or an
+// OBJECT's metadata.objects entry ("Knife 1", "Person 3").
+interface AiMediaLabel {
+  // Stored on the media_asset: { faceNumber } or { objectName, objectLabel }.
+  metadata: Record<string, unknown>;
+  // Appended to the title ("AI face capture 2") or replacing it for objects.
+  title: string;
+  fileSuffix: string;
+}
+
 interface UploadedAiMedia {
   item: AiEventMedia;
-  // 1-based position among FACE items (matches metadata.faces); null otherwise.
-  faceNumber: number | null;
+  label: AiMediaLabel | null;
   fileBytes: Buffer;
   fileHash: string;
   originalFilename: string;
   storagePath: string;
 }
 
+function objectAt(metadata: Record<string, unknown> | undefined, index: number) {
+  const objects = metadata?.objects;
+  const entry = Array.isArray(objects) ? objects[index] : undefined;
+  if (!entry || typeof entry !== "object") return null;
+  const { name, label } = entry as { name?: unknown; label?: unknown };
+  return typeof name === "string" && typeof label === "string" ? { name, label } : null;
+}
+
+// FACE and OBJECT items are numbered in order, matching metadata.faces /
+// metadata.objects; the other kinds have one image each.
+function labelAiMedia(media: AiEventMedia[], metadata: Record<string, unknown> | undefined): (AiMediaLabel | null)[] {
+  let faces = 0;
+  let objects = 0;
+  return media.map((item) => {
+    if (item.kind === "FACE") {
+      faces += 1;
+      return { metadata: { faceNumber: faces }, title: `${MEDIA_TITLE.FACE} ${faces}`, fileSuffix: `-${faces}` };
+    }
+    if (item.kind === "OBJECT") {
+      objects += 1;
+      const object = objectAt(metadata, objects - 1);
+      const name = object?.name ?? `Object ${objects}`;
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      return {
+        metadata: { objectName: name, objectLabel: object?.label ?? null },
+        title: `${MEDIA_TITLE.OBJECT}: ${name}`,
+        fileSuffix: `-${slug || objects}`,
+      };
+    }
+    return null;
+  });
+}
+
 async function uploadAiMedia(
   item: AiEventMedia,
   input: AiEventInput,
-  faceNumber: number | null,
+  label: AiMediaLabel | null,
 ): Promise<UploadedAiMedia> {
   const fileBytes = Buffer.from(item.dataBase64, "base64");
   const { maxBytes } = AI_MEDIA_LIMITS[item.kind];
@@ -197,10 +248,10 @@ async function uploadAiMedia(
   if (fileBytes.length === 0 || fileBytes.length > maxBytes) {
     throw new Error(`${item.kind} is ${fileBytes.length} bytes (max ${maxBytes})`);
   }
-  const suffix = faceNumber === null ? "" : `-${faceNumber}`;
+  const suffix = label?.fileSuffix ?? "";
   const originalFilename = `${input.cameraId}-${input.eventType.toLowerCase()}-${item.kind.toLowerCase()}${suffix}.${MEDIA_EXTENSION[item.mimeType]}`;
   const { storagePath } = await uploadEvidenceFile(fileBytes, originalFilename, item.mimeType);
-  return { item, faceNumber, fileBytes, fileHash: sha256Hex(fileBytes), originalFilename, storagePath };
+  return { item, label, fileBytes, fileHash: sha256Hex(fileBytes), originalFilename, storagePath };
 }
 
 /**
@@ -221,10 +272,9 @@ async function attachAiEvidence(
   incidentId: string,
 ): Promise<string[]> {
   const media = input.media ?? [];
-  let faces = 0;
-  const faceNumbers = media.map((item) => (item.kind === "FACE" ? ++faces : null));
+  const labels = labelAiMedia(media, input.metadata);
   const uploads = await Promise.allSettled(
-    media.map((item, index) => uploadAiMedia(item, input, faceNumbers[index] ?? null)),
+    media.map((item, index) => uploadAiMedia(item, input, labels[index] ?? null)),
   );
   const evidenceIds: string[] = [];
 
@@ -233,8 +283,8 @@ async function attachAiEvidence(
       console.error(`Failed to upload AI ${media[index]?.kind} evidence for case ${caseId}`, upload.reason);
       continue;
     }
-    const { item, faceNumber, fileBytes, fileHash, originalFilename, storagePath } = upload.value;
-    const mediaTitle = faceNumber === null ? MEDIA_TITLE[item.kind] : `${MEDIA_TITLE[item.kind]} ${faceNumber}`;
+    const { item, label, fileBytes, fileHash, originalFilename, storagePath } = upload.value;
+    const mediaTitle = label?.title ?? MEDIA_TITLE[item.kind];
     let recorded = false;
 
     try {
@@ -259,7 +309,7 @@ async function attachAiEvidence(
             confidence: input.confidence,
             incidentId,
             ...input.metadata,
-            ...(faceNumber === null ? {} : { faceNumber }),
+            ...label?.metadata,
           },
           createdByUserId: null,
         })

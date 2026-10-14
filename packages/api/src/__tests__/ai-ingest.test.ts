@@ -321,6 +321,44 @@ describe("ingestAiEvent", () => {
     expect(inserted.get(caseEvidence)).toHaveLength(3);
   });
 
+  it("stores each object close-up as named AI evidence on the case", async () => {
+    const inserted = fakeDb();
+    const objects = [
+      { label: "knife", number: 1, name: "Knife 1", view: "Main", bbox: [10, 10, 60, 70], confidence: 0.81 },
+      { label: "person", number: 1, name: "Person 1", view: "Main", bbox: [0, 0, 400, 700], confidence: 0.9 },
+    ];
+
+    await ingestAiEvent(
+      event({
+        metadata: { view: "Main", objects },
+        media: [
+          { kind: "FACE", mimeType: "image/jpeg", dataBase64: JPEG },
+          { kind: "OBJECT", mimeType: "image/jpeg", dataBase64: JPEG },
+          { kind: "OBJECT", mimeType: "image/jpeg", dataBase64: JPEG },
+          { kind: "OBJECT", mimeType: "image/jpeg", dataBase64: JPEG },
+        ],
+      }),
+    );
+
+    const media = inserted.get(mediaAsset) ?? [];
+    expect(media[0]).toMatchObject({ title: "AI face capture 1 — weapon detected" });
+    expect(media[1]).toMatchObject({
+      title: "AI capture: Knife 1 — weapon detected",
+      originalFilename: "CAM-DEMO-1-weapon_detected-object-knife-1.jpg",
+      metadata: expect.objectContaining({ kind: "OBJECT", objectName: "Knife 1", objectLabel: "knife", objects }),
+    });
+    expect(media[2]).toMatchObject({
+      title: "AI capture: Person 1 — weapon detected",
+      metadata: expect.objectContaining({ objectName: "Person 1", objectLabel: "person" }),
+    });
+    // More images than metadata.objects entries: still stored, generic name.
+    expect(media[3]).toMatchObject({
+      title: "AI capture: Object 3 — weapon detected",
+      metadata: expect.objectContaining({ objectName: "Object 3", objectLabel: null }),
+    });
+    expect(media[1]?.metadata).not.toHaveProperty("faceNumber");
+  });
+
   it("rejects a face over the face size cap before it reaches storage", async () => {
     fakeDb();
     vi.spyOn(console, "error").mockImplementation(() => {});
