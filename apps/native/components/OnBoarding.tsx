@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BrandLockup } from "@/components/brand-mark";
 import { useAppTheme } from "@/contexts/app-theme-context";
+import { markOnboardingSeen } from "@/lib/onboarding-seen";
 
 const { width, height } = Dimensions.get("window");
 
@@ -24,7 +26,6 @@ type OnboardingItem = {
 };
 
 const HERO_BG = "#0b1f22";
-const HERO_ACCENT = "#0e6d7a";
 const CTA_BG = "#0b2e4a";
 
 const OnboardingScreen = () => {
@@ -59,6 +60,11 @@ const OnboardingScreen = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
+  const finish = useCallback(async (href: "/sign-in" | "/sign-up") => {
+    await markOnboardingSeen();
+    router.replace(href);
+  }, []);
+
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
       flatListRef.current?.scrollToIndex({
@@ -66,13 +72,14 @@ const OnboardingScreen = () => {
         animated: true,
       });
       setCurrentIndex(currentIndex + 1);
-    } else {
-      router.replace("/sign-up");
+      return;
     }
+
+    void finish("/sign-up");
   };
 
   const handleSkip = () => {
-    router.replace("/sign-in");
+    void finish("/sign-in");
   };
 
   const renderItem = ({ item }: ListRenderItemInfo<OnboardingItem>) => {
@@ -86,26 +93,19 @@ const OnboardingScreen = () => {
       >
         <View className="flex-1">
           {/* Hero */}
-          <View className="px-7 pt-10 pb-6" style={{ height: Math.max(340, height * 0.46) }}>
-            <Text
-              className="font-extrabold tracking-wider"
-              style={{ fontSize: 44, color: HERO_ACCENT, letterSpacing: 2 }}
-            >
-              ONBOARDING
-            </Text>
+          <View className="px-7 pt-8 pb-6" style={{ height: Math.max(340, height * 0.46) }}>
+            <BrandLockup />
 
-            <Text className="mt-2 text-xs leading-4" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <Text
+              className="mt-3 text-xs leading-4 text-center"
+              style={{ color: "rgba(255,255,255,0.55)" }}
+            >
               Sentinel360 helps communities stay connected with real-time alerts and verified
               reports.
             </Text>
 
-            {/* Center icon */}
-            <View className="items-center justify-center mt-10">
-              <Ionicons name="person-circle-outline" size={92} color="rgba(255,255,255,0.35)" />
-            </View>
-
             {/* Alert card */}
-            <View className="items-center mt-6">
+            <View className="items-center mt-8">
               <View
                 style={{
                   width: Math.min(260, width - 64),
@@ -204,7 +204,7 @@ const OnboardingScreen = () => {
               {currentIndex === onboardingData.length - 1 ? (
                 <View className="items-end gap-3">
                   <Pressable
-                    onPress={() => router.replace("/sign-up")}
+                    onPress={() => void finish("/sign-up")}
                     style={({ pressed }) => ({
                       backgroundColor: CTA_BG,
                       paddingHorizontal: 18,
@@ -219,7 +219,7 @@ const OnboardingScreen = () => {
                     <Ionicons name="arrow-forward" size={18} color="#fff" />
                   </Pressable>
 
-                  <Pressable onPress={() => router.replace("/sign-in")}>
+                  <Pressable onPress={() => void finish("/sign-in")}>
                     <Text style={{ color: CTA_BG, fontWeight: "700" }}>Sign In</Text>
                   </Pressable>
                 </View>

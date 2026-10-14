@@ -31,64 +31,6 @@ function Pill({ label }: { label: string }) {
   );
 }
 
-function CommunityItem({
-  tag,
-  title,
-  time,
-}: {
-  tag: { label: string; bg: string; fg: string };
-  title: string;
-  time: string;
-}) {
-  const { colors } = useAppTheme();
-  return (
-    <View
-      style={{
-        backgroundColor: colors.surface,
-        borderRadius: 14,
-        padding: 12,
-        flexDirection: "row",
-        gap: 12,
-        alignItems: "center",
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 2,
-      }}
-    >
-      <View
-        style={{
-          width: 54,
-          height: 54,
-          borderRadius: 12,
-          backgroundColor: "#e2e8f0",
-        }}
-      />
-
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View
-            style={{
-              backgroundColor: tag.bg,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 10, fontWeight: "900", color: tag.fg }}>{tag.label}</Text>
-          </View>
-          <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: "700" }}>{time}</Text>
-        </View>
-        <Text style={{ marginTop: 6, color: colors.text, fontWeight: "800" }}>{title}</Text>
-        <Text style={{ marginTop: 2, color: colors.textSubtle, fontSize: 12 }}>
-          Updates for Auckland Park residents and nearby streets...
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 function AlertItem({
   accent,
   iconBg,
@@ -258,35 +200,6 @@ export default function HomeScreen() {
 
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </Pressable>
-        </View>
-
-        <View style={{ marginTop: 22 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-            <View>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: colors.text }}>Community Updates</Text>
-              <Text style={{ marginTop: 4, fontSize: 12, color: colors.textSubtle }}>
-                Verified announcements from {place?.label ?? "your area"}
-              </Text>
-            </View>
-            <Pressable style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
-              <Text style={{ color: colors.text, fontWeight: "900" }}>
-                View{`\n`}all
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={{ marginTop: 14, gap: 12 }}>
-            <CommunityItem
-              tag={{ label: "CIVIC", bg: "#dbeafe", fg: "#1d4ed8" }}
-              title="Kingsway Street Lighting Upgrade"
-              time="2h ago"
-            />
-            <CommunityItem
-              tag={{ label: "EVENT", bg: "#fef3c7", fg: "#92400e" }}
-              title="Auckland Park Neighbourhood Watch"
-              time="5h ago"
-            />
-          </View>
         </View>
 
         <View style={{ marginTop: 22 }}>

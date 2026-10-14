@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { File } from "expo-file-system";
 
 import { AccountAvatarButton } from "@/lib/account-profile";
-import { trpc } from "@/utils/trpc";
+import { queryClient, trpc } from "@/utils/trpc";
 import { useAppTheme } from "@/contexts/app-theme-context";
 import { useUserLocation } from "@/contexts/user-location-context";
 
@@ -75,6 +75,7 @@ export default function ReportScreen() {
         setDescription("");
         setLocationAddress("");
         setPhotos([]);
+        void queryClient.invalidateQueries({ queryKey: trpc.sightings.listMine.queryKey() });
       },
     }),
   );

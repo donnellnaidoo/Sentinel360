@@ -1,14 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect, useRouter } from "expo-router";
+import { type ReactNode, useCallback } from "react";
 import { Image, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppTheme } from "@/contexts/app-theme-context";
 import { useUserLocation } from "@/contexts/user-location-context";
+import { isAccountReport, isActiveTip } from "@/lib/account-activity";
 import { useAccountProfile } from "@/lib/account-profile";
 import { supabase } from "@/lib/auth-client";
-import { queryClient } from "@/utils/trpc";
+import { queryClient, trpc } from "@/utils/trpc";
 
 function Header() {
   const { colors } = useAppTheme();
@@ -129,11 +131,34 @@ function SettingsGroup({ title, children }: { title: string; children: ReactNode
   );
 }
 
+function statValue(count: number | undefined) {
+  return count === undefined ? "–" : String(count);
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, isDark, toggleTheme } = useAppTheme();
   const { status: locationStatus, place, message: locationMessage } = useUserLocation();
   const { name: displayName, email: accountEmail, image: avatarUri, initials } = useAccountProfile();
+  const {
+    data: sightings,
+    refetch: refetchSightings,
+  } = useQuery(trpc.sightings.listMine.queryOptions());
+  const {
+    data: alerts,
+    refetch: refetchAlerts,
+  } = useQuery(trpc.alerts.listMine.queryOptions());
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchSightings();
+      void refetchAlerts();
+    }, [refetchAlerts, refetchSightings]),
+  );
+
+  const reportCount = sightings?.filter(isAccountReport).length;
+  const activeTipCount = sightings?.filter(isActiveTip).length;
+  const alertCount = alerts?.length;
   const email = accountEmail || "demo@sentinel360.com";
   const areaLabel =
     locationStatus === "loading"
@@ -225,9 +250,9 @@ export default function ProfileScreen() {
         </View>
 
         <View style={{ marginTop: 16, flexDirection: "row", gap: 10 }}>
-          <StatCard value="3" label="Reports" onPress={() => router.push("/my-sightings")} />
-          <StatCard value="1" label="Active Tips" onPress={() => router.push("/secure-tips")} />
-          <StatCard value="12" label="Alerts" onPress={() => router.push("/(drawer)/(tabs)/alerts")} />
+          <StatCard value={statValue(reportCount)} label="Reports" onPress={() => router.push("/my-sightings")} />
+          <StatCard value={statValue(activeTipCount)} label="Active Tips" onPress={() => router.push("/secure-tips")} />
+          <StatCard value={statValue(alertCount)} label="Alerts" onPress={() => router.push("/(drawer)/(tabs)/alerts")} />
         </View>
 
         <SettingsGroup title="APPEARANCE">

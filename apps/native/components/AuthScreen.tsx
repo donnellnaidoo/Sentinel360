@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StatusBar, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "heroui-native";
 import { useForm } from "@tanstack/react-form";
+import { BrandMark } from "@/components/brand-mark";
 import { supabase } from "@/lib/auth-client";
 import { useAppTheme } from "@/contexts/app-theme-context";
 import { queryClient } from "@/utils/trpc";
@@ -13,7 +15,6 @@ import z from "zod";
 type AuthMode = "sign-in" | "sign-up";
 
 // Palette aligned with onboarding (`components/OnBoarding.tsx`)
-const HERO_BG = "#0b1f22";
 const HERO_ACCENT = "#0e6d7a";
 const CTA_BG = "#0b2e4a";
 
@@ -130,6 +131,9 @@ function FieldRow({
   onSubmitEditing?: () => void;
 }) {
   const { colors } = useAppTheme();
+  const [hidden, setHidden] = useState(Boolean(secureTextEntry));
+  const canReveal = Boolean(secureTextEntry);
+
   return (
     <View
       style={{
@@ -148,7 +152,7 @@ function FieldRow({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textSubtle}
-        secureTextEntry={secureTextEntry}
+        secureTextEntry={canReveal ? hidden : false}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         textContentType={textContentType}
@@ -157,11 +161,22 @@ function FieldRow({
         style={{
           flex: 1,
           marginLeft: 10,
+          marginRight: canReveal ? 8 : 0,
           color: colors.text,
           fontWeight: "600",
           paddingVertical: 0,
         }}
       />
+      {canReveal && (
+        <Pressable
+          onPress={() => setHidden((current) => !current)}
+          accessibilityRole="button"
+          accessibilityLabel={hidden ? "Show password" : "Hide password"}
+          hitSlop={8}
+        >
+          <Ionicons name={hidden ? "eye-outline" : "eye-off-outline"} size={20} color={colors.iconMuted} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -169,6 +184,7 @@ function FieldRow({
 export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
   const { toast } = useToast();
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -278,22 +294,26 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.sheetBg }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
       <StatusBar barStyle={colors.statusBar} backgroundColor={colors.sheetBg} />
 
-      <View style={{ flex: 1, paddingHorizontal: 18, paddingTop: 14 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 18,
+          paddingTop: 14,
+          paddingBottom: insets.bottom + 24,
+        }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bottomOffset={24}
+        extraKeyboardSpace={24}
+      >
         <View style={{ alignItems: "center", paddingTop: 6, paddingBottom: 10 }}>
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 14,
-              backgroundColor: "rgba(14,109,122,0.12)",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ color: HERO_ACCENT, fontWeight: "900", fontSize: 18 }}>S</Text>
+          <BrandMark size={64} color={colors.text} />
+          <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 8, gap: 6 }}>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: "800" }}>Sentinel</Text>
+            <Text style={{ color: "#d98e2b", fontSize: 15, fontWeight: "700" }}>360</Text>
           </View>
 
           <Text style={{ marginTop: 12, fontSize: 28, fontWeight: "800", color: colors.text }}>
@@ -490,44 +510,6 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
                     </Pressable>
                   )}
                 </form.Subscribe>
-
-                <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center" }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                  <Text style={{ marginHorizontal: 10, color: colors.textSubtle, fontWeight: "700" }}>Or</Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                </View>
-
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-                  <Pressable
-                    onPress={() => toast.show({ variant: "default", label: "Facebook coming soon" })}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      backgroundColor: HERO_BG,
-                      paddingVertical: 12,
-                      borderRadius: 14,
-                      alignItems: "center",
-                      opacity: pressed ? 0.9 : 1,
-                    })}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "900" }}>Facebook</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => toast.show({ variant: "default", label: "Google coming soon" })}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      backgroundColor: colors.surfaceMuted,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      paddingVertical: 12,
-                      borderRadius: 14,
-                      alignItems: "center",
-                      opacity: pressed ? 0.9 : 1,
-                    })}
-                  >
-                    <Text style={{ color: colors.text, fontWeight: "900" }}>Google</Text>
-                  </Pressable>
-                </View>
               </View>
             )}
           </form.Subscribe>
@@ -548,7 +530,7 @@ export default function AuthScreen({ mode: initialMode }: { mode: AuthMode }) {
             </Link>
           )}
         </View>
-      </View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

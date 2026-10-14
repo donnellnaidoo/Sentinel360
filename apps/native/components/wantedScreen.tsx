@@ -235,8 +235,8 @@ export default function WantedScreen() {
           Wanted Persons
         </Text>
         <Text style={{ marginTop: 8, color: colors.textMuted, lineHeight: 18 }}>
-          Official public safety repository for individuals with outstanding warrants or active investigations
-          in Auckland Park. Help secure your neighbourhood through informed vigilance.
+          Official public safety repository for individuals with outstanding warrants or active investigations.
+          Help secure your neighbourhood through informed vigilance.
         </Text>
 
         <View style={{ marginTop: 18, gap: 16 }}>
