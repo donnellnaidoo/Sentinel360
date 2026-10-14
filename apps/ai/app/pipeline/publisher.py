@@ -203,12 +203,15 @@ class EventPublisher:
                 self.duplicates += 1
             else:
                 self.sent += 1
+            # Detections wait for an officer to open a docket (caseNumber
+            # null); repeats on this camera join the open incident (merged).
             logger.info(
-                "Published %s %s -> case %s (%d evidence item(s))%s",
+                "Published %s %s -> %s (%d evidence item(s))%s%s",
                 event.event_type,
                 event.event_id,
-                result.get("caseNumber"),
+                f"case {result['caseNumber']}" if result.get("caseNumber") else "incident, awaiting review",
                 len(result.get("evidenceIds") or []),
+                " [added to open incident]" if result.get("merged") else "",
                 " [duplicate]" if result.get("duplicate") else "",
             )
             return True

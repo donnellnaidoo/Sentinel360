@@ -3,9 +3,15 @@
 Single-stream computer vision pipeline: weapon detection, SlowFast anomaly
 detection, face crops on every docket, plus opt-in pose-based altercation
 detection and watchlist face matching. On a trigger it posts a structured event to the existing
-Node backend (`POST /internal/ai/events`), which creates the incident, opens
-a case (docket), and raises an alert in the normal Sentinel360 tables — see
-`packages/api/src/services/ai-ingest.ts`.
+Node backend (`POST /internal/ai/events`), which creates the incident and
+raises an alert in the normal Sentinel360 tables — see
+`packages/api/src/services/ai-ingest.ts`. Repeats of the same detection on
+the same camera within 10 minutes join that incident (more captures, a
+higher count on the alert, no new notification) rather than raising new
+ones. A detection does not open a docket by itself: an officer reviews the
+captures on the Alerts page and opens a docket or dismisses it as a false
+alarm (`services/ai-review.ts`). Panic presses, made by a person on purpose,
+are docketed at once.
 
 Deliberately out of scope for this service (see `.claude/plans` /
 project decisions): multi-camera re-identification, GPU inference, thousands
@@ -210,7 +216,8 @@ model was trained on ~1 s clips — one reason its scores aren't calibrated.
 
 Backend ingest (hosted Supabase) is the slowest hop: the alert and
 notifications land ~2.5 s after the backend receives an event, and the
-evidence images a few seconds later. Detection -> full docket is ~10 s.
+evidence images a few seconds later. Detection -> incident with all
+captures is ~10 s.
 
 ## Tests
 
@@ -227,7 +234,6 @@ uv run python scripts/smoke_e2e.py
 ```
 
 Starts a throwaway instance on port 8011 playing `samples/knife_demo.mp4`
-once, and passes when the backend has opened a docket with both evidence
-images. **It writes a real incident, docket, alert and operator
-notifications to whatever database `apps/server` uses** — close the docket
-afterwards.
+once, and passes when the backend has raised an incident with both evidence
+images. **It writes a real incident, alert and operator notifications to
+whatever database `apps/server` uses** — dismiss the alert afterwards.

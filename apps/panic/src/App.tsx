@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { getPanicStatus, isCameraServiceUp, pressPanic, type PanicStatus } from "./api";
+import { remoteSirenConfigured, useRemoteSiren } from "./remote-siren";
 import { playSiren, stopSiren } from "./siren";
 
 const SIREN_SECONDS = 15;
@@ -23,6 +24,9 @@ export function App() {
   const pollTimer = useRef<number | null>(null);
   const resetTimer = useRef<number | null>(null);
   const sirenTimer = useRef<number | null>(null);
+  // True while the siren is sounding for a hold in the mobile app.
+  const remoteSiren = useRef(false);
+  const [remoteOn, setRemoteOn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +74,8 @@ export function App() {
   }
 
   function startSiren() {
+    remoteSiren.current = false;
+    setRemoteOn(false);
     playSiren(SIREN_SECONDS);
     setSirenOn(true);
     if (sirenTimer.current !== null) window.clearTimeout(sirenTimer.current);
@@ -79,14 +85,42 @@ export function App() {
   function silence() {
     stopSiren();
     setSirenOn(false);
+    remoteSiren.current = false;
+    setRemoteOn(false);
   }
 
-  async function onPress() {
+  function onSilencePress() {
+    silence();
+    remote.silenceRemote();
+  }
+
+  const remote = useRemoteSiren(
+    () => {
+      if (sirenTimer.current !== null) window.clearTimeout(sirenTimer.current);
+      playSiren();
+      remoteSiren.current = true;
+      setRemoteOn(true);
+      setSirenOn(true);
+      // A hold in the app is a panic press: open the docket the same way.
+      void sendAlert();
+    },
+    () => {
+      // A press on this page since the hold began owns the siren now.
+      if (remoteSiren.current) silence();
+    },
+  );
+
+  function onPress() {
     if (view.kind === "capturing") return;
     // Sound first: it must start inside the tap, and it shouldn't wait on
     // the network.
     startSiren();
     navigator.vibrate?.([200, 100, 200]);
+    void sendAlert();
+  }
+
+  async function sendAlert() {
+    if (view.kind === "capturing") return;
     if (pollTimer.current !== null) window.clearTimeout(pollTimer.current);
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
     setView({ kind: "capturing" });
@@ -103,7 +137,7 @@ export function App() {
   }
 
   return (
-    <main className={`screen screen--${view.kind}`}>
+    <main className={`screen screen--${view.kind} ${remoteOn ? "screen--siren" : ""}`}>
       <header className="topbar">
         <span className="brand">Sentinel360</span>
         <span className={`link link--${online === null ? "unknown" : online ? "up" : "down"}`}>
@@ -123,11 +157,15 @@ export function App() {
       </button>
 
       <section className="message" aria-live="assertive">
+        {remoteOn && <p className="message__detail">Siren triggered from the mobile app</p>}
         <Message view={view} />
+        {remoteSirenConfigured && !remote.unlocked && (
+          <p className="message__detail">Tap the screen once so the mobile app can sound the siren here.</p>
+        )}
       </section>
 
       {sirenOn && (
-        <button type="button" className="silence" onClick={silence}>
+        <button type="button" className="silence" onClick={onSilencePress}>
           Silence siren
         </button>
       )}

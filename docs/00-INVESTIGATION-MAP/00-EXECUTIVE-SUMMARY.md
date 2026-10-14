@@ -10,7 +10,7 @@
 > several items that are now built and live — the case/evidence/POPIA/profiles tRPC routers,
 > chain-of-custody hashing, sensitive-case access control, and the POPIA SAR/deletion API. For the
 > current, code-verified status of the investigation (case/docket) process specifically, see
-> `INVESTIGATION-PROCESS-REVIEW.md` at the repo root — it supersedes §3.2/§3.3 below for that
+> `08-INVESTIGATION-PROCESS-REVIEW.md` — it supersedes §3.2/§3.3 below for that
 > module. This document has not been fully rewritten for time; treat the tables as historical
 > baseline, not current state.
 

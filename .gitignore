@@ -53,3 +53,6 @@ temp
 .env*
 !.env.example
 !**/.env.example
+
+# graphify knowledge-graph output (regenerate with /graphify)
+graphify-out

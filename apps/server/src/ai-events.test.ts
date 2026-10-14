@@ -35,6 +35,21 @@ let watchlistItems: unknown[] = [];
 const listAiWatchlist = mock(async () => watchlistItems);
 mock.module("@Sentinel360/api/services/ai-watchlist", () => ({ listAiWatchlist }));
 
+const sweepDismissedAiCaptures = mock(async (_actor: unknown) => ({
+  disposedEvidenceIds: ["media-1"],
+  disposedCount: 1,
+  incidentCount: 1,
+  cutoff: new Date("2026-09-14T00:00:00Z"),
+}));
+mock.module("@Sentinel360/api/services/retention", () => ({
+  sweepDismissedAiCaptures,
+  sweepCaseRetention: mock(async () => ({})),
+  AI_DISMISSED_RETENTION_DAYS: 30,
+  DISPOSED_MEDIA_STATUS: "DISPOSED",
+}));
+const CRON_SECRET = "test-cron-secret-0123456789";
+process.env.CRON_SECRET = CRON_SECRET;
+
 const { default: app } = await import("./index");
 
 const EVENT_ID = "33333333-3333-4333-8333-333333333333";
@@ -63,13 +78,14 @@ function event(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function created(duplicate: boolean) {
+function created(duplicate: boolean, options: { merged?: boolean; docketed?: boolean } = {}) {
   return {
     incident: { id: "incident-1" },
-    case: { id: "case-1", caseNumber: "S360-2026-00001" },
+    case: options.docketed ? { id: "case-1", caseNumber: "S360-2026-00001" } : null,
     alert: { id: "alert-1" },
     evidenceIds: ["media-1"],
     duplicate,
+    merged: options.merged ?? false,
   };
 }
 
@@ -85,21 +101,36 @@ describe("POST /internal/ai/events", () => {
     expect(ingestAiEvent).not.toHaveBeenCalled();
   });
 
-  it("returns 201 with the docket and evidence ids", async () => {
+  it("returns 201 with the incident and evidence ids, and no docket until an officer opens one", async () => {
     const response = await post(event());
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({
       incidentId: "incident-1",
-      caseId: "case-1",
-      caseNumber: "S360-2026-00001",
+      caseId: null,
+      caseNumber: null,
       alertId: "alert-1",
       evidenceIds: ["media-1"],
       duplicate: false,
+      merged: false,
     });
 
     const input = ingestAiEvent.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(input.eventId).toBe(EVENT_ID);
     expect(input.occurredAt).toBeInstanceOf(Date);
+  });
+
+  it("returns the docket of an auto-docketed event", async () => {
+    ingestResult = created(false, { docketed: true });
+    const body = (await (await post(event({ eventType: "PANIC_BUTTON", confidence: 1 }))).json()) as Record<string, unknown>;
+    expect(body.caseId).toBe("case-1");
+    expect(body.caseNumber).toBe("S360-2026-00001");
+  });
+
+  it("returns 200 for a repeat added to an open incident", async () => {
+    ingestResult = created(false, { merged: true });
+    const response = await post(event());
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { merged: boolean }).merged).toBe(true);
   });
 
   it("returns 200 for a retried eventId", async () => {
@@ -254,5 +285,26 @@ describe("GET /internal/ai/watchlist", () => {
     const res = await get();
     console.error = spy;
     expect(res.status).toBe(500);
+  });
+});
+
+describe("GET /internal/retention/ai-captures", () => {
+  const sweep = (headers: Record<string, string>) =>
+    app.request("/internal/retention/ai-captures", { headers });
+
+  it("refuses requests without the cron secret or the internal key", async () => {
+    sweepDismissedAiCaptures.mockClear();
+    expect((await sweep({})).status).toBe(401);
+    expect((await sweep({ Authorization: "Bearer wrong" })).status).toBe(401);
+    expect(sweepDismissedAiCaptures).not.toHaveBeenCalled();
+  });
+
+  it("runs the sweep for Vercel cron or the internal key", async () => {
+    sweepDismissedAiCaptures.mockClear();
+    const response = await sweep({ Authorization: `Bearer ${CRON_SECRET}` });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ disposedCount: 1, incidentCount: 1, cutoff: "2026-09-14T00:00:00.000Z" });
+    expect((await sweep({ "X-Internal-Api-Key": API_KEY })).status).toBe(200);
+    expect(sweepDismissedAiCaptures).toHaveBeenCalledTimes(2);
   });
 });

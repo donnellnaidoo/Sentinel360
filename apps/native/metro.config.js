@@ -12,13 +12,24 @@ const config = getDefaultConfig(projectRoot);
 // Monorepo: Bun hoists shared deps to the workspace root's node_modules,
 // so Metro needs to watch that root and know where to look them up —
 // otherwise it crashes resolving hoisted packages ("Unexpectedly escaped traversal").
-config.watchFolders = [monorepoRoot];
+config.watchFolders = [...new Set([...(config.watchFolders ?? []), monorepoRoot])];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(monorepoRoot, "node_modules"),
 ];
 
-const uniwindConfig = withUniwindConfig(wrapWithReanimatedMetroConfig(config), {
+// The web app hoists a newer React to the workspace root. Packages hoisted there
+// (expo-router, heroui-native, ...) would pick it up and bundle a second React,
+// which crashes React Native. Always resolve React from this app instead.
+const reactSingletons = ["react", "react-dom"];
+const upstreamResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const isReact = reactSingletons.some((n) => moduleName === n || moduleName.startsWith(`${n}/`));
+  const ctx = isReact ? { ...context, originModulePath: path.join(projectRoot, "package.json") } : context;
+  return (upstreamResolveRequest ?? context.resolveRequest)(ctx, moduleName, platform);
+};
+
+const uniwindConfig =withUniwindConfig(wrapWithReanimatedMetroConfig(config), {
   cssEntryFile: "./global.css",
   dtsFile: "./uniwind-types.d.ts",
 });

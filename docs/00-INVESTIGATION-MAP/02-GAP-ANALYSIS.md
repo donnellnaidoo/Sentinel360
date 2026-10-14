@@ -6,7 +6,7 @@
 
 > **⚠️ Sprint status update (2026-07-29):** GAP-LEG-01 (POPIA), GAP-LEG-05 (audit immutability),
 > and GAP-LEG-03 (retention) below are stale — see the inline status notes added to each row, and
-> `INVESTIGATION-PROCESS-REVIEW.md` at the repo root for the full remediation detail (what closed,
+> `08-INVESTIGATION-PROCESS-REVIEW.md` for the full remediation detail (what closed,
 > what's mitigated vs. closed, and residual limitations on each).
 
 ---
@@ -158,7 +158,7 @@
 
 | Gap ID | Description | Severity | Current State | Required State |
 |--------|-------------|----------|---------------|----------------|
-| GAP-LEG-01 | No POPIA compliance implementation | **Critical** | Documented in NFR-07-001; no implementation | 🟡 **Mitigated (2026-07-29):** `popia.myData`/`requestDeletion`/`reviewDeletionRequest` (SAR + deletion, s23/s24) shipped and audit-logged; consent capture exists for new signups, backfill for legacy accounts is opt-in only (no proactive banner yet), breach notification still not built — see `INVESTIGATION-PROCESS-REVIEW.md` §3.5 |
+| GAP-LEG-01 | No POPIA compliance implementation | **Critical** | Documented in NFR-07-001; no implementation | 🟡 **Mitigated (2026-07-29):** `popia.myData`/`requestDeletion`/`reviewDeletionRequest` (SAR + deletion, s23/s24) shipped and audit-logged; consent capture exists for new signups, backfill for legacy accounts is opt-in only (no proactive banner yet), breach notification still not built — see `08-INVESTIGATION-PROCESS-REVIEW.md` §3.5 |
 | GAP-LEG-02 | No SAPS data standard alignment | **High** | FR-05-004 requires alignment; no XSD/JSON Schema | ⬜ Still open — no SAPS integration spec available to align against |
 | GAP-LEG-03 | No data retention enforcement | **High** | NFR-03-005 requires 7-year retention; no policy engine | 🟡 **Mitigated (2026-07-29):** `cases.runRetentionSweep` batch-archives closed cases past the 90-day cutoff, but it's manually triggered (no cron/job queue yet, still GAP-INF-06) and doesn't yet cover the broader 7-year anonymisation policy |
 | GAP-LEG-04 | No evidence integrity verification | **Critical** | NFR-03-001 requires SHA-256 chain; not implemented | ✅ Closed — SHA-256 hash at upload + chain-of-custody ledger (`chain-of-custody.ts`), live re-verification via `evidence.verifyIntegrity` |

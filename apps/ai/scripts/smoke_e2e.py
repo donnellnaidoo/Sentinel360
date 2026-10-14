@@ -2,13 +2,13 @@
 
 Starts a throwaway AI service on --port streaming samples/knife_demo.mp4,
 starts the pipeline, and waits until the publisher has delivered a
-WEAPON_DETECTED event that the backend turned into a docket with both
-evidence images. Prints the docket number and how long detection -> docket
-took, then stops everything.
+WEAPON_DETECTED event that the backend turned into an incident (awaiting an
+officer's review) with both evidence images. Prints how long detection ->
+incident took, then stops everything.
 
 WARNING: this writes to whatever database apps/server is connected to — a
-real incident, docket, alert, notifications to operators/admins, and two
-evidence files. Close the docket afterwards if it isn't wanted.
+real incident, alert, notifications to operators/admins, and two evidence
+files. Dismiss the alert afterwards if it isn't wanted.
 
 Prerequisites:
   * apps/server running (BACKEND_URL, default http://localhost:3000)
@@ -37,7 +37,7 @@ CLIP = AI_ROOT / "samples" / "knife_demo.mp4"
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", type=int, default=8011)
-    parser.add_argument("--timeout", type=float, default=90.0, help="seconds to wait for the docket")
+    parser.add_argument("--timeout", type=float, default=90.0, help="seconds to wait for the incident")
     args = parser.parse_args()
 
     if not CLIP.exists():
@@ -89,7 +89,7 @@ def main() -> int:
 
             client.post("/stream/start").raise_for_status()
             started = time.time()
-            print(f"Pipeline started on {CLIP.name}; waiting for a docket (up to {args.timeout:.0f}s)…")
+            print(f"Pipeline started on {CLIP.name}; waiting for an incident (up to {args.timeout:.0f}s)…")
 
             while time.time() - started < args.timeout:
                 status = client.get("/stream/status").json()
@@ -107,12 +107,13 @@ def main() -> int:
                     evidence = result.get("evidenceIds") or []
                     print(
                         f"OK  {event['event_type']} {event['confidence']:.2f} "
-                        f"[{event['metadata'].get('confirmationMethod')}] -> docket {result['caseNumber']} "
+                        f"[{event['metadata'].get('confirmationMethod')}] -> "
+                        f"{('docket ' + result['caseNumber']) if result.get('caseNumber') else 'incident for review'} "
                         f"with {len(evidence)} evidence item(s)"
                     )
                     print(
                         f"    pipeline start -> detection {detected_at - started:.1f}s, "
-                        f"detection -> docket {time.time() - detected_at:.1f}s (polled every 0.5s), "
+                        f"detection -> incident {time.time() - detected_at:.1f}s (polled every 0.5s), "
                         f"{status['fps']:.1f} fps"
                     )
                     return 0 if len(evidence) == 2 else 1

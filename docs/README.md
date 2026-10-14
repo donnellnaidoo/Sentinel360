@@ -13,9 +13,10 @@
 | 05 | `05-FRONTEND-WEB/` | Web frontend — setup, components, routes, pages, state management, API layer, styling |
 | 06 | `06-MOBILE-APP/` | Mobile app — requirements, screens, navigation, API integration, push notifications |
 | 07 | `07-DATABASE/` | Database design, schema, relationships, **Supabase migration files** |
-| 08 | `08-INFRASTRUCTURE/` | Deployment architecture, CI/CD, monitoring, edge infrastructure |
+| 08 | `08-INFRASTRUCTURE/` | Deployment architecture, CI/CD, monitoring, edge infrastructure, BA deployment answers |
 | 09 | `09-IMPLEMENTATION-PLANS/` | Phased implementation roadmap with milestones |
-| 00 | `00-INVESTIGATION-MAP/` | **Complete gap analysis, traceability matrix, SA legal compliance, remediation roadmap, data flow maps, security assessment** |
+| 00 | `00-INVESTIGATION-MAP/` | **Complete gap analysis, traceability matrix, SA legal compliance, remediation roadmap, data flow maps, security assessment, investigation process review** |
+| 10 | `10-SPRINT/` | Sprint report, demo script, test results, BA sprint summary |
 
 ## System Overview
 
@@ -54,6 +55,8 @@ Sentinel360 transforms passive CCTV surveillance into real-time, actionable fore
 - [Remediation Roadmap (~1,050h remaining)](./00-INVESTIGATION-MAP/04-REMEDIATION-ROADMAP.md)
 - [Data Flow Maps](./00-INVESTIGATION-MAP/05-DATA-FLOW-MAP.md)
 - [Security Assessment (Threat Model + OWASP)](./00-INVESTIGATION-MAP/06-SECURITY-ASSESSMENT.md)
+- [Investigation Process Review](./00-INVESTIGATION-MAP/08-INVESTIGATION-PROCESS-REVIEW.md)
+- [Sprint Report](./10-SPRINT/SPRINT-REPORT.md)
 
 ## Revision
 

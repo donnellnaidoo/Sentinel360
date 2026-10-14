@@ -32,6 +32,9 @@ import {
   MAX_AI_PANORAMA_BYTES,
   type AiEventInput,
 } from "../services/ai-ingest";
+import { AiReviewError, dismissAiIncident, openAiDocket } from "../services/ai-review";
+import { recordAuditEvent } from "../services/audit-log";
+import { sweepDismissedAiCaptures } from "../services/retention";
 import { insertCaseWithGeneratedNumber } from "../services/case-number";
 import { recordCustodyEvent } from "../services/chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "../services/evidence-storage";
@@ -42,24 +45,35 @@ const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString("base64");
 type Row = Record<string, unknown>;
 
 let insertOrder: unknown[] = [];
+let updated = new Map<unknown, Row[]>();
 
 /**
- * Minimal drizzle stand-in: records every insert's values per table and
- * answers selects from `selectResults` keyed by the table passed to from().
+ * Minimal drizzle stand-in: records every insert/update's values per table
+ * and answers selects from the table passed to from(): first from
+ * `selectQueue` (one answer per call, in order), then `selectResults`, then
+ * the rows inserted so far. Where clauses are ignored.
  */
 function fakeDb(
-  options: { incidentConflict?: boolean; selectResults?: Map<unknown, Row[]>; failInsertInto?: unknown } = {},
+  options: {
+    incidentConflict?: boolean;
+    selectResults?: Map<unknown, Row[]>;
+    selectQueue?: Map<unknown, Row[][]>;
+    failInsertInto?: unknown;
+  } = {},
 ) {
   const inserted = new Map<unknown, Row[]>();
+  // Inserted rows as returning() gave them (with ids), for later selects.
+  const stored = new Map<unknown, Row[]>();
+  updated = new Map<unknown, Row[]>();
   insertOrder = [];
   let mediaCount = 0;
+  const queue = new Map([...(options.selectQueue ?? new Map<unknown, Row[][]>())].map(([t, q]) => [t, [...q]]));
 
   vi.mocked(db.insert).mockImplementation(((table: unknown) => ({
     values: (values: Row | Row[]) => {
       if (table === options.failInsertInto) throw new Error("insert failed");
       const rows = Array.isArray(values) ? values : [values];
       insertOrder.push(table);
-      inserted.set(table, [...(inserted.get(table) ?? []), ...rows]);
 
       const returned = rows.map((row) => {
         if (table === mediaAsset) return { id: `media-${++mediaCount}`, ...row };
@@ -67,6 +81,8 @@ function fakeDb(
         if (table === alert) return { id: "alert-1", ...row };
         return { id: "row", ...row };
       });
+      inserted.set(table, [...(inserted.get(table) ?? []), ...rows]);
+      stored.set(table, [...(stored.get(table) ?? []), ...returned]);
       const result = Promise.resolve(undefined) as Promise<undefined> & Row;
       result.returning = async () => returned;
       result.onConflictDoNothing = () => {
@@ -78,6 +94,24 @@ function fakeDb(
     },
   })) as unknown as typeof db.insert);
 
+  vi.mocked(db.update).mockImplementation(((table: unknown) => ({
+    set: (values: Row) => {
+      const chain: Row = {};
+      chain.where = () => chain;
+      chain.returning = async () => {
+        updated.set(table, [...(updated.get(table) ?? []), values]);
+        // Only rows the fake knows of can be updated (else nothing matched).
+        const current = (options.selectResults?.get(table) ?? stored.get(table) ?? [])[0];
+        return current ? [{ ...current, ...values }] : [];
+      };
+      chain.then = (resolve: (v: unknown) => unknown) => {
+        updated.set(table, [...(updated.get(table) ?? []), values]);
+        return resolve(undefined);
+      };
+      return chain;
+    },
+  })) as unknown as typeof db.update);
+
   vi.mocked(db.select).mockImplementation((() => {
     let table: unknown;
     const chain: Row = {};
@@ -86,7 +120,11 @@ function fakeDb(
       table = t;
       return chain;
     };
-    chain.then = (resolve: (rows: Row[]) => unknown) => resolve(options.selectResults?.get(table) ?? []);
+    chain.then = (resolve: (rows: Row[]) => unknown) => {
+      const queued = queue.get(table);
+      if (queued && queued.length > 0) return resolve(queued.shift() ?? []);
+      return resolve(options.selectResults?.get(table) ?? stored.get(table) ?? []);
+    };
     return chain;
   }) as unknown as typeof db.select);
 
@@ -115,17 +153,19 @@ describe("ingestAiEvent", () => {
     vi.clearAllMocks();
   });
 
-  it("opens a docket and attaches snapshot + crop as AI evidence with custody", async () => {
+  it("raises an incident for review and stores snapshot + crop as AI evidence with custody, without a docket", async () => {
     const inserted = fakeDb({ selectResults: new Map([[user, [{ id: "operator-1" }]]]) });
 
     const result = await ingestAiEvent(event());
 
-    expect(result.duplicate).toBe(false);
+    expect(result).toMatchObject({ duplicate: false, merged: false, case: null });
     expect(result.evidenceIds).toEqual(["media-1", "media-2"]);
     expect(inserted.get(incident)?.[0]).toMatchObject({
       incidentNumber: `INC-AI-${EVENT_ID}`,
       severity: "CRITICAL",
+      status: "PENDING_REVIEW",
     });
+    expect(insertCaseWithGeneratedNumber).not.toHaveBeenCalled();
 
     const media = inserted.get(mediaAsset) ?? [];
     expect(media).toHaveLength(2);
@@ -136,7 +176,7 @@ describe("ingestAiEvent", () => {
       mimeType: "image/jpeg",
       status: "READY",
       fileSize: 7,
-      metadata: expect.objectContaining({ kind: "SNAPSHOT", eventId: EVENT_ID, view: "Rear" }),
+      metadata: expect.objectContaining({ kind: "SNAPSHOT", eventId: EVENT_ID, view: "Rear", incidentId: "incident-1" }),
     });
     expect(media[0]?.fileHash).toMatch(/^[0-9a-f]{64}$/);
 
@@ -146,14 +186,16 @@ describe("ingestAiEvent", () => {
       action: "CREATED",
       evidenceHash: media[0]?.fileHash,
     });
-    expect(inserted.get(caseEvidence)).toEqual([
-      expect.objectContaining({ caseId: "case-1", evidenceEntityType: "MEDIA_ASSET", evidenceEntityId: "media-1" }),
-      expect.objectContaining({ caseId: "case-1", evidenceEntityType: "MEDIA_ASSET", evidenceEntityId: "media-2" }),
-    ]);
+    expect(inserted.get(caseEvidence)).toBeUndefined();
+    expect(inserted.get(alert)?.[0]).toMatchObject({ sourceEntityType: "INCIDENT", sourceEntityId: "incident-1" });
     expect(inserted.get(alert)?.[0]?.metadata).toMatchObject({
       eventId: EVENT_ID,
-      caseNumber: "S360-2026-00001",
+      incidentId: "incident-1",
+      detectionCount: 1,
+      maxConfidence: 0.58,
+      review: { decision: "PENDING" },
     });
+    expect(inserted.get(alert)?.[0]?.metadata).not.toHaveProperty("caseId");
     expect(inserted.get(notification)).toHaveLength(1);
   });
 
@@ -202,7 +244,8 @@ describe("ingestAiEvent", () => {
     fakeDb({ failInsertInto: caseEvidence });
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await ingestAiEvent(event());
+    // Panic presses are docketed at once, so their evidence is linked.
+    await ingestAiEvent(event({ eventType: "PANIC_BUTTON", confidence: 1 }));
 
     expect(deleteEvidenceFile).not.toHaveBeenCalled();
   });
@@ -212,20 +255,93 @@ describe("ingestAiEvent", () => {
     await ingestAiEvent(event({ eventType: "ANOMALY_DETECTED", media: [], metadata: { modelStatus: "experimental" } }));
 
     expect(inserted.get(incident)?.[0]?.severity).toBe("HIGH");
-    expect(vi.mocked(insertCaseWithGeneratedNumber).mock.calls[0]?.[0]).toMatchObject({ priority: "HIGH" });
+    expect(insertCaseWithGeneratedNumber).not.toHaveBeenCalled();
     expect(inserted.get(alert)?.[0]?.metadata).toMatchObject({ modelStatus: "experimental" });
   });
 
-  it("raises panic button presses as CRITICAL with a human-initiated description", async () => {
+  it("dockets panic button presses at once, as CRITICAL with a human-initiated description", async () => {
     const inserted = fakeDb();
-    await ingestAiEvent(event({ eventType: "PANIC_BUTTON", confidence: 1 }));
+    const result = await ingestAiEvent(event({ eventType: "PANIC_BUTTON", confidence: 1 }));
 
     expect(inserted.get(incident)?.[0]).toMatchObject({ severity: "CRITICAL", incidentType: "PANIC_BUTTON" });
     expect(inserted.get(incident)?.[0]?.description).toMatch(/^Panic button pressed at camera/);
-    expect(vi.mocked(insertCaseWithGeneratedNumber).mock.calls[0]?.[0]).toMatchObject({ priority: "CRITICAL" });
+    expect(vi.mocked(insertCaseWithGeneratedNumber).mock.calls[0]?.[0]).toMatchObject({
+      priority: "CRITICAL",
+      createdByUserId: null,
+    });
+    expect(result.case).toMatchObject({ id: "case-1", caseNumber: "S360-2026-00001" });
+    expect(updated.get(incident)).toContainEqual(expect.objectContaining({ status: "DOCKETED" }));
+    expect(inserted.get(caseIncident)).toEqual([expect.objectContaining({ caseId: "case-1", incidentId: "incident-1" })]);
+    // The captures arrive after the docket exists, so each is linked to it.
+    expect(inserted.get(caseEvidence)).toEqual([
+      expect.objectContaining({ caseId: "case-1", evidenceEntityId: "media-1" }),
+      expect.objectContaining({ caseId: "case-1", evidenceEntityId: "media-2" }),
+    ]);
+    expect(updated.get(alert)).toContainEqual(
+      expect.objectContaining({ metadata: expect.objectContaining({ caseId: "case-1", caseNumber: "S360-2026-00001" }) }),
+    );
   });
 
-  it("returns the original docket for a retried eventId without writing anything new", async () => {
+  it("adds a repeat detection to the open incident: new captures, a higher count, no new alert", async () => {
+    const open = {
+      id: "incident-open",
+      incidentNumber: "INC-AI-earlier",
+      sourceDomain: "ai_pipeline",
+      status: "PENDING_REVIEW",
+    };
+    const openAlert = { id: "alert-open", metadata: { incidentId: "incident-open", detectionCount: 2, maxConfidence: 0.9 } };
+    const inserted = fakeDb({
+      selectQueue: new Map<unknown, Row[][]>([[incident, [[], [open]]]]),
+      selectResults: new Map<unknown, Row[]>([[alert, [openAlert]]]),
+    });
+
+    const result = await ingestAiEvent(event());
+
+    expect(result).toMatchObject({ merged: true, duplicate: false, case: null });
+    expect(result.incident.id).toBe("incident-open");
+    expect(inserted.get(incident)).toBeUndefined();
+    expect(inserted.get(alert)).toBeUndefined();
+    expect(inserted.get(notification)).toBeUndefined();
+    expect(updated.get(alert)?.[0]?.metadata).toMatchObject({
+      incidentId: "incident-open",
+      detectionCount: 3,
+      maxConfidence: 0.9,
+      lastDetectedAt: "2026-10-07T10:00:00.000Z",
+    });
+    expect(inserted.get(mediaAsset)?.map((m) => (m.metadata as Row).incidentId)).toEqual(["incident-open", "incident-open"]);
+    expect(inserted.get(caseEvidence)).toBeUndefined();
+  });
+
+  it("puts a repeat detection's captures straight onto the docket once one is open", async () => {
+    const open = { id: "incident-open", incidentNumber: "INC-AI-earlier", sourceDomain: "ai_pipeline", status: "DOCKETED" };
+    const inserted = fakeDb({
+      selectQueue: new Map<unknown, Row[][]>([[incident, [[], [open]]]]),
+      selectResults: new Map<unknown, Row[]>([
+        [caseIncident, [{ caseId: "case-9" }]],
+        [investigationCase, [{ id: "case-9", caseNumber: "S360-2026-00009" }]],
+      ]),
+    });
+
+    const result = await ingestAiEvent(event());
+
+    expect(result.case).toMatchObject({ id: "case-9" });
+    expect(inserted.get(caseEvidence)).toEqual([
+      expect.objectContaining({ caseId: "case-9", evidenceEntityId: "media-1" }),
+      expect.objectContaining({ caseId: "case-9", evidenceEntityId: "media-2" }),
+    ]);
+  });
+
+  it("never groups panic presses: each one is its own docket", async () => {
+    const open = { id: "incident-open", incidentNumber: "INC-AI-earlier", sourceDomain: "ai_pipeline", status: "DOCKETED" };
+    fakeDb({ selectQueue: new Map<unknown, Row[][]>([[incident, [[], [open]]]]) });
+
+    const result = await ingestAiEvent(event({ eventType: "PANIC_BUTTON", confidence: 1 }));
+
+    expect(result.merged).toBe(false);
+    expect(insertCaseWithGeneratedNumber).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the original incident and docket for a retried eventId without writing anything new", async () => {
     const existingIncident = { id: "incident-1", incidentNumber: `INC-AI-${EVENT_ID}` };
     const existingCase = { id: "case-1", caseNumber: "S360-2026-00001" };
     const existingAlert = { id: "alert-1" };
@@ -236,7 +352,7 @@ describe("ingestAiEvent", () => {
         [caseIncident, [{ caseId: "case-1" }]],
         [investigationCase, [existingCase]],
         [alert, [existingAlert]],
-        [caseEvidence, [{ id: "media-1" }, { id: "media-2" }]],
+        [mediaAsset, [{ id: "media-1" }, { id: "media-2" }]],
       ]),
     });
 
@@ -253,19 +369,53 @@ describe("ingestAiEvent", () => {
     expect(inserted.get(alert)).toBeUndefined();
   });
 
-  it("resumes a half-ingested event whose incident has no docket yet", async () => {
+  it("opens the missing docket when a half-ingested panic press is retried", async () => {
     fakeDb({
-      incidentConflict: true,
-      selectResults: new Map<unknown, Row[]>([[incident, [{ id: "incident-1", incidentNumber: `INC-AI-${EVENT_ID}` }]]]),
+      selectResults: new Map<unknown, Row[]>([
+        [
+          incident,
+          [{ id: "incident-1", incidentNumber: `INC-AI-${EVENT_ID}`, sourceDomain: "ai_pipeline", status: "PENDING_REVIEW" }],
+        ],
+      ]),
+    });
+
+    const result = await ingestAiEvent(event({ eventType: "PANIC_BUTTON", confidence: 1, media: [] }));
+
+    expect(result.duplicate).toBe(true);
+    expect(insertCaseWithGeneratedNumber).toHaveBeenCalledTimes(1);
+    expect(result.case).toMatchObject({ id: "case-1" });
+  });
+
+  it("does not open a docket when a retried detection is still waiting for review", async () => {
+    fakeDb({
+      selectResults: new Map<unknown, Row[]>([
+        [incident, [{ id: "incident-1", incidentNumber: `INC-AI-${EVENT_ID}`, sourceDomain: "ai_pipeline" }]],
+      ]),
     });
 
     const result = await ingestAiEvent(event({ media: [] }));
 
-    expect(result.duplicate).toBe(false);
-    expect(insertCaseWithGeneratedNumber).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ duplicate: true, case: null });
+    expect(insertCaseWithGeneratedNumber).not.toHaveBeenCalled();
   });
 
-  it("keeps the docket and alert when one image fails to upload", async () => {
+  it("recognises a retried eventId that was merged into another incident", async () => {
+    const other = { id: "incident-open", incidentNumber: "INC-AI-earlier" };
+    const inserted = fakeDb({
+      selectQueue: new Map<unknown, Row[][]>([
+        [incident, [[], [other]]],
+        [mediaAsset, [[{ incidentId: "incident-open" }], [{ id: "media-7" }]]],
+      ]),
+    });
+
+    const result = await ingestAiEvent(event());
+
+    expect(result).toMatchObject({ duplicate: true, merged: true, evidenceIds: ["media-7"] });
+    expect(uploadEvidenceFile).not.toHaveBeenCalled();
+    expect(inserted.get(mediaAsset)).toBeUndefined();
+  });
+
+  it("keeps the incident and alert when one image fails to upload", async () => {
     const inserted = fakeDb();
     vi.mocked(uploadEvidenceFile).mockRejectedValueOnce(new Error("storage down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -288,7 +438,7 @@ describe("ingestAiEvent", () => {
     expect(result.evidenceIds).toEqual([]);
   });
 
-  it("stores each face as numbered AI evidence on the case", async () => {
+  it("stores each face as numbered AI evidence on the incident", async () => {
     const inserted = fakeDb();
     const faces = [
       { view: "Front", bbox: [10, 10, 60, 70], confidence: 0.93 },
@@ -318,10 +468,9 @@ describe("ingestAiEvent", () => {
       metadata: expect.objectContaining({ kind: "FACE", faceNumber: 2 }),
     });
     expect(media[0]?.metadata).not.toHaveProperty("faceNumber");
-    expect(inserted.get(caseEvidence)).toHaveLength(3);
   });
 
-  it("stores each object close-up as named AI evidence on the case", async () => {
+  it("stores each object close-up as named AI evidence on the incident", async () => {
     const inserted = fakeDb();
     const objects = [
       { label: "knife", number: 1, name: "Knife 1", view: "Main", bbox: [10, 10, 60, 70], confidence: 0.81 },
@@ -470,5 +619,172 @@ describe("ingestAiEvent", () => {
     ]);
     expect(inserted.get(incident)?.[0]).toMatchObject({ severity: "MEDIUM", incidentType: "PLATE_MATCH" });
     expect(String(inserted.get(incident)?.[0]?.description)).toContain("check the plate and vehicle");
+  });
+});
+
+describe("AI incident review", () => {
+  const pending = {
+    id: "incident-1",
+    incidentNumber: `INC-AI-${EVENT_ID}`,
+    incidentType: "WEAPON_DETECTED",
+    title: "Knife detected — camera CAM-DEMO-1",
+    description: "Automatically detected",
+    severity: "CRITICAL",
+    sourceDomain: "ai_pipeline",
+    status: "PENDING_REVIEW",
+  };
+  const pendingAlert = { id: "alert-1", metadata: { incidentId: "incident-1", detectionCount: 4 } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("opens a docket as the officer and links every capture taken before it", async () => {
+    const inserted = fakeDb({
+      selectResults: new Map<unknown, Row[]>([
+        [incident, [pending]],
+        [alert, [pendingAlert]],
+        [mediaAsset, [{ id: "media-1", title: "AI snapshot" }, { id: "media-2", title: "AI capture: Knife 1" }]],
+      ]),
+    });
+
+    const result = await openAiDocket("incident-1", "officer-1");
+
+    expect(result.created).toBe(true);
+    expect(vi.mocked(insertCaseWithGeneratedNumber).mock.calls[0]?.[0]).toMatchObject({
+      caseType: "AI_GENERATED",
+      priority: "CRITICAL",
+      createdByUserId: "officer-1",
+      title: "AI detection: Knife detected — camera CAM-DEMO-1",
+    });
+    expect(inserted.get(caseEvidence)).toEqual([
+      expect.objectContaining({ caseId: "case-1", evidenceEntityId: "media-1", createdByUserId: "officer-1" }),
+      expect.objectContaining({ caseId: "case-1", evidenceEntityId: "media-2" }),
+    ]);
+    expect(updated.get(incident)).toContainEqual(expect.objectContaining({ status: "DOCKETED" }));
+    expect(updated.get(alert)?.[0]?.metadata).toMatchObject({
+      detectionCount: 4,
+      caseId: "case-1",
+      review: expect.objectContaining({ decision: "DOCKETED", byUserId: "officer-1" }),
+    });
+    expect(vi.mocked(recordAuditEvent).mock.calls.at(-1)?.[0]).toMatchObject({
+      eventType: "ai.incident_docketed",
+      actorId: "officer-1",
+    });
+  });
+
+  it("returns the existing docket instead of opening a second one", async () => {
+    fakeDb({
+      selectResults: new Map<unknown, Row[]>([
+        [incident, [{ ...pending, status: "DOCKETED" }]],
+        [caseIncident, [{ caseId: "case-9" }]],
+        [investigationCase, [{ id: "case-9" }]],
+      ]),
+    });
+
+    const result = await openAiDocket("incident-1", "officer-1");
+
+    expect(result).toMatchObject({ created: false, case: { id: "case-9" } });
+    expect(insertCaseWithGeneratedNumber).not.toHaveBeenCalled();
+  });
+
+  it("refuses incidents that did not come from the AI pipeline", async () => {
+    fakeDb({ selectResults: new Map<unknown, Row[]>([[incident, [{ ...pending, sourceDomain: "community" }]]]) });
+
+    await expect(openAiDocket("incident-1", "officer-1")).rejects.toBeInstanceOf(AiReviewError);
+  });
+
+  it("dismisses a pending detection, resolving its alert and keeping the evidence", async () => {
+    const inserted = fakeDb({
+      selectResults: new Map<unknown, Row[]>([
+        [incident, [pending]],
+        [alert, [pendingAlert]],
+      ]),
+    });
+
+    await dismissAiIncident("incident-1", "officer-1", "Phone, not a knife");
+
+    expect(updated.get(incident)).toContainEqual(expect.objectContaining({ status: "DISMISSED" }));
+    expect(updated.get(alert)?.[0]).toMatchObject({
+      status: "RESOLVED",
+      metadata: expect.objectContaining({
+        review: expect.objectContaining({ decision: "DISMISSED", byUserId: "officer-1", reason: "Phone, not a knife" }),
+      }),
+    });
+    expect(inserted.get(caseEvidence)).toBeUndefined();
+    expect(vi.mocked(recordAuditEvent).mock.calls.at(-1)?.[0]).toMatchObject({ eventType: "ai.incident_dismissed" });
+  });
+
+  it("will not dismiss a detection that already has a docket", async () => {
+    fakeDb({ selectResults: new Map<unknown, Row[]>([[incident, [{ ...pending, status: "DOCKETED" }]]]) });
+    vi.mocked(db.update).mockImplementation((() => ({
+      set: () => ({ where: () => ({ returning: async () => [] }) }),
+    })) as unknown as typeof db.update);
+
+    await expect(dismissAiIncident("incident-1", "officer-1")).rejects.toThrow("already has a docket");
+  });
+});
+
+describe("dismissed AI capture retention", () => {
+  const captures = [
+    { id: "media-1", storageUrl: "2026/a.jpg", fileHash: "a".repeat(64), metadata: { incidentId: "incident-1" } },
+    { id: "media-2", storageUrl: "2026/b.jpg", fileHash: "b".repeat(64), metadata: { incidentId: "incident-1" } },
+    { id: "media-3", storageUrl: "2026/c.jpg", fileHash: "c".repeat(64), metadata: { incidentId: "incident-1" } },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(deleteEvidenceFile).mockResolvedValue(true);
+  });
+
+  it("deletes the files, keeps tombstones with a DISPOSED custody entry, and skips anything on a case", async () => {
+    fakeDb({
+      selectResults: new Map<unknown, Row[]>([
+        [incident, [{ id: "incident-1" }]],
+        [mediaAsset, captures],
+        [caseEvidence, [{ id: "media-3" }]],
+      ]),
+    });
+
+    const result = await sweepDismissedAiCaptures(null);
+
+    expect(result.disposedEvidenceIds).toEqual(["media-1", "media-2"]);
+    expect(vi.mocked(deleteEvidenceFile).mock.calls.map((c) => c[0])).toEqual(["2026/a.jpg", "2026/b.jpg"]);
+    expect(updated.get(mediaAsset)).toEqual([
+      expect.objectContaining({ status: "DISPOSED" }),
+      expect.objectContaining({ status: "DISPOSED" }),
+    ]);
+    expect(vi.mocked(recordCustodyEvent).mock.calls[0]?.[0]).toMatchObject({
+      evidenceEntityId: "media-1",
+      action: "DISPOSED",
+      evidenceHash: "a".repeat(64),
+    });
+    expect(vi.mocked(recordAuditEvent).mock.calls.at(-1)?.[0]).toMatchObject({
+      eventType: "ai.dismissed_captures_disposed",
+      action: "DELETE",
+    });
+  });
+
+  it("leaves a capture for the next sweep when its file could not be deleted", async () => {
+    fakeDb({
+      selectResults: new Map<unknown, Row[]>([
+        [incident, [{ id: "incident-1" }]],
+        [mediaAsset, captures.slice(0, 1)],
+      ]),
+    });
+    vi.mocked(deleteEvidenceFile).mockResolvedValue(false);
+
+    const result = await sweepDismissedAiCaptures(null);
+
+    expect(result.disposedCount).toBe(0);
+    expect(updated.get(mediaAsset)).toBeUndefined();
+    expect(recordCustodyEvent).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when no dismissed incident is past the retention period", async () => {
+    fakeDb();
+    const result = await sweepDismissedAiCaptures(null);
+    expect(result.disposedCount).toBe(0);
+    expect(deleteEvidenceFile).not.toHaveBeenCalled();
   });
 });
