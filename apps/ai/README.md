@@ -87,11 +87,17 @@ Measure first, then change one thing at a time — see `eval/README.md`:
    hour and time to detect; `sweep` finds the alarm settings that would
    have done best; `calibrate` sets the SlowFast threshold from normal
    footage.
-2. **Fine-tune the weapon model.** `scripts/export_frames.py` turns your
-   clips into the views the detector sees, for labelling;
-   `scripts/train_weapon.py` fine-tunes YOLO11 on a public weapon dataset
-   plus those frames (knife, pistol, rifle) and prints the `.env` lines to
-   switch to it. The stock `yolov8n.pt` is never touched.
+2. **Fine-tune the weapon model.** Open
+   `notebooks/train_weapon_colab.ipynb` in Google Colab (free T4 GPU) and
+   run all. `scripts/prepare_weapon_dataset.py` builds the dataset there
+   from public sets: knives and pistols in people's hands, plus phones,
+   wallets, banknotes and cards held the same way as their own classes, so
+   the model learns not to call them weapons (the stock COCO model misses
+   held knives, and the ready-made threat model was trained on almost no
+   knives, so it calls them guns). `scripts/train_weapon.py` then trains
+   YOLO11s and prints the `.env` lines to switch to it. Add your own
+   labelled frames (`scripts/export_frames.py`) with
+   `prepare_weapon_dataset.py --extra`. The stock models are never touched.
 3. **Switch on the optional rules** below if the evaluation says they help.
 
 Every option below is off (or at its original value) by default, except
