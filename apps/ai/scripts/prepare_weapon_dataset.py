@@ -19,7 +19,7 @@ Images are deduplicated by content. Sohas' own test split is the
 validation set; the rest is split 85/15 by image hash, so it's stable.
 
 Usage (needs ~8 GB free; run it on Colab, see notebooks/):
-  pip install httpx
+  pip install gdown httpx
   python scripts/prepare_weapon_dataset.py --out datasets/weapons
   python scripts/train_weapon.py --data datasets/weapons/data.yaml ...
 
@@ -51,7 +51,7 @@ LABEL_MAP = {
     "tarjeta": "card",
 }
 
-DRIVE_ZIP = "https://drive.usercontent.google.com/download?id=1Szc920DAh5kU8Qk38Doq0znEVR1QmTZS&export=download&confirm=t"
+DRIVE_ID = "1Szc920DAh5kU8Qk38Doq0znEVR1QmTZS"
 ZIP_ROOT = "OD-WeaponDetection-master/"
 # (folder in the zip, its test images are the validation set)
 ZIP_SOURCES = [
@@ -116,34 +116,28 @@ def voc_boxes(xml_text: str) -> list[tuple[str, float, float, float, float]] | N
 
 
 def download_zip(target: Path) -> Path:
-    """The authors' 4.7 GB zip, downloaded once (resumes a partial file)."""
-    import httpx
+    """The authors' 4.7 GB zip, downloaded once with gdown (handles Drive's
+    large-file confirm page; resumes a partial file; retries timeouts)."""
+    import time
+
+    import gdown
 
     if target.is_file() and zipfile.is_zipfile(target):
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
-    partial = target.with_suffix(".part")
-    start = partial.stat().st_size if partial.exists() else 0
     print(f"Downloading OD-WeaponDetection (4.7 GB) to {target} ...")
-    headers = {"Range": f"bytes={start}-"} if start else {}
-    with httpx.stream("GET", DRIVE_ZIP, headers=headers, follow_redirects=True, timeout=120) as response:
-        response.raise_for_status()
-        if "text/html" in response.headers.get("content-type", ""):
-            raise SystemExit(
-                "Google Drive returned a web page instead of the zip (download quota?). "
-                "Download it in a browser and pass --zip: https://drive.google.com/file/d/1Szc920DAh5kU8Qk38Doq0znEVR1QmTZS"
-            )
-        mode = "ab" if start and response.status_code == 206 else "wb"
-        total = int(response.headers.get("content-length", 0)) + (start if mode == "ab" else 0)
-        written = start if mode == "ab" else 0
-        with partial.open(mode) as f:
-            for chunk in response.iter_bytes(1 << 20):
-                f.write(chunk)
-                written += len(chunk)
-                if written % (500 << 20) < len(chunk):
-                    print(f"  {written >> 20} / {total >> 20} MB")
-    partial.rename(target)
-    return target
+    for attempt in range(1, 6):
+        try:
+            gdown.download(id=DRIVE_ID, output=str(target), quiet=False, resume=True)
+        except Exception as e:  # timeouts, dropped connections
+            print(f"  attempt {attempt} failed: {e}")
+        if target.is_file() and zipfile.is_zipfile(target):
+            return target
+        time.sleep(10 * attempt)
+    raise SystemExit(
+        "Couldn't download the zip from Google Drive (quota or network). Download it in a browser from "
+        f"https://drive.google.com/file/d/{DRIVE_ID}, put it at {target}, and run again."
+    )
 
 
 def add_od_weapon_detection(builder: Builder, zip_path: Path) -> None:
