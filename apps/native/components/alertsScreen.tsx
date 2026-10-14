@@ -27,11 +27,11 @@ function Header() {
         borderBottomColor: colors.border,
       }}
     >
-      <Text style={{ flex: 1, fontSize: 14, fontWeight: "900", color: colors.brand }}>
-        COMMUNITY SAFETY
+      <Text style={{ flex: 1, fontSize: 20, fontWeight: "900", color: colors.brand }}>
+        Community Safety
       </Text>
 
-      <AccountAvatarButton radius={12} />
+      <AccountAvatarButton />
     </View>
   );
 }
@@ -155,47 +155,6 @@ function AlertCard({
         </View>
       </View>
     </Pressable>
-  );
-}
-
-function MonitoringMapCard() {
-  const { colors } = useAppTheme();
-  return (
-    <View
-      style={{
-        borderRadius: 16,
-        overflow: "hidden",
-        backgroundColor: CTA_BG,
-        height: 150,
-      }}
-    >
-      <Image
-        source={{
-          uri: "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=1200&q=70",
-        }}
-        style={{ position: "absolute", width: "100%", height: "100%", opacity: 0.35 }}
-      />
-
-      <View style={{ flex: 1, padding: 14, justifyContent: "flex-end" }}>
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            alignSelf: "flex-start",
-          }}
-        >
-          <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#b91c1c" }} />
-          <Text style={{ fontSize: 10, fontWeight: "900", color: colors.text }}>
-            MONITORING AUCKLAND PARK
-          </Text>
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -413,10 +372,6 @@ export default function AlertsScreen() {
               />
             );
           })}
-        </View>
-
-        <View style={{ marginTop: 18 }}>
-          <MonitoringMapCard />
         </View>
 
         <Modal
