@@ -1,9 +1,10 @@
 """Fine-tunes a YOLO11 weapon detector (knife, pistol, rifle, ...).
 
 Needs a dataset in Ultralytics YOLO format — a data.yaml listing the class
-names and train/val image folders. Roboflow Universe has public ones (search
-"weapon detection" and export as "YOLOv11"); add your own labelled X3
-frames from scripts/export_frames.py to the same dataset.
+names and train/val image folders. scripts/prepare_weapon_dataset.py builds
+one from public datasets (knife, pistol, and look-alikes such as phones);
+add your own labelled frames from scripts/export_frames.py with its --extra.
+notebooks/train_weapon_colab.ipynb runs both on a free Colab GPU.
 
 Training wants a GPU. On a Mac it runs on MPS (slow but works for a small
 dataset); on Google Colab (free T4 GPU) roughly an hour for ~5k images:
@@ -31,6 +32,8 @@ import sys
 from pathlib import Path
 
 AI_ROOT = Path(__file__).resolve().parent.parent
+# Classes that may raise an alarm; anything else in data.yaml is a look-alike.
+WEAPON_CLASSES = {"knife", "pistol", "handgun", "gun", "rifle", "shotgun"}
 
 
 def main() -> int:
@@ -99,15 +102,19 @@ def main() -> int:
     for index, ap50 in zip(metrics.box.ap_class_index, metrics.box.ap50):
         print(f"  {class_names[int(index)]:<12} AP50 {ap50:.3f}")
 
-    weapon_classes = [n for n in class_names if n.lower() not in ("person", "people", "human")]
+    # Look-alike classes (smartphone, wallet, ...) are trained so the model
+    # can tell them apart, but never alarm.
+    weapon_classes = [n for n in class_names if n.lower() in WEAPON_CLASSES]
     print("\nTo try it, add to apps/ai/.env (remove the lines to go back):")
     print(f"  WEAPON_MODEL_PATH=models/{target.name}")
     print(f"  WEAPON_ALARM_LABELS='{json.dumps(weapon_classes)}'")
+    print("  WEAPON_EXTRA_MODEL_PATH=   # empty: this model has its own pistol class")
     if "person" not in class_names:
         print("  WEAPON_PERSON_MODEL_PATH=models/yolov8n.pt   # this model has no person class")
     print("\nBut first compare it with the current model on your own clips:")
     print(f"  uv run python scripts/evaluate.py run --set WEAPON_MODEL_PATH=models/{target.name} "
           f"--set 'WEAPON_ALARM_LABELS={json.dumps(weapon_classes)}'"
+          + " --set WEAPON_EXTRA_MODEL_PATH="
           + ("" if "person" in class_names else " --set WEAPON_PERSON_MODEL_PATH=models/yolov8n.pt"))
     return 0
 

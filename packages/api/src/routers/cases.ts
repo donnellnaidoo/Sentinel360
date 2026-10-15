@@ -62,7 +62,7 @@ import {
   type ViewerCtx,
 } from "../services/case-access";
 import { caseStatusLabel, formatSAST, humanizeEnum } from "../services/case-labels";
-import { sweepCaseRetention } from "../services/retention";
+import { sweepCaseRetention, sweepDismissedAiCaptures } from "../services/retention";
 
 function pushIf<T>(arr: T[], item: T | undefined): void {
   if (item !== undefined) {
@@ -816,7 +816,11 @@ export const casesRouter = router({
   // (matches settings.ts's use of superAdminProcedure for the same reason).
   // Run this periodically until a real job scheduler exists — see
   // services/retention.ts for why it isn't self-scheduling.
+  // Also deletes the photos of AI detections dismissed as false alarms
+  // more than AI_DISMISSED_RETENTION_DAYS ago.
   runRetentionSweep: superAdminProcedure.mutation(async ({ ctx }) => {
-    return sweepCaseRetention(ctx.session.user.id);
+    const cases = await sweepCaseRetention(ctx.session.user.id);
+    const aiCaptures = await sweepDismissedAiCaptures(ctx.session.user.id);
+    return { ...cases, aiCaptures };
   }),
 });

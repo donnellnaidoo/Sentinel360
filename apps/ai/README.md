@@ -3,9 +3,15 @@
 Single-stream computer vision pipeline: weapon detection, SlowFast anomaly
 detection, face crops on every docket, plus opt-in pose-based altercation
 detection and watchlist face matching. On a trigger it posts a structured event to the existing
-Node backend (`POST /internal/ai/events`), which creates the incident, opens
-a case (docket), and raises an alert in the normal Sentinel360 tables — see
-`packages/api/src/services/ai-ingest.ts`.
+Node backend (`POST /internal/ai/events`), which creates the incident and
+raises an alert in the normal Sentinel360 tables — see
+`packages/api/src/services/ai-ingest.ts`. Repeats of the same detection on
+the same camera within 10 minutes join that incident (more captures, a
+higher count on the alert, no new notification) rather than raising new
+ones. A detection does not open a docket by itself: an officer reviews the
+captures on the Alerts page and opens a docket or dismisses it as a false
+alarm (`services/ai-review.ts`). Panic presses, made by a person on purpose,
+are docketed at once.
 
 Deliberately out of scope for this service (see `.claude/plans` /
 project decisions): multi-camera re-identification, GPU inference, thousands
@@ -65,6 +71,18 @@ personal information under POPIA), so set `FACE_ENABLED=false` where that
 isn't justified, and treat them under the same retention rules as other
 case evidence.
 
+### Weapon and person close-ups
+
+Every event (including the panic button) also gets a close-up of each
+weapon and person the detector found in that frame, as `OBJECT` media:
+weapons at alarm confidence first (up to `OBJECT_MAX_WEAPONS`, 3), then
+people from `OBJECT_PERSON_CONFIDENCE` (0.40), largest first (up to
+`OBJECT_MAX_PEOPLE`, 10). The case shows them as "AI capture: Knife 1",
+"AI capture: Person 1", "AI capture: Person 2", ..., described in
+`metadata.objects`. No extra model runs: these are the boxes the frame
+already has. People include bystanders, as with faces; set
+`OBJECT_EVIDENCE_ENABLED=false` to turn it off. Vehicles and plates are not
+cropped (plate readings stay limited to watchlist matches, below).
 
 ## Improving accuracy
 
@@ -75,11 +93,17 @@ Measure first, then change one thing at a time — see `eval/README.md`:
    hour and time to detect; `sweep` finds the alarm settings that would
    have done best; `calibrate` sets the SlowFast threshold from normal
    footage.
-2. **Fine-tune the weapon model.** `scripts/export_frames.py` turns your
-   clips into the views the detector sees, for labelling;
-   `scripts/train_weapon.py` fine-tunes YOLO11 on a public weapon dataset
-   plus those frames (knife, pistol, rifle) and prints the `.env` lines to
-   switch to it. The stock `yolov8n.pt` is never touched.
+2. **Fine-tune the weapon model.** Open
+   `notebooks/train_weapon_colab.ipynb` in Google Colab (free T4 GPU) and
+   run all. `scripts/prepare_weapon_dataset.py` builds the dataset there
+   from public sets: knives and pistols in people's hands, plus phones,
+   wallets, banknotes and cards held the same way as their own classes, so
+   the model learns not to call them weapons (the stock COCO model misses
+   held knives, and the ready-made threat model was trained on almost no
+   knives, so it calls them guns). `scripts/train_weapon.py` then trains
+   YOLO11s and prints the `.env` lines to switch to it. Add your own
+   labelled frames (`scripts/export_frames.py`) with
+   `prepare_weapon_dataset.py --extra`. The stock models are never touched.
 3. **Switch on the optional rules** below if the evaluation says they help.
 
 Every option below is off (or at its original value) by default, except
@@ -192,7 +216,8 @@ model was trained on ~1 s clips — one reason its scores aren't calibrated.
 
 Backend ingest (hosted Supabase) is the slowest hop: the alert and
 notifications land ~2.5 s after the backend receives an event, and the
-evidence images a few seconds later. Detection -> full docket is ~10 s.
+evidence images a few seconds later. Detection -> incident with all
+captures is ~10 s.
 
 ## Tests
 
@@ -209,7 +234,6 @@ uv run python scripts/smoke_e2e.py
 ```
 
 Starts a throwaway instance on port 8011 playing `samples/knife_demo.mp4`
-once, and passes when the backend has opened a docket with both evidence
-images. **It writes a real incident, docket, alert and operator
-notifications to whatever database `apps/server` uses** — close the docket
-afterwards.
+once, and passes when the backend has raised an incident with both evidence
+images. **It writes a real incident, alert and operator notifications to
+whatever database `apps/server` uses** — dismiss the alert afterwards.

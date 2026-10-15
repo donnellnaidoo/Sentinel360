@@ -11,6 +11,7 @@ import {
   ingestAiEvent,
 } from "@Sentinel360/api/services/ai-ingest";
 import { listAiWatchlist } from "@Sentinel360/api/services/ai-watchlist";
+import { sweepDismissedAiCaptures } from "@Sentinel360/api/services/retention";
 import { env } from "@Sentinel360/env/server";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -93,11 +94,15 @@ const aiEventSchema = z.object({
     .optional(),
 });
 
-function isValidInternalApiKey(provided: string | undefined): boolean {
-  if (!provided) return false;
-  const expected = Buffer.from(env.AI_SERVICE_API_KEY);
+function matchesSecret(provided: string | undefined, secret: string | undefined): boolean {
+  if (!provided || !secret) return false;
+  const expected = Buffer.from(secret);
   const actual = Buffer.from(provided);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+function isValidInternalApiKey(provided: string | undefined): boolean {
+  return matchesSecret(provided, env.AI_SERVICE_API_KEY);
 }
 
 // Room for every max-size base64 image plus the JSON envelope.
@@ -128,14 +133,18 @@ app.post("/internal/ai/events", aiEventBodyLimit, async (c) => {
     return c.json(
       {
         incidentId: result.incident.id,
-        caseId: result.case.id,
-        caseNumber: result.case.caseNumber,
+        // Null until an officer opens a docket (a panic press has one at once).
+        caseId: result.case?.id ?? null,
+        caseNumber: result.case?.caseNumber ?? null,
         alertId: result.alert?.id ?? null,
         evidenceIds: result.evidenceIds,
         duplicate: result.duplicate,
+        // Added to an open incident for the same thing on this camera.
+        merged: result.merged,
       },
-      // 200 for a retried eventId: nothing new was created.
-      result.duplicate ? 200 : 201,
+      // 200 for a retried eventId (nothing new) or a repeat added to an
+      // existing incident; 201 for a new incident.
+      result.duplicate || result.merged ? 200 : 201,
     );
   } catch (error) {
     console.error("Failed to ingest AI event", error);
@@ -154,6 +163,28 @@ app.get("/internal/ai/watchlist", async (c) => {
   } catch (error) {
     console.error("Failed to list the AI watchlist", error);
     return c.json({ error: "Failed to list watchlist" }, 500);
+  }
+});
+
+// Daily Vercel cron (vercel.json): deletes the photos of AI detections
+// dismissed as false alarms past the retention period
+// (services/retention.ts). Vercel authenticates with CRON_SECRET; the
+// internal key also works, for running it by hand.
+app.get("/internal/retention/ai-captures", async (c) => {
+  const bearer = c.req.header("Authorization")?.replace(/^Bearer /, "");
+  if (!matchesSecret(bearer, env.CRON_SECRET) && !isValidInternalApiKey(c.req.header("X-Internal-Api-Key"))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  try {
+    const result = await sweepDismissedAiCaptures(null);
+    return c.json({
+      disposedCount: result.disposedCount,
+      incidentCount: result.incidentCount,
+      cutoff: result.cutoff.toISOString(),
+    });
+  } catch (error) {
+    console.error("AI capture retention sweep failed", error);
+    return c.json({ error: "Retention sweep failed" }, 500);
   }
 });
 

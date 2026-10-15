@@ -45,7 +45,7 @@ interface AiStatus {
     duplicates: number;
     failed: number;
     last_error: string | null;
-    last_result: { event_id: string; caseId?: string; caseNumber?: string } | null;
+    last_result: { event_id: string; caseId?: string | null; caseNumber?: string | null; merged?: boolean } | null;
   };
 }
 
@@ -301,12 +301,12 @@ export default function MonitoringPage() {
                     value={<span className={status.publisher.failed ? "text-error" : undefined}>{status.publisher.failed}</span>}
                   />
                 </div>
-                {lastCase?.caseId && (
+                {lastCase && (
                   <Link
-                    href={`/docket/${lastCase.caseId}`}
+                    href={lastCase.caseId ? `/docket/${lastCase.caseId}` : "/alerts"}
                     className="mt-4 inline-flex items-center gap-1 text-body-sm font-semibold text-primary hover:underline"
                   >
-                    Latest auto-docket {lastCase.caseNumber}
+                    {lastCase.caseId ? `Latest docket ${lastCase.caseNumber}` : "Latest detection: review it in Alerts"}
                     <span className="material-symbols-outlined text-base" aria-hidden="true">
                       arrow_forward
                     </span>

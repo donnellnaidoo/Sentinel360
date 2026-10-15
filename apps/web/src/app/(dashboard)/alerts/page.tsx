@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { queryClient, trpc } from "@/lib/trpc/client";
+
+import { AiReviewPanel, readAiAlert } from "./AiReview";
 
 const ALERT_TYPES = [
   "WANTED_PERSON_SIGHTING",
@@ -25,21 +26,6 @@ const SEVERITY_STYLES: Record<string, { accent: string; badgeBg: string; badgeFg
   MEDIUM: { accent: "border-l-primary-container", badgeBg: "bg-primary-container/20", badgeFg: "text-primary", icon: "info" },
   LOW: { accent: "border-l-outline-variant", badgeBg: "bg-surface-container", badgeFg: "text-on-surface-variant", icon: "notifications" },
 };
-
-// Alerts raised by apps/ai via packages/api/src/services/ai-ingest.ts. Their
-// metadata carries the auto-opened docket and the detection details.
-function readAiAlert(alert: { sourceDomain: string | null; metadata?: unknown }) {
-  if (alert.sourceDomain !== "ai_pipeline") return null;
-  const metadata = (alert.metadata ?? {}) as Record<string, unknown>;
-  return {
-    caseId: typeof metadata.caseId === "string" ? metadata.caseId : null,
-    caseNumber: typeof metadata.caseNumber === "string" ? metadata.caseNumber : null,
-    cameraId: typeof metadata.cameraId === "string" ? metadata.cameraId : null,
-    confidence: typeof metadata.confidence === "number" ? metadata.confidence : null,
-    view: typeof metadata.view === "string" && metadata.view !== "Main" ? metadata.view : null,
-    experimental: metadata.modelStatus === "experimental",
-  };
-}
 
 function getRelativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -194,6 +180,15 @@ export default function AlertsPage() {
                     {ai.confidence !== null && ` · ${Math.round(ai.confidence * 100)}%`}
                   </span>
                 )}
+                {ai && ai.detectionCount > 1 && (
+                  <span
+                    className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-surface-container text-on-surface-variant"
+                    title="Repeat detections of the same thing on this camera are grouped into one alert."
+                  >
+                    Seen {ai.detectionCount} times
+                    {ai.lastDetectedAt && ` · last ${getRelativeTime(ai.lastDetectedAt)}`}
+                  </span>
+                )}
                 {ai?.experimental && (
                   <span
                     className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-tertiary-container/30 text-tertiary"
@@ -202,15 +197,7 @@ export default function AlertsPage() {
                     Experimental model
                   </span>
                 )}
-                {ai?.caseId && (
-                  <Link
-                    href={`/docket/${ai.caseId}`}
-                    className="inline-flex items-center gap-1 text-body-sm font-semibold text-primary hover:underline"
-                  >
-                    Open docket{ai.caseNumber && ` ${ai.caseNumber}`}
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">arrow_forward</span>
-                  </Link>
-                )}
+                {ai && <AiReviewPanel ai={ai} />}
                 {a.expiresAt && (
                   <span className="text-[10px] text-on-surface-variant">
                     Expires {new Date(a.expiresAt).toLocaleString()}

@@ -20,12 +20,19 @@ import {
   verifyEvidenceIntegrity,
 } from "../services/chain-of-custody";
 import { getCaseOrThrow } from "../services/case-access";
+import { DISPOSED_MEDIA_STATUS } from "../services/retention";
 import { recordCaseEvent } from "../services/case-timeline";
 import {
   downloadEvidenceFile,
   getEvidenceSignedUrl,
   uploadEvidenceFile,
 } from "../services/evidence-storage";
+
+const ACCESS_REASON = {
+  DOWNLOAD: "Download URL requested",
+  VIEW_360: "Opened in 360° viewer",
+  AI_REVIEW: "Viewed while reviewing an AI detection",
+} as const;
 
 function pushIf<T>(arr: T[], item: T | undefined): void {
   if (item !== undefined) {
@@ -179,11 +186,15 @@ export const evidenceRouter = router({
     }),
 
   getDownloadUrl: requirePermission("evidence:read")
-    // VIEW_360: the docket's 360° viewer loads the file in the browser —
-    // still an access, so it's logged with its own reason.
-    .input(idSchema.extend({ purpose: z.enum(["DOWNLOAD", "VIEW_360"]).default("DOWNLOAD") }))
+    // VIEW_360: the docket's 360° viewer loads the file in the browser;
+    // AI_REVIEW: a thumbnail on an AI alert an officer is reviewing. Still
+    // accesses, so each is logged with its own reason.
+    .input(idSchema.extend({ purpose: z.enum(["DOWNLOAD", "VIEW_360", "AI_REVIEW"]).default("DOWNLOAD") }))
     .mutation(async ({ ctx, input }) => {
       const evidence = await getEvidenceOrThrow(input.id);
+      if (evidence.status === DISPOSED_MEDIA_STATUS) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "This file was deleted under the retention policy" });
+      }
       const url = await getEvidenceSignedUrl(evidence.storageUrl, 300, input.purpose === "DOWNLOAD");
 
       // Every access must be logged — this is not optional telemetry, it's
@@ -192,7 +203,7 @@ export const evidenceRouter = router({
         evidenceEntityId: evidence.id,
         action: "ACCESSED",
         evidenceHash: evidence.fileHash,
-        reason: input.purpose === "VIEW_360" ? "Opened in 360° viewer" : "Download URL requested",
+        reason: ACCESS_REASON[input.purpose],
         toUserId: ctx.session.user.id,
       });
 

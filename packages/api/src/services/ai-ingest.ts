@@ -1,14 +1,14 @@
 import { db } from "@Sentinel360/db";
 import { alert, notification } from "@Sentinel360/db/schema/alerts";
 import { user } from "@Sentinel360/db/schema/auth";
-import { caseEvidence, caseIncident, incident, investigationCase } from "@Sentinel360/db/schema/cases";
+import { caseEvidence, incident, investigationCase } from "@Sentinel360/db/schema/cases";
 import { mediaAsset } from "@Sentinel360/db/schema/evidence";
 import { role, userRole } from "@Sentinel360/db/schema/rbac";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 
-import { insertCaseWithGeneratedNumber } from "./case-number";
 import { recordCaseEvent } from "./case-timeline";
 import { recordAuditEvent } from "./audit-log";
+import { AI_INCIDENT_STATUS, findIncidentAlert, findLinkedCase, openAiDocket } from "./ai-review";
 import { recordWatchlistSuggestions } from "./ai-watchlist";
 import { EVIDENCE_ENTITY_TYPE, recordCustodyEvent, sha256Hex } from "./chain-of-custody";
 import { deleteEvidenceFile, uploadEvidenceFile } from "./evidence-storage";
@@ -57,28 +57,39 @@ const AI_ALERT_RECIPIENT_ROLE_CODES = [
   "admin",
   "super_admin",
 ];
+// Shown as the alert's audience; deliberately not COMMUNITY or ALL, which
+// alerts.listMine broadcasts to everyone.
+export const AI_ALERT_TARGET_ROLE = "OPERATORS_AND_POLICE";
 
 // FACE: every face in view when the event fired (apps/ai pipeline/faces.py).
 // Detection only — no identity is attached, the crops are just evidence.
 // PANORAMA: the full 360° equirectangular frame from a panoramic camera,
 // shown in the docket's interactive 360° viewer.
-export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE", "PANORAMA"] as const;
+// OBJECT: a close-up of each weapon and person in the frame (apps/ai
+// pipeline/objects.py), described in the same order by metadata.objects
+// ({ label, number, name: "Person 1", view, bbox, confidence }).
+export const AI_MEDIA_KINDS = ["SNAPSHOT", "CROP", "FACE", "PANORAMA", "OBJECT"] as const;
 export type AiMediaKind = (typeof AI_MEDIA_KINDS)[number];
 export const AI_MEDIA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 // Every image base64-encoded (4/3 overhead) plus the JSON envelope must fit
-// Vercel's 4.5 MB request-body cap: 2 x 1.05 MB + 1.4 MB + 5 x 171 KB +
-// 64 KB ~= 4.43 MB. Real snapshots are 10-200 KB; face crops (<= 256 px)
-// ~10-30 KB; apps/ai shrinks a panorama until it fits MAX_AI_PANORAMA_BYTES.
-export const MAX_AI_MEDIA_BYTES = 768 * 1024;
+// Vercel's 4.5 MB request-body cap: 2 x 683 KB + 1.37 MB + 5 x 171 KB +
+// 13 x 53 KB + 64 KB ~= 4.45 MB. Real snapshots are 10-350 KB; face crops
+// (<= 256 px) ~10-30 KB; object crops (<= 320 px) ~10-30 KB; apps/ai
+// shrinks a panorama until it fits MAX_AI_PANORAMA_BYTES.
+export const MAX_AI_MEDIA_BYTES = 512 * 1024;
 export const MAX_AI_PANORAMA_BYTES = 1024 * 1024;
 export const MAX_AI_FACE_BYTES = 128 * 1024;
 // Must stay >= face_max_per_event in apps/ai/app/config.py.
 export const MAX_AI_FACES = 5;
+export const MAX_AI_OBJECT_BYTES = 40 * 1024;
+// Must stay >= object_max_weapons + object_max_people in apps/ai/app/config.py.
+export const MAX_AI_OBJECTS = 13;
 export const AI_MEDIA_LIMITS: Record<AiMediaKind, { maxCount: number; maxBytes: number }> = {
   SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   FACE: { maxCount: MAX_AI_FACES, maxBytes: MAX_AI_FACE_BYTES },
   PANORAMA: { maxCount: 1, maxBytes: MAX_AI_PANORAMA_BYTES },
+  OBJECT: { maxCount: MAX_AI_OBJECTS, maxBytes: MAX_AI_OBJECT_BYTES },
 };
 const AI_EVIDENCE_SOURCE = "AI_PIPELINE";
 
@@ -93,6 +104,7 @@ const MEDIA_TITLE: Record<AiMediaKind, string> = {
   CROP: "AI detection close-up",
   FACE: "AI face capture",
   PANORAMA: "AI 360° panorama",
+  OBJECT: "AI capture",
 };
 
 export interface AiEventMedia {
@@ -115,13 +127,26 @@ export interface AiEventInput {
   media?: AiEventMedia[];
 }
 
+// A repeat of the same event type on the same camera within this window of
+// the incident's last detection is added to that incident instead of
+// raising a new one: one person holding a knife for a minute is one
+// incident with many captures, not a dozen alerts.
+export const AI_INCIDENT_GROUP_WINDOW_MS = 10 * 60 * 1000;
+
+// Raised by a person on purpose, so docketed at once. Model detections wait
+// for an officer to open a docket or dismiss them (services/ai-review.ts).
+export const AI_AUTO_DOCKET_EVENT_TYPES: ReadonlySet<AiEventType> = new Set(["PANIC_BUTTON"]);
+
 export interface AiEventResult {
   incident: typeof incident.$inferSelect;
-  case: typeof investigationCase.$inferSelect;
+  // Null until an officer opens a docket (except auto-docketed event types).
+  case: typeof investigationCase.$inferSelect | null;
   alert: typeof alert.$inferSelect | null;
   evidenceIds: string[];
   // True when eventId had already been ingested — nothing new was written.
   duplicate: boolean;
+  // True when the event was added to an open incident (no new alert).
+  merged: boolean;
 }
 
 async function resolveAiAlertRecipientIds(): Promise<string[]> {
@@ -140,55 +165,62 @@ function incidentNumberFor(eventId: string | undefined): string {
   return `INC-AI-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
-async function findLinkedCase(incidentId: string) {
-  const [link] = await db
-    .select({ caseId: caseIncident.caseId })
-    .from(caseIncident)
-    .where(eq(caseIncident.incidentId, incidentId))
-    .limit(1);
-  if (!link) return null;
-
-  const [linkedCase] = await db
-    .select()
-    .from(investigationCase)
-    .where(eq(investigationCase.id, link.caseId))
-    .limit(1);
-  return linkedCase ?? null;
-}
-
-async function findCaseAlert(caseId: string) {
-  const [found] = await db
-    .select()
-    .from(alert)
-    .where(
-      and(eq(alert.sourceDomain, "ai_pipeline"), eq(alert.sourceEntityType, "CASE"), eq(alert.sourceEntityId, caseId)),
-    )
-    .limit(1);
-  return found ?? null;
-}
-
-async function findCaseEvidenceIds(caseId: string): Promise<string[]> {
-  const links = await db
-    .select({ id: caseEvidence.evidenceEntityId })
-    .from(caseEvidence)
-    .where(and(eq(caseEvidence.caseId, caseId), eq(caseEvidence.evidenceEntityType, EVIDENCE_ENTITY_TYPE)));
-  return links.map((link) => link.id);
+// What one image shows, for its title and filename: "Face 2", or an
+// OBJECT's metadata.objects entry ("Knife 1", "Person 3").
+interface AiMediaLabel {
+  // Stored on the media_asset: { faceNumber } or { objectName, objectLabel }.
+  metadata: Record<string, unknown>;
+  // Appended to the title ("AI face capture 2") or replacing it for objects.
+  title: string;
+  fileSuffix: string;
 }
 
 interface UploadedAiMedia {
   item: AiEventMedia;
-  // 1-based position among FACE items (matches metadata.faces); null otherwise.
-  faceNumber: number | null;
+  label: AiMediaLabel | null;
   fileBytes: Buffer;
   fileHash: string;
   originalFilename: string;
   storagePath: string;
 }
 
+function objectAt(metadata: Record<string, unknown> | undefined, index: number) {
+  const objects = metadata?.objects;
+  const entry = Array.isArray(objects) ? objects[index] : undefined;
+  if (!entry || typeof entry !== "object") return null;
+  const { name, label } = entry as { name?: unknown; label?: unknown };
+  return typeof name === "string" && typeof label === "string" ? { name, label } : null;
+}
+
+// FACE and OBJECT items are numbered in order, matching metadata.faces /
+// metadata.objects; the other kinds have one image each.
+function labelAiMedia(media: AiEventMedia[], metadata: Record<string, unknown> | undefined): (AiMediaLabel | null)[] {
+  let faces = 0;
+  let objects = 0;
+  return media.map((item) => {
+    if (item.kind === "FACE") {
+      faces += 1;
+      return { metadata: { faceNumber: faces }, title: `${MEDIA_TITLE.FACE} ${faces}`, fileSuffix: `-${faces}` };
+    }
+    if (item.kind === "OBJECT") {
+      objects += 1;
+      const object = objectAt(metadata, objects - 1);
+      const name = object?.name ?? `Object ${objects}`;
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      return {
+        metadata: { objectName: name, objectLabel: object?.label ?? null },
+        title: `${MEDIA_TITLE.OBJECT}: ${name}`,
+        fileSuffix: `-${slug || objects}`,
+      };
+    }
+    return null;
+  });
+}
+
 async function uploadAiMedia(
   item: AiEventMedia,
   input: AiEventInput,
-  faceNumber: number | null,
+  label: AiMediaLabel | null,
 ): Promise<UploadedAiMedia> {
   const fileBytes = Buffer.from(item.dataBase64, "base64");
   const { maxBytes } = AI_MEDIA_LIMITS[item.kind];
@@ -197,17 +229,19 @@ async function uploadAiMedia(
   if (fileBytes.length === 0 || fileBytes.length > maxBytes) {
     throw new Error(`${item.kind} is ${fileBytes.length} bytes (max ${maxBytes})`);
   }
-  const suffix = faceNumber === null ? "" : `-${faceNumber}`;
+  const suffix = label?.fileSuffix ?? "";
   const originalFilename = `${input.cameraId}-${input.eventType.toLowerCase()}-${item.kind.toLowerCase()}${suffix}.${MEDIA_EXTENSION[item.mimeType]}`;
   const { storagePath } = await uploadEvidenceFile(fileBytes, originalFilename, item.mimeType);
-  return { item, faceNumber, fileBytes, fileHash: sha256Hex(fileBytes), originalFilename, storagePath };
+  return { item, label, fileBytes, fileHash: sha256Hex(fileBytes), originalFilename, storagePath };
 }
 
 /**
- * Stores each image as a READY media_asset linked to the case, with a
- * chain-of-custody CREATED row and an EVIDENCE_LINKED timeline entry — the
+ * Stores each image as a READY media_asset (metadata.incidentId ties it to
+ * the incident) with a chain-of-custody CREATED row. With a docket, it is
+ * also linked to the case with an EVIDENCE_LINKED timeline entry — the
  * same rows routers/evidence.ts#create writes for a manual upload, so AI
- * evidence is handled identically downstream. Per-item failures are logged
+ * evidence is handled identically downstream. Without one, openAiDocket
+ * links it when an officer opens the docket. Per-item failures are logged
  * and skipped: losing an image must not lose the alert/docket.
  *
  * Storage uploads run in parallel (the slow part against hosted Supabase),
@@ -216,25 +250,24 @@ async function uploadAiMedia(
  * would fork the chain.
  */
 async function attachAiEvidence(
-  caseId: string,
+  caseId: string | null,
   input: AiEventInput,
   incidentId: string,
 ): Promise<string[]> {
   const media = input.media ?? [];
-  let faces = 0;
-  const faceNumbers = media.map((item) => (item.kind === "FACE" ? ++faces : null));
+  const labels = labelAiMedia(media, input.metadata);
   const uploads = await Promise.allSettled(
-    media.map((item, index) => uploadAiMedia(item, input, faceNumbers[index] ?? null)),
+    media.map((item, index) => uploadAiMedia(item, input, labels[index] ?? null)),
   );
   const evidenceIds: string[] = [];
 
   for (const [index, upload] of uploads.entries()) {
     if (upload.status === "rejected") {
-      console.error(`Failed to upload AI ${media[index]?.kind} evidence for case ${caseId}`, upload.reason);
+      console.error(`Failed to upload AI ${media[index]?.kind} evidence for incident ${incidentId}`, upload.reason);
       continue;
     }
-    const { item, faceNumber, fileBytes, fileHash, originalFilename, storagePath } = upload.value;
-    const mediaTitle = faceNumber === null ? MEDIA_TITLE[item.kind] : `${MEDIA_TITLE[item.kind]} ${faceNumber}`;
+    const { item, label, fileBytes, fileHash, originalFilename, storagePath } = upload.value;
+    const mediaTitle = label?.title ?? MEDIA_TITLE[item.kind];
     let recorded = false;
 
     try {
@@ -259,7 +292,7 @@ async function attachAiEvidence(
             confidence: input.confidence,
             incidentId,
             ...input.metadata,
-            ...(faceNumber === null ? {} : { faceNumber }),
+            ...label?.metadata,
           },
           createdByUserId: null,
         })
@@ -278,25 +311,27 @@ async function attachAiEvidence(
         metadata: { eventId: input.eventId, kind: item.kind, source: AI_EVIDENCE_SOURCE },
       });
 
-      await db.insert(caseEvidence).values({
-        caseId,
-        evidenceEntityType: EVIDENCE_ENTITY_TYPE,
-        evidenceEntityId: created.id,
-        relationshipDescription: `${mediaTitle} from AI detection`,
-        createdByUserId: null,
-      });
+      if (caseId) {
+        await db.insert(caseEvidence).values({
+          caseId,
+          evidenceEntityType: EVIDENCE_ENTITY_TYPE,
+          evidenceEntityId: created.id,
+          relationshipDescription: `${mediaTitle} from AI detection`,
+          createdByUserId: null,
+        });
 
-      await recordCaseEvent({
-        caseId,
-        eventType: "EVIDENCE_LINKED",
-        summary: `AI evidence captured: ${created.title} (SHA-256 ${fileHash.slice(0, 12)}…)`,
-        payload: { evidenceId: created.id, fileHash, mimeType: item.mimeType, source: AI_EVIDENCE_SOURCE },
-        actorUserId: null,
-      });
+        await recordCaseEvent({
+          caseId,
+          eventType: "EVIDENCE_LINKED",
+          summary: `AI evidence captured: ${created.title} (SHA-256 ${fileHash.slice(0, 12)}…)`,
+          payload: { evidenceId: created.id, fileHash, mimeType: item.mimeType, source: AI_EVIDENCE_SOURCE },
+          actorUserId: null,
+        });
+      }
 
       evidenceIds.push(created.id);
     } catch (error) {
-      console.error(`Failed to attach AI ${item.kind} evidence to case ${caseId}`, error);
+      console.error(`Failed to attach AI ${item.kind} evidence to incident ${incidentId}`, error);
       if (!recorded) {
         // No media_asset row points at the file, so don't leave it orphaned
         // in the private bucket. Once a row exists the file must stay.
@@ -321,24 +356,158 @@ function describeEvent(input: AiEventInput): string {
   return `Automatically detected by the AI monitoring pipeline on camera ${input.cameraId} (${(input.confidence * 100).toFixed(0)}% confidence).`;
 }
 
+
+function detectionStats(previous: Record<string, unknown>, input: AiEventInput) {
+  const count = typeof previous.detectionCount === "number" ? previous.detectionCount : 1;
+  const maxConfidence = typeof previous.maxConfidence === "number" ? previous.maxConfidence : 0;
+  return {
+    detectionCount: count + 1,
+    lastDetectedAt: input.occurredAt.toISOString(),
+    maxConfidence: Math.max(maxConfidence, input.confidence),
+  };
+}
+
+// An eventId already stored, as its own incident or as a capture merged
+// into another one. Retries must not count or upload it twice.
+async function findIngestedEvent(input: AiEventInput, incidentNumber: string) {
+  const [own] = await db.select().from(incident).where(eq(incident.incidentNumber, incidentNumber)).limit(1);
+  if (own) return own;
+  if (!input.eventId) return null;
+  const [captured] = await db
+    .select({ incidentId: sql<string>`${mediaAsset.metadata}->>'incidentId'` })
+    .from(mediaAsset)
+    .where(sql`${mediaAsset.metadata}->>'eventId' = ${input.eventId}`)
+    .limit(1);
+  if (!captured?.incidentId) return null;
+  const [merged] = await db.select().from(incident).where(eq(incident.id, captured.incidentId)).limit(1);
+  return merged ?? null;
+}
+
+async function eventEvidenceIds(eventId: string | undefined): Promise<string[]> {
+  if (!eventId) return [];
+  const rows = await db
+    .select({ id: mediaAsset.id })
+    .from(mediaAsset)
+    .where(sql`${mediaAsset.metadata}->>'eventId' = ${eventId}`);
+  return rows.map((row) => row.id);
+}
+
+// The incident still collecting detections of this kind on this camera:
+// pending review or already docketed, with a detection inside the window.
+async function findOpenIncident(input: AiEventInput) {
+  const [open] = await db
+    .select()
+    .from(incident)
+    .where(
+      and(
+        eq(incident.sourceDomain, "ai_pipeline"),
+        eq(incident.sourceEntityId, input.cameraId),
+        eq(incident.incidentType, input.eventType),
+        inArray(incident.status, [AI_INCIDENT_STATUS.PENDING_REVIEW, AI_INCIDENT_STATUS.DOCKETED]),
+        gt(incident.updatedAt, new Date(Date.now() - AI_INCIDENT_GROUP_WINDOW_MS)),
+      ),
+    )
+    .orderBy(desc(incident.updatedAt))
+    .limit(1);
+  return open ?? null;
+}
+
 /**
- * Entry point for apps/ai's POST /internal/ai/events. Writes an incident,
- * auto-opens a case (docket) for it, attaches any snapshot/crop images as
- * evidence, and raises an alert with notification fan-out — the same
- * shapes routers/cases.ts#create and routers/alerts.ts#create use for
- * human-initiated actions, so the resulting rows are indistinguishable to
- * the rest of the app. actorUserId is null throughout: there is no Supabase
- * session on this path, only a shared-secret-authenticated service.
+ * Adds a repeat detection to its open incident: new captures, an updated
+ * count on the alert, and no new notifications. If the incident already
+ * has a docket, the captures go straight onto it.
+ */
+async function mergeIntoIncident(open: typeof incident.$inferSelect, input: AiEventInput): Promise<AiEventResult> {
+  const [touched] = await db
+    .update(incident)
+    .set({ updatedAt: new Date() })
+    .where(eq(incident.id, open.id))
+    .returning();
+  const currentAlert = await findIncidentAlert(open.id);
+  let updatedAlert = currentAlert;
+  if (currentAlert) {
+    const metadata = (currentAlert.metadata ?? {}) as Record<string, unknown>;
+    const [updated] = await db
+      .update(alert)
+      .set({ metadata: { ...metadata, ...detectionStats(metadata, input) }, updatedAt: new Date() })
+      .where(eq(alert.id, currentAlert.id))
+      .returning();
+    updatedAlert = updated ?? currentAlert;
+  }
+
+  const linkedCase = await findLinkedCase(open.id);
+  const evidenceIds = await attachAiEvidence(linkedCase?.id ?? null, input, open.id);
+  const watchlistSuggestions = await recordWatchlistSuggestions(open.id, input.metadata);
+
+  await recordAuditEvent({
+    eventType: "ai.event_merged",
+    domain: "ai_pipeline",
+    actorId: null,
+    targetEntityType: "INCIDENT",
+    targetEntityId: open.id,
+    action: "UPDATE",
+    payload: {
+      eventType: input.eventType,
+      eventId: input.eventId,
+      cameraId: input.cameraId,
+      confidence: input.confidence,
+      caseId: linkedCase?.id ?? null,
+      evidenceIds,
+      watchlistSuggestions,
+    },
+  });
+
+  return {
+    incident: touched ?? open,
+    case: linkedCase,
+    alert: updatedAlert ?? null,
+    evidenceIds,
+    duplicate: false,
+    merged: true,
+  };
+}
+
+/**
+ * Entry point for apps/ai's POST /internal/ai/events. A new detection
+ * writes an incident (PENDING_REVIEW), attaches the snapshot/crop images as
+ * evidence, and raises an alert with notification fan-out for an officer to
+ * review: they open a docket or dismiss it (services/ai-review.ts). A
+ * repeat within AI_INCIDENT_GROUP_WINDOW_MS is added to the same incident
+ * instead. A panic press is docketed at once. actorUserId is null
+ * throughout: there is no Supabase session on this path, only a
+ * shared-secret-authenticated service.
  *
- * Retries with the same eventId return the original case instead of
- * opening a second docket. If an earlier attempt died after creating the
- * incident but before linking a case, the retry resumes from there.
+ * Retries with the same eventId return what the first attempt wrote. If an
+ * earlier attempt of an auto-docketed event died before its docket was
+ * opened, the retry opens it.
  */
 export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult> {
   const severity = SEVERITY_BY_EVENT_TYPE[input.eventType];
   const title = input.summary ?? `${input.eventType.replace(/_/g, " ")} — camera ${input.cameraId}`;
   const description = describeEvent(input);
   const incidentNumber = incidentNumberFor(input.eventId);
+  const autoDocket = AI_AUTO_DOCKET_EVENT_TYPES.has(input.eventType);
+
+  const ingested = await findIngestedEvent(input, incidentNumber);
+  if (ingested) {
+    const linkedCase =
+      autoDocket && ingested.incidentNumber === incidentNumber && !(await findLinkedCase(ingested.id))
+        ? (await openAiDocket(ingested.id, null)).case
+        : await findLinkedCase(ingested.id);
+    return {
+      incident: ingested,
+      case: linkedCase,
+      alert: await findIncidentAlert(ingested.id),
+      evidenceIds: await eventEvidenceIds(input.eventId),
+      duplicate: true,
+      merged: ingested.incidentNumber !== incidentNumber,
+    };
+  }
+
+  if (!autoDocket) {
+    const open = await findOpenIncident(input);
+    if (open) return mergeIntoIncident(open, input);
+  }
 
   const [insertedIncident] = await db
     .insert(incident)
@@ -350,7 +519,7 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
       location: input.location ?? {},
       occurredAt: input.occurredAt,
       severity,
-      status: "REPORTED",
+      status: AI_INCIDENT_STATUS.PENDING_REVIEW,
       sourceDomain: "ai_pipeline",
       sourceEntityType: "CAMERA",
       sourceEntityId: input.cameraId,
@@ -358,52 +527,19 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
     })
     .onConflictDoNothing({ target: incident.incidentNumber })
     .returning();
-
-  let createdIncident = insertedIncident;
-  if (!createdIncident) {
+  if (!insertedIncident) {
+    // Lost a race with a concurrent retry of the same eventId.
     const [existing] = await db.select().from(incident).where(eq(incident.incidentNumber, incidentNumber)).limit(1);
-    if (!existing) {
-      throw new Error("Incident was not created");
-    }
-    const existingCase = await findLinkedCase(existing.id);
-    if (existingCase) {
-      return {
-        incident: existing,
-        case: existingCase,
-        alert: await findCaseAlert(existingCase.id),
-        evidenceIds: await findCaseEvidenceIds(existingCase.id),
-        duplicate: true,
-      };
-    }
-    createdIncident = existing;
+    if (!existing) throw new Error("Incident was not created");
+    return {
+      incident: existing,
+      case: await findLinkedCase(existing.id),
+      alert: await findIncidentAlert(existing.id),
+      evidenceIds: [],
+      duplicate: true,
+      merged: false,
+    };
   }
-
-  const createdCase = await insertCaseWithGeneratedNumber({
-    caseType: "AI_GENERATED",
-    title: `Auto-docket: ${title}`,
-    description,
-    priority: severity,
-    assignedToUserId: null,
-    createdByUserId: null,
-  });
-
-  await recordCaseEvent({
-    caseId: createdCase.id,
-    eventType: "CASE_CREATED",
-    summary: `Case ${createdCase.caseNumber} auto-opened by AI pipeline: ${createdCase.title}`,
-    payload: { caseType: createdCase.caseType, priority: createdCase.priority, source: "ai_pipeline" },
-    actorUserId: null,
-  });
-
-  await db.insert(caseIncident).values({ caseId: createdCase.id, incidentId: createdIncident.id }).onConflictDoNothing();
-
-  await recordCaseEvent({
-    caseId: createdCase.id,
-    eventType: "INCIDENT_LINKED",
-    summary: `Incident ${createdIncident.incidentNumber} linked to case`,
-    payload: { incidentId: createdIncident.id },
-    actorUserId: null,
-  });
 
   const [createdAlert] = await db
     .insert(alert)
@@ -413,17 +549,23 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
       message: description,
       severity,
       sourceDomain: "ai_pipeline",
-      sourceEntityType: "CASE",
-      sourceEntityId: createdCase.id,
+      sourceEntityType: "INCIDENT",
+      sourceEntityId: insertedIncident.id,
       location: input.location ?? {},
       metadata: {
-        targetRole: "ALL",
+        // Not a public broadcast: only AI_ALERT_RECIPIENT_ROLE_CODES get it
+        // (notification rows below), and alerts.listMine never shows AI
+        // alerts to the community.
+        targetRole: AI_ALERT_TARGET_ROLE,
         cameraId: input.cameraId,
         confidence: input.confidence,
-        caseId: createdCase.id,
-        caseNumber: createdCase.caseNumber,
-        incidentId: createdIncident.id,
+        incidentId: insertedIncident.id,
         eventId: input.eventId,
+        detectionCount: 1,
+        firstDetectedAt: input.occurredAt.toISOString(),
+        lastDetectedAt: input.occurredAt.toISOString(),
+        maxConfidence: input.confidence,
+        review: autoDocket ? { decision: "AUTO" } : { decision: "PENDING" },
         ...input.metadata,
       },
     })
@@ -450,28 +592,37 @@ export async function ingestAiEvent(input: AiEventInput): Promise<AiEventResult>
   }
 
   // After the alert, not before: operators are notified as soon as the
-  // docket exists, and the images land on it moments later.
-  const evidenceIds = await attachAiEvidence(createdCase.id, input, createdIncident.id);
-  const watchlistSuggestions = await recordWatchlistSuggestions(createdIncident.id, input.metadata);
+  // incident exists, and the images land on it moments later. A panic
+  // press's docket is opened first so its captures go straight onto it.
+  const docket = autoDocket ? (await openAiDocket(insertedIncident.id, null)).case : null;
+  const evidenceIds = await attachAiEvidence(docket?.id ?? null, input, insertedIncident.id);
+  const watchlistSuggestions = await recordWatchlistSuggestions(insertedIncident.id, input.metadata);
 
   await recordAuditEvent({
     eventType: "ai.event_ingested",
     domain: "ai_pipeline",
     actorId: null,
-    targetEntityType: "CASE",
-    targetEntityId: createdCase.id,
+    targetEntityType: "INCIDENT",
+    targetEntityId: insertedIncident.id,
     action: "CREATE",
     payload: {
       eventType: input.eventType,
       eventId: input.eventId,
       cameraId: input.cameraId,
       confidence: input.confidence,
-      incidentId: createdIncident.id,
+      caseId: docket?.id ?? null,
       alertId: createdAlert.id,
       evidenceIds,
       watchlistSuggestions,
     },
   });
 
-  return { incident: createdIncident, case: createdCase, alert: createdAlert, evidenceIds, duplicate: false };
+  return {
+    incident: insertedIncident,
+    case: docket,
+    alert: (await findIncidentAlert(insertedIncident.id)) ?? createdAlert,
+    evidenceIds,
+    duplicate: false,
+    merged: false,
+  };
 }

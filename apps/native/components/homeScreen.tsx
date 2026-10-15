@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CommunityMap from "./communityMap";
 import { useRouter } from "expo-router";
 
 import { AccountAvatarButton } from "@/lib/account-profile";
+import { useRemoteSiren } from "@/lib/remote-siren";
 import { useAppTheme } from "@/contexts/app-theme-context";
 import { regionHeadline, useUserLocation } from "@/contexts/user-location-context";
 import { trpc } from "@/utils/trpc";
@@ -118,6 +120,7 @@ export default function HomeScreen() {
   const { colors } = useAppTheme();
   const { status: locationStatus, place, message: locationMessage } = useUserLocation();
   const regionLabel = regionHeadline(locationStatus, place);
+  const siren = useRemoteSiren();
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.sheetBg }}>
@@ -228,10 +231,43 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {siren.sounding && (
+        <Pressable
+          onPress={siren.stop}
+          accessibilityRole="button"
+          accessibilityLabel="Stop the siren"
+          style={{
+            position: "absolute",
+            right: 84,
+            bottom: 36,
+            backgroundColor: "#dc2626",
+            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "800" }}>
+            {!siren.connected
+              ? "Not connected — check signal"
+              : siren.speakers === 0
+                ? "Panic page isn't open"
+                : "Siren on — tap to stop"}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Tap: report a sighting. Long press: siren on the panic website until stopped. */}
       <Pressable
-        onPress={() => router.push("/(drawer)/(tabs)/report")}
+        onPress={() => (siren.sounding ? siren.stop() : router.push("/(drawer)/(tabs)/report"))}
+        delayLongPress={300}
+        onLongPress={() => {
+          siren.start();
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }}
         accessibilityRole="button"
-        accessibilityLabel="Panic — report a sighting"
+        accessibilityLabel={
+          siren.sounding ? "Stop the siren" : "Panic — tap to report a sighting, hold to sound the siren"
+        }
         style={({ pressed }) => ({
           position: "absolute",
           right: 18,
@@ -248,9 +284,10 @@ export default function HomeScreen() {
           shadowOffset: { width: 0, height: 10 },
           elevation: 8,
           opacity: pressed ? 0.92 : 1,
+          transform: [{ scale: siren.sounding ? 1.12 : 1 }],
         })}
       >
-        <Ionicons name="warning" size={26} color="#fff" />
+        <Ionicons name={siren.sounding ? "megaphone" : "warning"} size={26} color="#fff" />
       </Pressable>
     </SafeAreaView>
   );

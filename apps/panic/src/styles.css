@@ -46,6 +46,10 @@ body,
   background: #2a1206;
 }
 
+.screen--siren {
+  animation: siren-flash 0.9s steps(1) infinite;
+}
+
 .topbar {
   width: 100%;
   display: flex;
@@ -169,8 +173,15 @@ body,
   }
 }
 
+@keyframes siren-flash {
+  50% {
+    background: #3a0a10;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .panic {
+  .panic,
+  .screen--siren {
     animation: none;
   }
 }

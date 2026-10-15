@@ -44,6 +44,8 @@ def build_payload(event: DetectionEvent, location: dict[str, Any] | None = None)
         media.append({"kind": "CROP", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(event.crop_jpeg).decode()})
     for face in event.face_jpegs:
         media.append({"kind": "FACE", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(face).decode()})
+    for crop in event.object_jpegs:
+        media.append({"kind": "OBJECT", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(crop).decode()})
     if event.panorama_jpeg:
         media.append({"kind": "PANORAMA", "mimeType": "image/jpeg", "dataBase64": base64.b64encode(event.panorama_jpeg).decode()})
 
@@ -201,12 +203,15 @@ class EventPublisher:
                 self.duplicates += 1
             else:
                 self.sent += 1
+            # Detections wait for an officer to open a docket (caseNumber
+            # null); repeats on this camera join the open incident (merged).
             logger.info(
-                "Published %s %s -> case %s (%d evidence item(s))%s",
+                "Published %s %s -> %s (%d evidence item(s))%s%s",
                 event.event_type,
                 event.event_id,
-                result.get("caseNumber"),
+                f"case {result['caseNumber']}" if result.get("caseNumber") else "incident, awaiting review",
                 len(result.get("evidenceIds") or []),
+                " [added to open incident]" if result.get("merged") else "",
                 " [duplicate]" if result.get("duplicate") else "",
             )
             return True

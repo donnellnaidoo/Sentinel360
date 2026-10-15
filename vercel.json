@@ -10,6 +10,7 @@
       "entrypoint": "src/index.ts"
     }
   },
+  "crons": [{ "path": "/internal/retention/ai-captures", "schedule": "0 1 * * *" }],
   "rewrites": [
     { "source": "/trpc/(.*)", "destination": { "service": "api" } },
     { "source": "/internal/(.*)", "destination": { "service": "api" } },

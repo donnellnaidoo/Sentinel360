@@ -13,6 +13,9 @@ export const env = createEnv({
     // posting detection events to POST /internal/ai/events. Not a user
     // credential — there is no Supabase session on that request path.
     AI_SERVICE_API_KEY: z.string().min(1),
+    // Vercel sends it as "Authorization: Bearer ..." on cron requests
+    // (vercel.json crons). Unset = crons are refused.
+    CRON_SECRET: z.string().min(16).optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().optional(),
     SMTP_USER: z.string().optional(),

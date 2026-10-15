@@ -86,9 +86,10 @@ async function ensureBucketExists(): Promise<void> {
 
 //Delete/Cleanup helper
 
+// True if the file is gone. Failures are logged, not thrown.
 export async function deleteEvidenceFile(
   storagePath: string,
-): Promise<void> {
+): Promise<boolean> {
   const { error } = await supabaseAdmin.storage
     .from(EVIDENCE_BUCKET)
     .remove([storagePath]);
@@ -100,7 +101,9 @@ export async function deleteEvidenceFile(
       storagePath,
       error,
     );
+    return false;
   }
+  return true;
 }
 
 

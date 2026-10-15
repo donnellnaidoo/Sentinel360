@@ -8,14 +8,16 @@ process.env.AI_SERVICE_API_KEY = API_KEY;
 process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 process.env.CORS_ORIGIN ??= "http://localhost:3001";
 
-const MAX_AI_MEDIA_BYTES = 768 * 1024;
+const MAX_AI_MEDIA_BYTES = 512 * 1024;
 const MAX_AI_FACE_BYTES = 128 * 1024;
 const MAX_AI_PANORAMA_BYTES = 1024 * 1024;
+const MAX_AI_OBJECT_BYTES = 40 * 1024;
 const AI_MEDIA_LIMITS = {
   SNAPSHOT: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   CROP: { maxCount: 1, maxBytes: MAX_AI_MEDIA_BYTES },
   FACE: { maxCount: 5, maxBytes: MAX_AI_FACE_BYTES },
   PANORAMA: { maxCount: 1, maxBytes: MAX_AI_PANORAMA_BYTES },
+  OBJECT: { maxCount: 13, maxBytes: MAX_AI_OBJECT_BYTES },
 };
 const base64Length = (bytes: number) => Math.ceil(bytes / 3) * 4;
 let ingestResult: Record<string, unknown> = {};
@@ -23,7 +25,7 @@ const ingestAiEvent = mock(async (_input: unknown) => ingestResult);
 
 mock.module("@Sentinel360/api/services/ai-ingest", () => ({
   AI_EVENT_TYPES: ["WEAPON_DETECTED", "ANOMALY_DETECTED", "PANIC_BUTTON", "ALTERCATION", "WATCHLIST_MATCH", "PLATE_MATCH"],
-  AI_MEDIA_KINDS: ["SNAPSHOT", "CROP", "FACE", "PANORAMA"],
+  AI_MEDIA_KINDS: ["SNAPSHOT", "CROP", "FACE", "PANORAMA", "OBJECT"],
   AI_MEDIA_LIMITS,
   AI_MEDIA_MIME_TYPES: ["image/jpeg", "image/png", "image/webp"],
   ingestAiEvent,
@@ -32,6 +34,21 @@ mock.module("@Sentinel360/api/services/ai-ingest", () => ({
 let watchlistItems: unknown[] = [];
 const listAiWatchlist = mock(async () => watchlistItems);
 mock.module("@Sentinel360/api/services/ai-watchlist", () => ({ listAiWatchlist }));
+
+const sweepDismissedAiCaptures = mock(async (_actor: unknown) => ({
+  disposedEvidenceIds: ["media-1"],
+  disposedCount: 1,
+  incidentCount: 1,
+  cutoff: new Date("2026-09-14T00:00:00Z"),
+}));
+mock.module("@Sentinel360/api/services/retention", () => ({
+  sweepDismissedAiCaptures,
+  sweepCaseRetention: mock(async () => ({})),
+  AI_DISMISSED_RETENTION_DAYS: 30,
+  DISPOSED_MEDIA_STATUS: "DISPOSED",
+}));
+const CRON_SECRET = "test-cron-secret-0123456789";
+process.env.CRON_SECRET = CRON_SECRET;
 
 const { default: app } = await import("./index");
 
@@ -61,13 +78,14 @@ function event(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function created(duplicate: boolean) {
+function created(duplicate: boolean, options: { merged?: boolean; docketed?: boolean } = {}) {
   return {
     incident: { id: "incident-1" },
-    case: { id: "case-1", caseNumber: "S360-2026-00001" },
+    case: options.docketed ? { id: "case-1", caseNumber: "S360-2026-00001" } : null,
     alert: { id: "alert-1" },
     evidenceIds: ["media-1"],
     duplicate,
+    merged: options.merged ?? false,
   };
 }
 
@@ -83,21 +101,36 @@ describe("POST /internal/ai/events", () => {
     expect(ingestAiEvent).not.toHaveBeenCalled();
   });
 
-  it("returns 201 with the docket and evidence ids", async () => {
+  it("returns 201 with the incident and evidence ids, and no docket until an officer opens one", async () => {
     const response = await post(event());
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({
       incidentId: "incident-1",
-      caseId: "case-1",
-      caseNumber: "S360-2026-00001",
+      caseId: null,
+      caseNumber: null,
       alertId: "alert-1",
       evidenceIds: ["media-1"],
       duplicate: false,
+      merged: false,
     });
 
     const input = ingestAiEvent.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(input.eventId).toBe(EVENT_ID);
     expect(input.occurredAt).toBeInstanceOf(Date);
+  });
+
+  it("returns the docket of an auto-docketed event", async () => {
+    ingestResult = created(false, { docketed: true });
+    const body = (await (await post(event({ eventType: "PANIC_BUTTON", confidence: 1 }))).json()) as Record<string, unknown>;
+    expect(body.caseId).toBe("case-1");
+    expect(body.caseNumber).toBe("S360-2026-00001");
+  });
+
+  it("returns 200 for a repeat added to an open incident", async () => {
+    ingestResult = created(false, { merged: true });
+    const response = await post(event());
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { merged: boolean }).merged).toBe(true);
   });
 
   it("returns 200 for a retried eventId", async () => {
@@ -129,20 +162,25 @@ describe("POST /internal/ai/events", () => {
       "more than five faces",
       { media: Array.from({ length: 6 }, () => ({ kind: "FACE", mimeType: "image/jpeg", dataBase64: "AA" })) },
     ],
+    [
+      "more than thirteen objects",
+      { media: Array.from({ length: 14 }, () => ({ kind: "OBJECT", mimeType: "image/jpeg", dataBase64: "AA" })) },
+    ],
   ])("rejects %s with 400", async (_name, overrides) => {
     expect((await post(event(overrides))).status).toBe(400);
     expect(ingestAiEvent).not.toHaveBeenCalled();
   });
 
-  it("accepts a snapshot, a crop, five faces and a panorama", async () => {
+  it("accepts a snapshot, a crop, five faces, a panorama and thirteen objects", async () => {
     const media = [
       { kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
       { kind: "CROP", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
       ...Array.from({ length: 5 }, () => ({ kind: "FACE", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" })),
       { kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" },
+      ...Array.from({ length: 13 }, () => ({ kind: "OBJECT", mimeType: "image/jpeg", dataBase64: "/9j/4AAQ" })),
     ];
     expect((await post(event({ media }))).status).toBe(201);
-    expect((ingestAiEvent.mock.calls[0]?.[0] as { media: unknown[] }).media).toHaveLength(8);
+    expect((ingestAiEvent.mock.calls[0]?.[0] as { media: unknown[] }).media).toHaveLength(21);
   });
 
   it("keeps the largest valid body under Vercel's 4.5 MB request cap", async () => {
@@ -155,13 +193,18 @@ describe("POST /internal/ai/events", () => {
         dataBase64: "A".repeat(base64Length(MAX_AI_FACE_BYTES)),
       })),
       { kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: "A".repeat(base64Length(MAX_AI_PANORAMA_BYTES)) },
+      ...Array.from({ length: 13 }, () => ({
+        kind: "OBJECT",
+        mimeType: "image/jpeg",
+        dataBase64: "A".repeat(base64Length(MAX_AI_OBJECT_BYTES)),
+      })),
     ];
     const body = JSON.stringify(event({ media }));
     expect(body.length).toBeLessThan(4.5 * 1024 * 1024);
     expect((await post(body)).status).toBe(201);
   });
 
-  it("rejects a snapshot over 768 KB with 400", async () => {
+  it("rejects a snapshot over 512 KB with 400", async () => {
     const tooBig = "A".repeat(base64Length(MAX_AI_MEDIA_BYTES) + 4);
     const response = await post(event({ media: [{ kind: "SNAPSHOT", mimeType: "image/jpeg", dataBase64: tooBig }] }));
     expect(response.status).toBe(400);
@@ -170,6 +213,12 @@ describe("POST /internal/ai/events", () => {
   it("rejects a panorama over 1 MB with 400", async () => {
     const tooBig = "A".repeat(base64Length(MAX_AI_PANORAMA_BYTES) + 4);
     const response = await post(event({ media: [{ kind: "PANORAMA", mimeType: "image/jpeg", dataBase64: tooBig }] }));
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects an object close-up over 40 KB with 400", async () => {
+    const tooBig = "A".repeat(base64Length(MAX_AI_OBJECT_BYTES) + 4);
+    const response = await post(event({ media: [{ kind: "OBJECT", mimeType: "image/jpeg", dataBase64: tooBig }] }));
     expect(response.status).toBe(400);
   });
 
@@ -236,5 +285,26 @@ describe("GET /internal/ai/watchlist", () => {
     const res = await get();
     console.error = spy;
     expect(res.status).toBe(500);
+  });
+});
+
+describe("GET /internal/retention/ai-captures", () => {
+  const sweep = (headers: Record<string, string>) =>
+    app.request("/internal/retention/ai-captures", { headers });
+
+  it("refuses requests without the cron secret or the internal key", async () => {
+    sweepDismissedAiCaptures.mockClear();
+    expect((await sweep({})).status).toBe(401);
+    expect((await sweep({ Authorization: "Bearer wrong" })).status).toBe(401);
+    expect(sweepDismissedAiCaptures).not.toHaveBeenCalled();
+  });
+
+  it("runs the sweep for Vercel cron or the internal key", async () => {
+    sweepDismissedAiCaptures.mockClear();
+    const response = await sweep({ Authorization: `Bearer ${CRON_SECRET}` });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ disposedCount: 1, incidentCount: 1, cutoff: "2026-09-14T00:00:00.000Z" });
+    expect((await sweep({ "X-Internal-Api-Key": API_KEY })).status).toBe(200);
+    expect(sweepDismissedAiCaptures).toHaveBeenCalledTimes(2);
   });
 });

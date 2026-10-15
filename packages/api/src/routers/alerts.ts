@@ -3,12 +3,28 @@ import { alert, alertAcknowledgment, notification } from "@Sentinel360/db/schema
 import { user } from "@Sentinel360/db/schema/auth";
 import { role, userRole } from "@Sentinel360/db/schema/rbac";
 import { TRPCError } from "@trpc/server";
-import { and, count, desc, eq, getTableColumns, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import { protectedProcedure, requirePermission, router } from "../index";
 import { acknowledgeAlertSchema, alertListSchema, createAlertSchema } from "../validators";
 import { recordAuditEvent } from "../services/audit-log";
+import { AiReviewError, dismissAiIncident, getAiIncidentReview, openAiDocket } from "../services/ai-review";
 import { z } from "zod";
+
+const aiIncidentIdSchema = z.object({ incidentId: z.string().uuid() });
+
+// services/ai-review.ts throws plain errors (it also runs on the ingest
+// path, outside tRPC); map them to tRPC codes here.
+async function asTrpc<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof AiReviewError) {
+      throw new TRPCError({ code: error.code, message: error.message });
+    }
+    throw error;
+  }
+}
 
 
 // alert has no target-role column — recipiency is realized as explicit
@@ -289,6 +305,10 @@ export const alertsRouter = router({
           eq(alert.status, "ACTIVE"),
           or(isNull(alert.expiresAt), gt(alert.expiresAt, now)),
           sql`(${alert.metadata}->>'targetRole') IN ('COMMUNITY', 'ALL')`,
+          // AI detections are unverified and go to operators/police only
+          // (their notification rows); older ones were stored as targetRole
+          // ALL, so they're excluded by source, not just by role.
+          or(isNull(alert.sourceDomain), ne(alert.sourceDomain, "ai_pipeline")),
         ),
       )
       .orderBy(desc(alert.createdAt));
@@ -378,6 +398,23 @@ export const alertsRouter = router({
 
       return withPublicShape(created);
     }),
+
+  // AI detections waiting for an officer (services/ai-review.ts). The
+  // images themselves are opened through evidence.getDownloadUrl, which
+  // logs each access to the chain of custody.
+  aiIncident: requirePermission("alerts:read")
+    .input(aiIncidentIdSchema)
+    .query(({ input }) => asTrpc(() => getAiIncidentReview(input.incidentId))),
+
+  openAiDocket: requirePermission("cases:create")
+    .input(aiIncidentIdSchema)
+    .mutation(({ ctx, input }) => asTrpc(() => openAiDocket(input.incidentId, ctx.session.user.id))),
+
+  dismissAiIncident: requirePermission("alerts:manage")
+    .input(aiIncidentIdSchema.extend({ reason: z.string().trim().max(500).optional() }))
+    .mutation(({ ctx, input }) =>
+      asTrpc(() => dismissAiIncident(input.incidentId, ctx.session.user.id, input.reason || undefined)),
+    ),
 
   acknowledge: protectedProcedure
     .input(acknowledgeAlertSchema)

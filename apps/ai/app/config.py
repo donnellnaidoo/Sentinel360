@@ -100,6 +100,20 @@ class Settings(BaseSettings):
     # Keeps each crop well under the backend's per-face size cap.
     face_crop_max_side: int = 256
 
+    # Close-ups of every weapon and person in the alarm frame, attached to
+    # the docket as "Knife 1", "Person 1", ... (pipeline/objects.py). People
+    # include bystanders. Counts must stay <= MAX_AI_OBJECTS (13) and
+    # object_crop_max_bytes <= MAX_AI_OBJECT_BYTES (40 KB) in
+    # packages/api/src/services/ai-ingest.ts.
+    object_evidence_enabled: bool = True
+    object_max_weapons: int = 3
+    object_max_people: int = 10
+    # Weapons need knife_alarm_confidence; people this.
+    object_person_confidence: float = 0.40
+    object_crop_padding: float = 0.10
+    object_crop_max_side: int = 320
+    object_crop_max_bytes: int = 40 * 1024
+
     # Full 360° frame attached to every event from a panoramic source, for
     # the docket's 360° viewer. Shrunk until it fits the byte cap, which must
     # stay <= MAX_AI_PANORAMA_BYTES in packages/api/src/services/ai-ingest.ts.
@@ -107,9 +121,9 @@ class Settings(BaseSettings):
     panorama_max_width: int = 3840
     panorama_max_bytes: int = 1000 * 1024
     # Snapshots and close-ups are re-encoded smaller if needed to stay
-    # under this; must stay <= MAX_AI_MEDIA_BYTES (768 KB) in ai-ingest.ts,
+    # under this; must stay <= MAX_AI_MEDIA_BYTES (512 KB) in ai-ingest.ts,
     # which rejects the whole event over one oversized image.
-    evidence_image_max_bytes: int = 760 * 1024
+    evidence_image_max_bytes: int = 504 * 1024
 
     # Watchlist face matching (pipeline/watchlist.py). OFF by default:
     # biometric matching against wanted persons needs a POPIA basis. A

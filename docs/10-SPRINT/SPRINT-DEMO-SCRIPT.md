@@ -131,4 +131,4 @@ everything is finished:
 - SAPS docket format alignment is explicitly not attempted — it needs the real SAPS CMS
   integration spec, which isn't publicly available, so we didn't guess at it.
 
-Full detail: `INVESTIGATION-PROCESS-REVIEW.md` at the repo root.
+Full detail: `docs/00-INVESTIGATION-MAP/08-INVESTIGATION-PROCESS-REVIEW.md`.

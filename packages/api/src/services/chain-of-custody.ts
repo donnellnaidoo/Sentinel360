@@ -12,7 +12,9 @@ export function sha256Hex(data: Buffer): string {
 
 export interface RecordCustodyEventInput {
   evidenceEntityId: string;
-  action: "CREATED" | "ACCESSED" | "TRANSFERRED" | "VERIFIED" | "EXPORTED" | "ANALYZED";
+  // DISPOSED: the file was deleted under the retention policy (the row and
+  // its hash stay, so the ledger still accounts for it).
+  action: "CREATED" | "ACCESSED" | "TRANSFERRED" | "VERIFIED" | "EXPORTED" | "ANALYZED" | "DISPOSED";
   evidenceHash: string;
   reason: string;
   fromUserId?: string | null;
